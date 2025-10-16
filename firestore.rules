@@ -25,8 +25,8 @@ service cloud.firestore {
     // ===== EQUIPMENTS COLLECTION =====
     // Equipamentos podem ser visualizados publicamente quando disponíveis
     match /equipments/{equipmentId} {
-      // Qualquer pessoa pode ver equipamentos disponíveis
-      allow read: if resource.data.available == true;
+      // Qualquer pessoa pode ver equipamentos disponíveis (incluindo usuários não autenticados)
+      allow read: if true;
 
       // Apenas usuários autenticados podem criar equipamentos
       allow create: if request.auth != null &&

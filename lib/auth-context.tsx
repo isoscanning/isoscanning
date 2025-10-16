@@ -22,6 +22,10 @@ import {
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
+// Type assertions to ensure Firebase services are properly initialized
+const firebaseAuth = auth!;
+const firestore = db!;
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -76,7 +80,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Configurar persistência local do Firebase
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setPersistence(auth, browserLocalPersistence).catch((error) => {
+      setPersistence(firebaseAuth, browserLocalPersistence).catch((error) => {
         console.error("❌ Erro ao configurar persistência:", error);
       });
     }
@@ -84,60 +88,63 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Monitorar mudanças de autenticação
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
+    const unsubscribe = onAuthStateChanged(
+      firebaseAuth,
+      async (firebaseUser) => {
+        setUser(firebaseUser);
 
-      if (firebaseUser) {
-        try {
-          // Buscar perfil do usuário no Firestore
-          const userDocRef = doc(db, "users", firebaseUser.uid);
-          const userDoc = await getDoc(userDocRef);
+        if (firebaseUser) {
+          try {
+            // Buscar perfil do usuário no Firestore
+            const userDocRef = doc(firestore, "users", firebaseUser.uid);
+            const userDoc = await getDoc(userDocRef);
 
-          if (userDoc.exists()) {
-            const profileData = userDoc.data();
-            setUserProfile({
-              ...profileData,
-              createdAt: profileData.createdAt?.toDate() || new Date(),
-              updatedAt: profileData.updatedAt?.toDate() || new Date(),
-            } as UserProfile);
-          } else {
-            // Criar perfil básico se não existir
-            const basicProfile: UserProfile = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email || "",
-              displayName:
-                firebaseUser.displayName ||
-                firebaseUser.email?.split("@")[0] ||
-                "Usuário",
-              userType: "client", // padrão
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            };
+            if (userDoc.exists()) {
+              const profileData = userDoc.data();
+              setUserProfile({
+                ...profileData,
+                createdAt: profileData.createdAt?.toDate() || new Date(),
+                updatedAt: profileData.updatedAt?.toDate() || new Date(),
+              } as UserProfile);
+            } else {
+              // Criar perfil básico se não existir
+              const basicProfile: UserProfile = {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email || "",
+                displayName:
+                  firebaseUser.displayName ||
+                  firebaseUser.email?.split("@")[0] ||
+                  "Usuário",
+                userType: "client", // padrão
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              };
 
-            await setDoc(userDocRef, {
-              ...basicProfile,
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            });
+              await setDoc(userDocRef, {
+                ...basicProfile,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+              });
 
-            setUserProfile(basicProfile);
+              setUserProfile(basicProfile);
+            }
+          } catch (error) {
+            console.error("❌ Erro ao buscar perfil do usuário:", error);
+            setUserProfile(null);
           }
-        } catch (error) {
-          console.error("❌ Erro ao buscar perfil do usuário:", error);
+        } else {
           setUserProfile(null);
         }
-      } else {
-        setUserProfile(null);
-      }
 
-      setLoading(false);
-    });
+        setLoading(false);
+      }
+    );
 
     return () => unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    await signInWithEmailAndPassword(firebaseAuth, email, password);
   };
 
   const signInWithGoogle = async () => {
@@ -145,7 +152,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     provider.setCustomParameters({
       prompt: "select_account",
     });
-    await signInWithPopup(auth, provider);
+    await signInWithPopup(firebaseAuth, provider);
   };
 
   const signUp = async (
@@ -154,7 +161,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     userData: Partial<UserProfile>
   ) => {
     const userCredential = await createUserWithEmailAndPassword(
-      auth,
+      firebaseAuth,
       email,
       password
     );
@@ -176,7 +183,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       updatedAt: new Date(),
     };
 
-    await setDoc(doc(db, "users", user.uid), {
+    await setDoc(doc(firestore, "users", user.uid), {
       ...profileData,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -184,7 +191,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const signOut = async () => {
-    await firebaseSignOut(auth);
+    await firebaseSignOut(firebaseAuth);
     // Limpar URL de redirecionamento do localStorage
     if (typeof window !== "undefined") {
       localStorage.removeItem("redirectAfterLogin");
@@ -192,7 +199,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const resetPassword = async (email: string) => {
-    await sendPasswordResetEmail(auth, email);
+    await sendPasswordResetEmail(firebaseAuth, email);
   };
 
   const getRedirectUrl = (): string | null => {
@@ -203,7 +210,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!user) throw new Error("Usuário não autenticado");
 
-    const userDocRef = doc(db, "users", user.uid);
+    const userDocRef = doc(firestore, "users", user.uid);
     await setDoc(
       userDocRef,
       {

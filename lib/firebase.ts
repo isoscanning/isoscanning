@@ -26,10 +26,10 @@ export const FIREBASE_ENABLED =
   firebaseConfig.appId;
 
 // Initialize Firebase services
-let app: FirebaseApp | undefined;
-let auth: Auth | undefined;
-let db: Firestore | undefined;
-let storage: FirebaseStorage | undefined;
+let app: FirebaseApp;
+let auth: Auth;
+let db: Firestore;
+let storage: FirebaseStorage;
 let analytics: Analytics | undefined;
 
 if (FIREBASE_ENABLED) {
@@ -46,15 +46,21 @@ if (FIREBASE_ENABLED) {
     if (typeof window !== "undefined") {
       isSupported().then((supported) => {
         if (supported && firebaseConfig.measurementId) {
-          analytics = getAnalytics(app!);
+          analytics = getAnalytics(app);
         }
       });
     }
   } catch (error) {
     console.error("❌ Error initializing Firebase:", error);
+    throw new Error(
+      "Failed to initialize Firebase. Please check your configuration."
+    );
   }
 } else {
   console.warn("⚠️ Firebase not initialized - missing environment variables");
+  throw new Error(
+    "Firebase configuration is incomplete. Please check your environment variables."
+  );
 }
 
 export { app, auth, db, storage, analytics };

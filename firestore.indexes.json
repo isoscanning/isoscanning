@@ -1,0 +1,169 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userType",
+          "order": "ASC"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESC"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "uid",
+          "order": "ASC"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "equipments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "available",
+          "order": "ASC"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESC"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "equipments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "ownerId",
+          "order": "ASC"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESC"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "equipments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "category",
+          "order": "ASC"
+        },
+        {
+          "fieldPath": "available",
+          "order": "ASC"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESC"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "bookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "clientId",
+          "order": "ASC"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESC"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "bookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "professionalId",
+          "order": "ASC"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESC"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "bookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "date",
+          "order": "ASC"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "availabilities",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "professionalId",
+          "order": "ASC"
+        },
+        {
+          "fieldPath": "date",
+          "order": "ASC"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "reviews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "professionalId",
+          "order": "ASC"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESC"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "service_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "clientId",
+          "order": "ASC"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESC"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "service_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "professionalId",
+          "order": "ASC"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESC"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

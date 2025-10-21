@@ -1,0 +1,5 @@
+export const AVAILABILITY_REPOSITORY = Symbol("AVAILABILITY_REPOSITORY");
+
+
+
+

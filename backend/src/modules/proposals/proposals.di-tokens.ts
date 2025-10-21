@@ -1,0 +1,5 @@
+export const PROPOSALS_REPOSITORY = Symbol("PROPOSALS_REPOSITORY");
+
+
+
+

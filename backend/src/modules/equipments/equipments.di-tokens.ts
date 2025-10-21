@@ -1,0 +1,5 @@
+export const EQUIPMENTS_REPOSITORY = Symbol("EQUIPMENTS_REPOSITORY");
+
+
+
+

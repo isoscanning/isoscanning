@@ -1,18 +1,24 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useAuth } from "@/lib/auth-context"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Plus, Trash2, Upload } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, Trash2, Upload } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function PortfolioPage() {
-  const { user } = useAuth()
-  const router = useRouter()
+  const { userProfile } = useAuth();
+  const router = useRouter();
   const [portfolioItems, setPortfolioItems] = useState([
     {
       id: "1",
@@ -21,12 +27,12 @@ export default function PortfolioPage() {
       images: ["/beach-wedding-photography.jpg"],
       category: "Casamentos",
     },
-  ])
+  ]);
   const [newItem, setNewItem] = useState({
     title: "",
     description: "",
     category: "",
-  })
+  });
 
   const handleAddItem = () => {
     if (newItem.title && newItem.description) {
@@ -37,25 +43,27 @@ export default function PortfolioPage() {
           ...newItem,
           images: ["/portfolio-photography.jpg"],
         },
-      ])
-      setNewItem({ title: "", description: "", category: "" })
+      ]);
+      setNewItem({ title: "", description: "", category: "" });
     }
-  }
+  };
 
   const handleDeleteItem = (id: string) => {
-    setPortfolioItems(portfolioItems.filter((item) => item.id !== id))
-  }
+    setPortfolioItems(portfolioItems.filter((item) => item.id !== id));
+  };
 
-  if (!user) {
-    router.push("/login")
-    return null
+  if (!userProfile) {
+    router.push("/login");
+    return null;
   }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Meu Portfólio</h1>
-        <p className="text-muted-foreground">Adicione seus melhores trabalhos para atrair mais clientes</p>
+        <p className="text-muted-foreground">
+          Adicione seus melhores trabalhos para atrair mais clientes
+        </p>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
@@ -66,7 +74,9 @@ export default function PortfolioPage() {
               <Plus className="h-5 w-5" />
               Adicionar ao Portfólio
             </CardTitle>
-            <CardDescription>Compartilhe seus melhores trabalhos</CardDescription>
+            <CardDescription>
+              Compartilhe seus melhores trabalhos
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -75,7 +85,9 @@ export default function PortfolioPage() {
                 id="title"
                 placeholder="Ex: Casamento na Praia"
                 value={newItem.title}
-                onChange={(e) => setNewItem({ ...newItem, title: e.target.value })}
+                onChange={(e) =>
+                  setNewItem({ ...newItem, title: e.target.value })
+                }
               />
             </div>
 
@@ -85,7 +97,9 @@ export default function PortfolioPage() {
                 id="category"
                 placeholder="Ex: Casamentos, Eventos, Retratos"
                 value={newItem.category}
-                onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
+                onChange={(e) =>
+                  setNewItem({ ...newItem, category: e.target.value })
+                }
               />
             </div>
 
@@ -96,7 +110,9 @@ export default function PortfolioPage() {
                 placeholder="Descreva o projeto, técnicas utilizadas, etc."
                 rows={4}
                 value={newItem.description}
-                onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+                onChange={(e) =>
+                  setNewItem({ ...newItem, description: e.target.value })
+                }
               />
             </div>
 
@@ -104,8 +120,12 @@ export default function PortfolioPage() {
               <Label>Imagens</Label>
               <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer">
                 <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Clique para fazer upload ou arraste as imagens</p>
-                <p className="text-xs text-muted-foreground mt-1">PNG, JPG até 10MB</p>
+                <p className="text-sm text-muted-foreground">
+                  Clique para fazer upload ou arraste as imagens
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  PNG, JPG até 10MB
+                </p>
               </div>
             </div>
 
@@ -121,7 +141,9 @@ export default function PortfolioPage() {
           {portfolioItems.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <p className="text-muted-foreground">Nenhum trabalho adicionado ainda</p>
+                <p className="text-muted-foreground">
+                  Nenhum trabalho adicionado ainda
+                </p>
               </CardContent>
             </Card>
           ) : (
@@ -138,13 +160,21 @@ export default function PortfolioPage() {
                       <div className="flex items-start justify-between mb-2">
                         <div>
                           <h3 className="font-semibold">{item.title}</h3>
-                          <p className="text-sm text-muted-foreground">{item.category}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {item.category}
+                          </p>
                         </div>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteItem(item.id)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteItem(item.id)}
+                        >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
-                      <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {item.description}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -154,5 +184,5 @@ export default function PortfolioPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

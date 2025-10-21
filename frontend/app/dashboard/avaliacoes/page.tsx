@@ -1,20 +1,27 @@
-"use client"
+"use client";
 
-import { useAuth } from "@/lib/auth-context"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Star, TrendingUp, Users, Award } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useAuth } from "@/lib/auth-context";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Star, TrendingUp, Users, Award } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function AvaliacoesPage() {
-  const { user } = useAuth()
-  const router = useRouter()
+  const { userProfile } = useAuth();
+  const router = useRouter();
 
   const reviews = [
     {
       id: "1",
       clientName: "Maria Silva",
       rating: 5,
-      comment: "Excelente profissional! Superou todas as expectativas no casamento.",
+      comment:
+        "Excelente profissional! Superou todas as expectativas no casamento.",
       service: "Fotografia de Casamento",
       date: "2024-01-15",
     },
@@ -34,7 +41,7 @@ export default function AvaliacoesPage() {
       service: "Cobertura de Evento",
       date: "2024-01-05",
     },
-  ]
+  ];
 
   const stats = {
     averageRating: 4.8,
@@ -44,25 +51,29 @@ export default function AvaliacoesPage() {
     threeStars: 1,
     twoStars: 0,
     oneStars: 0,
-  }
+  };
 
-  if (!user) {
-    router.push("/login")
-    return null
+  if (!userProfile) {
+    router.push("/login");
+    return null;
   }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Minhas Avaliações</h1>
-        <p className="text-muted-foreground">Veja o que seus clientes estão dizendo sobre você</p>
+        <p className="text-muted-foreground">
+          Veja o que seus clientes estão dizendo sobre você
+        </p>
       </div>
 
       {/* Estatísticas */}
       <div className="grid gap-4 md:grid-cols-4 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avaliação Média</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Avaliação Média
+            </CardTitle>
             <Star className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -72,7 +83,9 @@ export default function AvaliacoesPage() {
                 <Star
                   key={star}
                   className={`h-4 w-4 ${
-                    star <= Math.round(stats.averageRating) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+                    star <= Math.round(stats.averageRating)
+                      ? "fill-yellow-400 text-yellow-400"
+                      : "text-gray-300"
                   }`}
                 />
               ))}
@@ -82,12 +95,16 @@ export default function AvaliacoesPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Avaliações</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total de Avaliações
+            </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalReviews}</div>
-            <p className="text-xs text-muted-foreground">Clientes satisfeitos</p>
+            <p className="text-xs text-muted-foreground">
+              Clientes satisfeitos
+            </p>
           </CardContent>
         </Card>
 
@@ -99,7 +116,8 @@ export default function AvaliacoesPage() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.fiveStars}</div>
             <p className="text-xs text-muted-foreground">
-              {Math.round((stats.fiveStars / stats.totalReviews) * 100)}% do total
+              {Math.round((stats.fiveStars / stats.totalReviews) * 100)}% do
+              total
             </p>
           </CardContent>
         </Card>
@@ -127,13 +145,13 @@ export default function AvaliacoesPage() {
               stars === 5
                 ? stats.fiveStars
                 : stars === 4
-                  ? stats.fourStars
-                  : stars === 3
-                    ? stats.threeStars
-                    : stars === 2
-                      ? stats.twoStars
-                      : stats.oneStars
-            const percentage = (count / stats.totalReviews) * 100
+                ? stats.fourStars
+                : stars === 3
+                ? stats.threeStars
+                : stars === 2
+                ? stats.twoStars
+                : stats.oneStars;
+            const percentage = (count / stats.totalReviews) * 100;
 
             return (
               <div key={stars} className="flex items-center gap-4">
@@ -142,11 +160,16 @@ export default function AvaliacoesPage() {
                   <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                 </div>
                 <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-                  <div className="h-full bg-yellow-400" style={{ width: `${percentage}%` }} />
+                  <div
+                    className="h-full bg-yellow-400"
+                    style={{ width: `${percentage}%` }}
+                  />
                 </div>
-                <span className="text-sm text-muted-foreground w-12 text-right">{count}</span>
+                <span className="text-sm text-muted-foreground w-12 text-right">
+                  {count}
+                </span>
               </div>
-            )
+            );
           })}
         </CardContent>
       </Card>
@@ -159,7 +182,9 @@ export default function AvaliacoesPage() {
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div>
-                  <CardTitle className="text-base">{review.clientName}</CardTitle>
+                  <CardTitle className="text-base">
+                    {review.clientName}
+                  </CardTitle>
                   <CardDescription>{review.service}</CardDescription>
                 </div>
                 <div className="flex items-center gap-1">
@@ -167,7 +192,9 @@ export default function AvaliacoesPage() {
                     <Star
                       key={star}
                       className={`h-4 w-4 ${
-                        star <= review.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+                        star <= review.rating
+                          ? "fill-yellow-400 text-yellow-400"
+                          : "text-gray-300"
                       }`}
                     />
                   ))}
@@ -175,12 +202,16 @@ export default function AvaliacoesPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground mb-2">{review.comment}</p>
-              <p className="text-xs text-muted-foreground">{new Date(review.date).toLocaleDateString("pt-BR")}</p>
+              <p className="text-sm text-muted-foreground mb-2">
+                {review.comment}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {new Date(review.date).toLocaleDateString("pt-BR")}
+              </p>
             </CardContent>
           </Card>
         ))}
       </div>
     </div>
-  )
+  );
 }

@@ -72,6 +72,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const loadProfile = async () => {
       try {
+        if (typeof window === "undefined") return;
+
         const token = localStorage.getItem("auth_token");
         const savedProfile = localStorage.getItem("user_profile");
 
@@ -90,9 +92,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       } catch (error) {
         console.error("[auth-context] Error loading profile:", error);
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("refresh_token");
-        localStorage.removeItem("user_profile");
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("refresh_token");
+          localStorage.removeItem("user_profile");
+        }
       } finally {
         setLoading(false);
       }
@@ -110,16 +114,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
 
       if (response.data.accessToken) {
-        localStorage.setItem("auth_token", response.data.accessToken);
-        if (response.data.refreshToken) {
-          localStorage.setItem("refresh_token", response.data.refreshToken);
-        }
-        if (response.data.user) {
-          setUserProfile(response.data.user);
-          localStorage.setItem(
-            "user_profile",
-            JSON.stringify(response.data.user)
-          );
+        if (typeof window !== "undefined") {
+          localStorage.setItem("auth_token", response.data.accessToken);
+          if (response.data.refreshToken) {
+            localStorage.setItem("refresh_token", response.data.refreshToken);
+          }
+          if (response.data.user) {
+            setUserProfile(response.data.user);
+            localStorage.setItem(
+              "user_profile",
+              JSON.stringify(response.data.user)
+            );
+          }
         }
         console.log("[auth-context] Sign in successful");
       }
@@ -145,16 +151,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
 
       if (response.data.accessToken) {
-        localStorage.setItem("auth_token", response.data.accessToken);
-        if (response.data.refreshToken) {
-          localStorage.setItem("refresh_token", response.data.refreshToken);
-        }
-        if (response.data.user) {
-          setUserProfile(response.data.user);
-          localStorage.setItem(
-            "user_profile",
-            JSON.stringify(response.data.user)
-          );
+        if (typeof window !== "undefined") {
+          localStorage.setItem("auth_token", response.data.accessToken);
+          if (response.data.refreshToken) {
+            localStorage.setItem("refresh_token", response.data.refreshToken);
+          }
+          if (response.data.user) {
+            setUserProfile(response.data.user);
+            localStorage.setItem(
+              "user_profile",
+              JSON.stringify(response.data.user)
+            );
+          }
         }
         console.log("[auth-context] Sign up successful");
       }
@@ -172,7 +180,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const redirectUrl = `${
         typeof window !== "undefined" ? window.location.origin : ""
       }/auth/callback`;
-      localStorage.setItem("redirectAfterLogin", redirectUrl);
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("redirectAfterLogin", redirectUrl);
+      }
 
       // Get Google OAuth URL from backend
       const response = await apiClient.post("/auth/google-login", {
@@ -182,7 +193,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (response.data.authUrl) {
         console.log("[auth-context] Redirecting to Google OAuth...");
         // Redirect to Google OAuth URL provided by backend
-        window.location.href = response.data.authUrl;
+        if (typeof window !== "undefined") {
+          window.location.href = response.data.authUrl;
+        }
       }
     } catch (error) {
       console.error("[auth-context] Google sign in error:", error);
@@ -192,10 +205,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signOut = async () => {
     try {
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("redirectAfterLogin");
-      localStorage.removeItem("user_profile");
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("redirectAfterLogin");
+        localStorage.removeItem("user_profile");
+      }
       setUserProfile(null);
       console.log("[auth-context] Sign out successful");
     } catch (error) {

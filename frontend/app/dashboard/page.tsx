@@ -118,12 +118,26 @@ export default function DashboardPage() {
                 </Card>
 
                 <Card className="hover:border-primary transition-colors cursor-pointer">
-                  <Link href="/dashboard/orcamentos">
+                  <Link href="/dashboard/avaliacoes">
                     <CardHeader>
                       <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
                         <Star className="h-5 w-5 text-primary" />
                       </div>
-                      <CardTitle>Orçamentos</CardTitle>
+                      <CardTitle>Avaliações</CardTitle>
+                      <CardDescription>
+                        Veja o que seus clientes estão dizendo sobre você
+                      </CardDescription>
+                    </CardHeader>
+                  </Link>
+                </Card>
+
+                <Card className="hover:border-primary transition-colors cursor-pointer">
+                  <Link href="/dashboard/solicitacoes">
+                    <CardHeader>
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                        <Calendar className="h-5 w-5 text-primary" />
+                      </div>
+                      <CardTitle>Solicitações</CardTitle>
                       <CardDescription>
                         Visualize e responda solicitações de orçamento
                       </CardDescription>

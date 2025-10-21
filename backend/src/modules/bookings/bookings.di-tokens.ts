@@ -1,5 +1,0 @@
-export const BOOKINGS_REPOSITORY = Symbol("BOOKINGS_REPOSITORY");
-
-
-
-

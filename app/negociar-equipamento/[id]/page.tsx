@@ -81,7 +81,7 @@ export default function NegociarEquipamentoPage() {
     }
 
     try {
-      const response = await apiClient.post("/equipment-proposals", {
+      const response = await apiClient.post("/proposals", {
         equipmentId,
         equipmentName: equipment?.name,
         buyerId: userProfile?.id,

@@ -78,7 +78,7 @@ export default function OrcamentoPage() {
     }
 
     try {
-      const response = await apiClient.post("/quote-requests", {
+      const response = await apiClient.post("/quotes", {
         professionalId,
         professionalName: professional?.displayName,
         clientId: userProfile?.id,

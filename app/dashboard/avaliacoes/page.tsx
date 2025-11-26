@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import {
   Card,
@@ -12,7 +13,7 @@ import { Star, TrendingUp, Users, Award } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function AvaliacoesPage() {
-  const { userProfile } = useAuth();
+  const { userProfile, loading } = useAuth();
   const router = useRouter();
 
   const reviews = [
@@ -53,8 +54,26 @@ export default function AvaliacoesPage() {
     oneStars: 0,
   };
 
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!loading && !userProfile) {
+      router.push("/login");
+    }
+  }, [userProfile, loading, router]);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated
   if (!userProfile) {
-    router.push("/login");
     return null;
   }
 

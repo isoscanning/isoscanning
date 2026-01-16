@@ -1,25 +1,30 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
   MapPin,
   Star,
-  Phone,
-  LinkIcon,
-  Calendar,
-  MessageSquare,
+  Instagram,
+  Linkedin,
+  Globe,
+  Play,
 } from "lucide-react";
 import Link from "next/link";
-import { useAuth } from "@/lib/auth-context";
 import apiClient from "@/lib/api-service";
 import type { Professional } from "@/lib/data-service";
+import { AvailabilityCalendar } from "@/components/availability-calendar";
+import {
+  getMockAvatar,
+  generateMockPortfolioItems,
+  getMockPortfolioImage,
+} from "@/lib/mock-data";
 
 interface Review {
   id: string;
@@ -39,8 +44,6 @@ interface PortfolioItem {
 
 export default function ProfessionalProfilePage() {
   const params = useParams();
-  const router = useRouter();
-  const { userProfile } = useAuth();
   const professionalId = params.id as string;
 
   const [professional, setProfessional] = useState<Professional | null>(null);
@@ -55,18 +58,9 @@ export default function ProfessionalProfilePage() {
   const fetchProfessionalData = async () => {
     setLoading(true);
     try {
-      console.log(
-        "[profissional-detail] Fetching professional data for id:",
-        professionalId
-      );
-
       // Fetch professional profile
       const profResponse = await apiClient.get(`/profiles/${professionalId}`);
       setProfessional(profResponse.data);
-      console.log(
-        "[profissional-detail] Professional loaded:",
-        profResponse.data
-      );
 
       // Fetch portfolio for this professional
       try {
@@ -78,12 +72,19 @@ export default function ProfessionalProfilePage() {
             id: item.id,
             title: item.title,
             description: item.description,
-            imageUrls: item.imageUrls || [],
+            imageUrls:
+              item.imageUrls && item.imageUrls.length > 0
+                ? item.imageUrls
+                : [getMockPortfolioImage(item.id)],
             category: item.category,
           })
         );
-        setPortfolio(portfolioData);
-        console.log("[profissional-detail] Portfolio loaded:", portfolioData);
+        // If portfolio is empty, generate mock items
+        if (portfolioData.length === 0) {
+          setPortfolio(generateMockPortfolioItems(6));
+        } else {
+          setPortfolio(portfolioData);
+        }
       } catch (error) {
         console.error("[profissional-detail] Error fetching portfolio:", error);
       }
@@ -103,7 +104,6 @@ export default function ProfessionalProfilePage() {
           })
         );
         setReviews(reviewsData);
-        console.log("[profissional-detail] Reviews loaded:", reviewsData);
       } catch (error) {
         console.error("[profissional-detail] Error fetching reviews:", error);
       }
@@ -147,237 +147,206 @@ export default function ProfessionalProfilePage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-white">
       <Header />
 
       <main className="flex-1 py-12 px-4">
-        <div className="container mx-auto max-w-6xl space-y-8">
+        <div className="container mx-auto max-w-5xl space-y-12">
           {/* Profile Header */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col md:flex-row gap-6">
-                {/* Avatar */}
-                <div className="flex-shrink-0">
-                  <div className="relative h-32 w-32 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
-                    {professional.avatarUrl ? (
-                      <img
-                        src={professional.avatarUrl || "/placeholder.svg"}
-                        alt={professional.displayName}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-5xl font-bold text-primary">
-                        {professional.displayName.charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 space-y-4">
-                  <div>
-                    <h1 className="text-3xl font-bold">
-                      {professional.artisticName || professional.displayName}
-                    </h1>
-                    {professional.specialty && (
-                      <p className="text-lg text-muted-foreground mt-1">
-                        {professional.specialty}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Rating */}
-                  {professional.totalReviews &&
-                  professional.totalReviews > 0 ? (
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star
-                            key={star}
-                            className={`h-5 w-5 ${
-                              star <= (professional.averageRating || 0)
-                                ? "fill-primary text-primary"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <span className="font-medium">
-                        {professional.averageRating?.toFixed(1)}
-                      </span>
-                      <span className="text-muted-foreground">
-                        ({professional.totalReviews} avaliações)
-                      </span>
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground">
-                      Sem avaliações ainda
-                    </p>
-                  )}
-
-                  {/* Location & Contact */}
-                  <div className="flex flex-wrap gap-4 text-sm">
-                    {(professional.city || professional.state) && (
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <MapPin className="h-4 w-4" />
-                        <span>
-                          {professional.city}
-                          {professional.city && professional.state && ", "}
-                          {professional.state}
-                        </span>
-                      </div>
-                    )}
-                    {professional.phone && (
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Phone className="h-4 w-4" />
-                        <span>{professional.phone}</span>
-                      </div>
-                    )}
-                    {professional.portfolioLink && (
-                      <a
-                        href={professional.portfolioLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-primary hover:underline"
-                      >
-                        <LinkIcon className="h-4 w-4" />
-                        <span>Portfólio externo</span>
-                      </a>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex flex-wrap gap-3">
-                    <Link href={`/orcamento/${professional.id}`}>
-                      <Button>
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        Solicitar Orçamento
-                      </Button>
-                    </Link>
-                    <Link href={`/agendar/${professional.id}`}>
-                      <Button variant="outline">
-                        <Calendar className="h-4 w-4 mr-2" />
-                        Ver Disponibilidade
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
+          <div className="flex flex-col items-center text-center space-y-6">
+            {/* Avatar */}
+            <div className="relative h-40 w-40 rounded-full p-1 bg-gradient-to-tr from-amber-200 to-amber-100 shadow-lg">
+              <div className="h-full w-full rounded-full overflow-hidden bg-white border-4 border-white">
+                <img
+                  src={
+                    professional.avatarUrl ||
+                    getMockAvatar(professional.id) ||
+                    "/placeholder.svg"
+                  }
+                  alt={professional.displayName}
+                  className="h-full w-full object-cover"
+                />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+
+            {/* Info */}
+            <div className="space-y-2">
+              <h1 className="text-4xl font-bold text-gray-900">
+                {professional.artisticName || professional.displayName}
+              </h1>
+              <p className="text-lg text-gray-600 font-medium">
+                {professional.specialty || "Profissional"}
+              </p>
+              {(professional.city || professional.state) && (
+                <div className="flex items-center justify-center gap-1 text-sm text-gray-400">
+                  <MapPin className="h-3 w-3" />
+                  <span>
+                    {professional.city}
+                    {professional.city && professional.state && ", "}
+                    {professional.state}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Social Icons */}
+            <div className="flex gap-4">
+              <Button
+                variant="secondary"
+                size="icon"
+                className="rounded-full h-10 w-10 bg-gray-100 hover:bg-gray-200 text-gray-600"
+              >
+                <Instagram className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="secondary"
+                size="icon"
+                className="rounded-full h-10 w-10 bg-gray-100 hover:bg-gray-200 text-gray-600"
+              >
+                <Linkedin className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="secondary"
+                size="icon"
+                className="rounded-full h-10 w-10 bg-gray-100 hover:bg-gray-200 text-gray-600"
+              >
+                <Globe className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
 
           {/* Tabs */}
-          <Tabs defaultValue="sobre" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="sobre">Sobre</TabsTrigger>
-              <TabsTrigger value="portfolio">
-                Portfólio ({portfolio.length})
-              </TabsTrigger>
-              <TabsTrigger value="avaliacoes">
-                Avaliações ({reviews.length})
-              </TabsTrigger>
-            </TabsList>
+          <Tabs defaultValue="portfolio" className="w-full">
+            <div className="flex justify-center mb-12 border-b border-gray-100">
+              <TabsList className="bg-transparent h-auto p-0 gap-8">
+                <TabsTrigger
+                  value="portfolio"
+                  className="bg-transparent border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:shadow-none rounded-none px-4 py-3 text-xs font-bold uppercase tracking-wider text-gray-400 data-[state=active]:text-gray-900"
+                >
+                  Portfólio
+                </TabsTrigger>
+                <TabsTrigger
+                  value="avaliacoes"
+                  className="bg-transparent border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:shadow-none rounded-none px-4 py-3 text-xs font-bold uppercase tracking-wider text-gray-400 data-[state=active]:text-gray-900"
+                >
+                  Avaliações
+                </TabsTrigger>
+                <TabsTrigger
+                  value="disponibilidade"
+                  className="bg-transparent border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:shadow-none rounded-none px-4 py-3 text-xs font-bold uppercase tracking-wider text-gray-400 data-[state=active]:text-gray-900"
+                >
+                  Disponibilidade
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-            <TabsContent value="sobre" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Sobre o profissional</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {professional.description ? (
-                    <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                      {professional.description}
-                    </p>
-                  ) : (
-                    <p className="text-muted-foreground italic">
-                      Nenhuma descrição disponível
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="portfolio" className="mt-6">
+            <TabsContent value="portfolio" className="mt-0 space-y-12">
               {portfolio.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {portfolio.map((item) => (
-                    <Card key={item.id} className="overflow-hidden">
-                      <div className="aspect-video bg-muted relative overflow-hidden">
-                        <img
-                          src={item.imageUrls?.[0] || "/placeholder.svg"}
-                          alt={item.title}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                      <CardContent className="pt-4">
-                        <h3 className="font-semibold mb-1">{item.title}</h3>
-                        {item.category && (
-                          <Badge variant="secondary">{item.category}</Badge>
+                    <div
+                      key={item.id}
+                      className="group relative aspect-square bg-gray-100 rounded-2xl overflow-hidden cursor-pointer"
+                    >
+                      <img
+                        src={item.imageUrls?.[0] || "/placeholder.svg"}
+                        alt={item.title}
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      {/* Video Overlay Mock - Assuming some items might be videos based on category or just visual style */}
+                      {(item.category === "Vídeo" ||
+                        item.category === "Videomaker") && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-colors">
+                            <div className="h-12 w-12 bg-white rounded-full flex items-center justify-center shadow-lg">
+                              <Play className="h-5 w-5 text-gray-900 fill-gray-900 ml-1" />
+                            </div>
+                          </div>
                         )}
-                        {item.description && (
-                          <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                            {item.description}
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
+                    </div>
                   ))}
                 </div>
               ) : (
-                <Card>
-                  <CardContent className="py-12 text-center">
-                    <p className="text-muted-foreground">
-                      Nenhum trabalho no portfólio ainda
-                    </p>
-                  </CardContent>
-                </Card>
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">
+                    Nenhum item no portfólio.
+                  </p>
+                </div>
               )}
             </TabsContent>
 
-            <TabsContent value="avaliacoes" className="mt-6">
+            <TabsContent value="avaliacoes" className="mt-0 space-y-8">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-gray-900">Avaliações</h2>
+                <div className="flex items-center gap-2 text-blue-600 font-bold">
+                  <span className="text-xl">
+                    {professional.averageRating?.toFixed(1)}
+                  </span>
+                  <Star className="h-5 w-5 fill-blue-600 text-blue-600" />
+                  <span className="text-sm text-gray-400 font-normal">
+                    ({professional.totalReviews} reviews)
+                  </span>
+                </div>
+              </div>
+
               {reviews.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {reviews.map((review) => (
-                    <Card key={review.id}>
-                      <CardContent className="pt-6">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <p className="font-semibold">{review.clientName}</p>
-                            <div className="flex items-center gap-1 mt-1">
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <Star
-                                  key={star}
-                                  className={`h-4 w-4 ${
-                                    star <= review.rating
-                                      ? "fill-primary text-primary"
-                                      : "text-muted-foreground"
-                                  }`}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                          {review.createdAt && (
-                            <span className="text-sm text-muted-foreground">
-                              {review.createdAt.toLocaleDateString("pt-BR")}
-                            </span>
-                          )}
+                    <div
+                      key={review.id}
+                      className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm"
+                    >
+                      <div className="flex items-start gap-4 mb-4">
+                        <div className="h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-lg">
+                          {review.clientName.charAt(0).toUpperCase()}
                         </div>
-                        <p className="text-muted-foreground">
-                          {review.comment}
-                        </p>
-                      </CardContent>
-                    </Card>
+                        <div>
+                          <h3 className="font-bold text-gray-900">
+                            {review.clientName}
+                          </h3>
+                          <p className="text-xs text-gray-400 uppercase tracking-wide mt-1">
+                            HÁ{" "}
+                            {Math.floor(
+                              (new Date().getTime() -
+                                review.createdAt.getTime()) /
+                              (1000 * 60 * 60 * 24 * 30)
+                            )}{" "}
+                            MESES
+                          </p>
+                        </div>
+                        <div className="ml-auto flex gap-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`h-4 w-4 ${star <= review.rating
+                                ? "fill-blue-500 text-blue-500"
+                                : "text-gray-200"
+                                }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-gray-600 italic leading-relaxed">
+                        "{review.comment}"
+                      </p>
+                    </div>
                   ))}
                 </div>
               ) : (
-                <Card>
-                  <CardContent className="py-12 text-center">
-                    <p className="text-muted-foreground">
-                      Nenhuma avaliação ainda
-                    </p>
-                  </CardContent>
-                </Card>
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">
+                    Nenhuma avaliação ainda.
+                  </p>
+                </div>
               )}
+            </TabsContent>
+
+            <TabsContent value="disponibilidade" className="mt-0 space-y-8">
+              <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Disponibilidade
+                </h2>
+              </div>
+              <AvailabilityCalendar />
             </TabsContent>
           </Tabs>
         </div>
@@ -387,3 +356,4 @@ export default function ProfessionalProfilePage() {
     </div>
   );
 }
+

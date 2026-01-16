@@ -5,19 +5,11 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
-import { Search, MapPin, Star, Filter, X } from "lucide-react";
+import { MapPin, Star } from "lucide-react";
 import Link from "next/link";
 import { fetchProfessionals, type Professional } from "@/lib/data-service";
+import { SearchBar } from "@/components/search-bar";
+import { getMockAvatar } from "@/lib/mock-data";
 
 const ESPECIALIDADES = [
   "Todos",
@@ -33,48 +25,14 @@ const ESPECIALIDADES = [
   "Cinegrafista",
 ];
 
-const ESTADOS = [
-  "Todos",
-  "AC",
-  "AL",
-  "AP",
-  "AM",
-  "BA",
-  "CE",
-  "DF",
-  "ES",
-  "GO",
-  "MA",
-  "MT",
-  "MS",
-  "MG",
-  "PA",
-  "PB",
-  "PR",
-  "PE",
-  "PI",
-  "RJ",
-  "RN",
-  "RS",
-  "RO",
-  "RR",
-  "SC",
-  "SP",
-  "SE",
-  "TO",
-];
-
 export default function ProfissionaisPage() {
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showFilters, setShowFilters] = useState(false);
 
   // Filters
-  const [searchTerm, setSearchTerm] = useState("");
   const [selectedSpecialty, setSelectedSpecialty] = useState("Todos");
-  const [selectedState, setSelectedState] = useState("Todos");
   const [selectedCity, setSelectedCity] = useState("");
-  const [minRating, setMinRating] = useState([0]);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
 
   useEffect(() => {
     loadProfessionals();
@@ -92,266 +50,164 @@ export default function ProfissionaisPage() {
     }
   };
 
-  const filteredProfessionals = professionals.filter((prof) => {
-    const matchesSearch =
-      searchTerm === "" ||
-      prof.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prof.artisticName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prof.specialty?.toLowerCase().includes(searchTerm.toLowerCase());
+  const handleSearch = (filters: {
+    city: string;
+    date: Date | undefined;
+    specialty: string;
+  }) => {
+    setSelectedCity(filters.city);
+    setSelectedDate(filters.date);
+    setSelectedSpecialty(filters.specialty);
+  };
 
+  const filteredProfessionals = professionals.filter((prof) => {
     const matchesSpecialty =
       selectedSpecialty === "Todos" || prof.specialty === selectedSpecialty;
-
-    const matchesState =
-      selectedState === "Todos" || prof.state === selectedState;
 
     const matchesCity =
       selectedCity === "" ||
       prof.city?.toLowerCase().includes(selectedCity.toLowerCase());
 
-    const matchesRating = (prof.averageRating || 0) >= minRating[0];
+    // Date filtering would go here if backend supported it or if we had availability data
+    // const matchesDate = ...
 
-    return (
-      matchesSearch &&
-      matchesSpecialty &&
-      matchesState &&
-      matchesCity &&
-      matchesRating
-    );
+    return matchesSpecialty && matchesCity;
   });
 
-  const clearFilters = () => {
-    setSearchTerm("");
-    setSelectedSpecialty("Todos");
-    setSelectedState("Todos");
-    setSelectedCity("");
-    setMinRating([0]);
-  };
-
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gray-50/50">
       <Header />
 
-      <main className="flex-1 py-12 px-4">
-        <div className="container mx-auto max-w-7xl">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">
-              Buscar Profissionais
+      <main className="flex-1">
+        {/* Hero Section */}
+        <div className="bg-gray-100 py-16 md:py-24 px-4 text-center">
+          <div className="container mx-auto max-w-4xl">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 tracking-tight text-gray-900">
+              Encontre o talento certo
+              <br />
+              <span className="text-blue-600">na hora e no lugar certo.</span>
             </h1>
-            <p className="text-muted-foreground">
-              Encontre fotógrafos, videomakers e profissionais de audiovisual
-              qualificados
+            <p className="text-lg md:text-xl text-muted-foreground mb-12 max-w-2xl mx-auto">
+              Conecte-se com os melhores fotógrafos e videógrafos disponíveis
+              para a sua data específica e especialidade.
             </p>
-          </div>
 
-          {/* Search Bar */}
-          <div className="mb-6">
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nome, especialidade ou palavra-chave..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+            <div className="relative z-10 -mb-28 md:-mb-32">
+              <SearchBar
+                onSearch={handleSearch}
+                specialties={ESPECIALIDADES}
+                className="shadow-xl"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Results Section */}
+        <div className="pt-32 pb-16 px-4">
+          <div className="container mx-auto max-w-7xl">
+            <div className="mb-8 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-900">
+                Profissionais Disponíveis
+              </h2>
+              <span className="text-muted-foreground">
+                {filteredProfessionals.length} resultados
+              </span>
+            </div>
+
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <Card key={i} className="animate-pulse border-0 shadow-sm">
+                    <CardContent className="pt-0 p-0">
+                      <div className="h-64 bg-muted rounded-t-xl w-full"></div>
+                      <div className="p-6 space-y-4">
+                        <div className="h-6 bg-muted rounded w-3/4"></div>
+                        <div className="h-4 bg-muted rounded w-1/2"></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-              <Button
-                variant="outline"
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Filtros
-              </Button>
-            </div>
-          </div>
-
-          {/* Filters Panel */}
-          {showFilters && (
-            <Card className="mb-6">
-              <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="space-y-2">
-                    <Label>Especialidade</Label>
-                    <Select
-                      value={selectedSpecialty}
-                      onValueChange={setSelectedSpecialty}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ESPECIALIDADES.map((esp) => (
-                          <SelectItem key={esp} value={esp}>
-                            {esp}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Estado</Label>
-                    <Select
-                      value={selectedState}
-                      onValueChange={setSelectedState}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ESTADOS.map((estado) => (
-                          <SelectItem key={estado} value={estado}>
-                            {estado}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Cidade</Label>
-                    <Input
-                      placeholder="Digite a cidade"
-                      value={selectedCity}
-                      onChange={(e) => setSelectedCity(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Avaliação mínima: {minRating[0]} estrelas</Label>
-                    <Slider
-                      value={minRating}
-                      onValueChange={setMinRating}
-                      max={5}
-                      step={0.5}
-                      className="mt-2"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end mt-4">
-                  <Button variant="ghost" onClick={clearFilters}>
-                    <X className="h-4 w-4 mr-2" />
-                    Limpar filtros
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Results */}
-          <div className="mb-4 text-sm text-muted-foreground">
-            {loading
-              ? "Carregando..."
-              : `${filteredProfessionals.length} profissionais encontrados`}
-          </div>
-
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <Card key={i} className="animate-pulse">
-                  <CardContent className="pt-6">
-                    <div className="h-24 w-24 rounded-full bg-muted mx-auto mb-4"></div>
-                    <div className="h-4 bg-muted rounded mb-2"></div>
-                    <div className="h-3 bg-muted rounded w-2/3 mx-auto"></div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : filteredProfessionals.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <p className="text-muted-foreground">
-                  Nenhum profissional encontrado com os filtros aplicados.
+            ) : filteredProfessionals.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground text-lg">
+                  Nenhum profissional encontrado com os filtros selecionados.
                 </p>
-                <Button variant="link" onClick={clearFilters} className="mt-2">
+                <Button
+                  variant="link"
+                  onClick={() => {
+                    setSelectedCity("");
+                    setSelectedSpecialty("Todos");
+                    setSelectedDate(undefined);
+                  }}
+                  className="mt-4"
+                >
                   Limpar filtros
                 </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredProfessionals.map((prof) => (
-                <Card
-                  key={prof.id}
-                  className="hover:border-primary transition-colors"
-                >
-                  <CardContent className="pt-6">
-                    <Link href={`/profissionais/${prof.id}`}>
-                      <div className="text-center space-y-4">
-                        {/* Avatar */}
-                        <div className="relative mx-auto h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
-                          {prof.avatarUrl ? (
-                            <img
-                              src={prof.avatarUrl || "/placeholder.svg"}
-                              alt={prof.displayName}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <span className="text-3xl font-bold text-primary">
-                              {prof.displayName?.charAt(0).toUpperCase()}
-                            </span>
-                          )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {filteredProfessionals.map((prof) => (
+                  <Card
+                    key={prof.id}
+                    className="group hover:shadow-lg transition-all duration-300 border-0 shadow-sm overflow-hidden bg-white"
+                  >
+                    <CardContent className="p-0">
+                      <Link href={`/profissionais/${prof.id}`}>
+                        {/* Image/Avatar Area - Mimicking the prototype's large image style */}
+                        <div className="relative h-64 bg-gray-100 overflow-hidden">
+                          <img
+                            src={
+                              prof.avatarUrl ||
+                              getMockAvatar(prof.id) ||
+                              "/placeholder.svg"
+                            }
+                            alt={prof.displayName}
+                            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
                         </div>
 
-                        {/* Info */}
-                        <div>
-                          <h3 className="font-semibold text-lg">
-                            {prof.artisticName || prof.displayName}
-                          </h3>
-                          {prof.specialty && (
-                            <p className="text-sm text-muted-foreground">
-                              {prof.specialty}
+                        <div className="p-6">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <h3 className="font-bold text-xl text-gray-900 mb-1">
+                                {prof.artisticName || prof.displayName}
+                              </h3>
+                              <p className="text-sm font-medium text-blue-600">
+                                {prof.specialty || "Profissional"}
+                              </p>
+                            </div>
+                            <div className="bg-green-50 text-green-700 text-xs font-bold px-2 py-1 rounded-full uppercase tracking-wide">
+                              Disponível
+                            </div>
+                          </div>
+
+                          {prof.description && (
+                            <p className="text-sm text-gray-500 line-clamp-2 mb-4 h-10">
+                              {prof.description}
                             </p>
                           )}
+
+                          <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                            <div className="flex gap-2">
+                              {/* Tags based on specialty or other data could go here */}
+                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-md">
+                                {prof.specialty?.split(" ")[0] || "Geral"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center text-blue-600 text-sm font-medium group-hover:translate-x-1 transition-transform">
+                              Ver Perfil →
+                            </div>
+                          </div>
                         </div>
-
-                        {/* Location */}
-                        {(prof.city || prof.state) && (
-                          <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
-                            <MapPin className="h-3 w-3" />
-                            <span>
-                              {prof.city}
-                              {prof.city && prof.state && ", "}
-                              {prof.state}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Rating */}
-                        {prof.totalReviews && prof.totalReviews > 0 ? (
-                          <div className="flex items-center justify-center gap-1">
-                            <Star className="h-4 w-4 fill-primary text-primary" />
-                            <span className="font-medium">
-                              {prof.averageRating?.toFixed(1)}
-                            </span>
-                            <span className="text-sm text-muted-foreground">
-                              ({prof.totalReviews})
-                            </span>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">
-                            Sem avaliações
-                          </p>
-                        )}
-
-                        {/* Description Preview */}
-                        {prof.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {prof.description}
-                          </p>
-                        )}
-
-                        <Button className="w-full mt-4">Ver Perfil</Button>
-                      </div>
-                    </Link>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+                      </Link>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </main>
 
@@ -359,3 +215,4 @@ export default function ProfissionaisPage() {
     </div>
   );
 }
+

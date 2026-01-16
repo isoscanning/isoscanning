@@ -8,6 +8,7 @@ import React, {
   ReactNode,
 } from "react";
 import apiClient from "./api-service";
+import { supabase } from "./supabase";
 
 /**
  * LocalStorage keys used by auth context:
@@ -174,29 +175,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signInWithGoogle = async () => {
     try {
-      console.log("[auth-context] Requesting Google login URL from backend...");
+      console.log("[auth-context] Initiating Google login with Supabase...");
 
-      // Store the redirect URL for after OAuth
-      const redirectUrl = `${
-        typeof window !== "undefined" ? window.location.origin : ""
-      }/auth/callback`;
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem("redirectAfterLogin", redirectUrl);
-      }
-
-      // Get Google OAuth URL from backend
-      const response = await apiClient.post("/auth/google-login", {
-        redirectUrl,
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
 
-      if (response.data.authUrl) {
-        console.log("[auth-context] Redirecting to Google OAuth...");
-        // Redirect to Google OAuth URL provided by backend
-        if (typeof window !== "undefined") {
-          window.location.href = response.data.authUrl;
-        }
-      }
+      if (error) throw error;
     } catch (error) {
       console.error("[auth-context] Google sign in error:", error);
       throw error;
@@ -224,9 +212,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.log("[auth-context] Requesting password reset...");
       await apiClient.post("/auth/reset-password", {
         email,
-        redirectUrl: `${
-          typeof window !== "undefined" ? window.location.origin : ""
-        }/recuperar-senha`,
+        redirectUrl: `${typeof window !== "undefined" ? window.location.origin : ""
+          }/recuperar-senha`,
       });
       console.log("[auth-context] Password reset email sent");
     } catch (error) {

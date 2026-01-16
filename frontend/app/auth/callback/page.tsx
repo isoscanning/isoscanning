@@ -1,57 +1,65 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import apiClient from "@/lib/api-service";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        console.log("[auth-callback] Processing OAuth callback...");
+        console.log("[auth-callback] Verifying Supabase session...");
 
-        // Get the authorization code from URL params (sent by Backend)
-        const code = searchParams.get("code");
-        const state = searchParams.get("state");
+        // Supabase client automatically handles the hash fragment or code exchange
+        // We just need to check if we have a session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-        if (!code) {
-          throw new Error("No authorization code received");
-        }
+        if (sessionError) throw sessionError;
 
-        console.log("[auth-callback] Exchanging code for token...");
+        if (session) {
+          console.log("[auth-callback] Session found, redirecting...");
 
-        // Exchange code for token via Backend
-        const response = await apiClient.post("/auth/google-callback", {
-          code,
-          state,
-        });
-
-        if (response.data.accessToken) {
-          console.log("[auth-callback] Token received, storing...");
-          localStorage.setItem("auth_token", response.data.accessToken);
-          if (response.data.refreshToken) {
-            localStorage.setItem("refresh_token", response.data.refreshToken);
+          // Store token in localStorage for compatibility with existing code
+          localStorage.setItem("auth_token", session.access_token);
+          if (session.refresh_token) {
+            localStorage.setItem("refresh_token", session.refresh_token);
           }
-          if (response.data.user) {
-            localStorage.setItem(
-              "user_profile",
-              JSON.stringify(response.data.user)
-            );
+          if (session.user) {
+            // Map Supabase user to local profile format if needed, or just store basic info
+            // For now, we rely on the auth context to fetch the full profile later
+            localStorage.setItem("user_profile", JSON.stringify(session.user));
           }
 
-          const redirectUrl =
-            localStorage.getItem("redirectAfterLogin") || "/dashboard";
+          const redirectUrl = localStorage.getItem("redirectAfterLogin") || "/dashboard";
           localStorage.removeItem("redirectAfterLogin");
 
-          console.log("[auth-callback] Redirecting to dashboard...");
           router.push(redirectUrl);
         } else {
-          throw new Error("No token received from Backend");
+          // If no session immediately, wait for onAuthStateChange
+          const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN' && session) {
+              console.log("[auth-callback] Signed in via event, redirecting...");
+              localStorage.setItem("auth_token", session.access_token);
+              router.push("/dashboard");
+            }
+          });
+
+          // If still no session after a short timeout, show error (or just stay loading)
+          setTimeout(() => {
+            if (loading) {
+              // Check one last time
+              supabase.auth.getSession().then(({ data }) => {
+                if (!data.session) {
+                  setError("Não foi possível confirmar a autenticação. Tente novamente.");
+                  setLoading(false);
+                }
+              });
+            }
+          }, 5000);
         }
       } catch (err: any) {
         console.error("[auth-callback] Error:", err);
@@ -61,14 +69,14 @@ export default function AuthCallbackPage() {
     };
 
     handleCallback();
-  }, [router, searchParams]);
+  }, [router]);
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <div className="h-8 w-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Processando autenticação...</p>
+          <p className="text-muted-foreground">Finalizando autenticação...</p>
         </div>
       </div>
     );

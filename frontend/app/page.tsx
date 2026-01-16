@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import { Search, Calendar, Package, Users } from "lucide-react";
+import { ParticleBackground } from "@/components/particle-background";
 
 export default function HomePage() {
   return (
@@ -12,20 +13,27 @@ export default function HomePage() {
 
       <main className="flex-1 pb-16">
         {/* Hero Section */}
-        <section className="relative py-20 md:py-32">
-          <div className="container mx-auto px-4">
-            <div className="max-w-3xl mx-auto text-center space-y-8">
-              <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-balance">
-                Conectando criatividade, cultura e crescimento
+        <section className="relative min-h-[calc(100vh-4rem)] flex items-center justify-center py-20 md:py-0 overflow-hidden">
+          {/* Particle Background */}
+          <ParticleBackground />
+
+          <div className="container mx-auto px-4 relative z-10">
+            <div className="max-w-4xl mx-auto text-center space-y-10">
+              <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-balance leading-tight text-gray-900">
+                Conectando criatividade,
+                <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
+                  cultura e crescimento
+                </span>
               </h1>
-              <p className="text-lg md:text-xl text-muted-foreground text-balance">
+              <p className="text-xl md:text-2xl text-muted-foreground text-balance max-w-2xl mx-auto font-light">
                 A plataforma completa para profissionais de fotografia e
-                audiovisual. Encontre profissionais talentosos, alugue
-                equipamentos e agende serviços com facilidade.
+                audiovisual. Encontre talentos, alugue equipamentos e agende
+                serviços.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
                 <Link href="/profissionais">
-                  <Button size="lg" className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full sm:w-auto h-12 px-8 text-lg rounded-full shadow-lg hover:shadow-xl transition-all">
                     <Search className="mr-2 h-5 w-5" />
                     Buscar Profissionais
                   </Button>
@@ -34,7 +42,7 @@ export default function HomePage() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="w-full sm:w-auto bg-transparent"
+                    className="w-full sm:w-auto h-12 px-8 text-lg rounded-full bg-white/50 backdrop-blur-sm border-gray-200 hover:bg-white/80 transition-all"
                   >
                     Sou Profissional
                   </Button>

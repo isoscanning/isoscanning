@@ -55,7 +55,7 @@ export default function SolicitacoesPage() {
       );
 
       const response = await apiClient.get(
-        `/quote-requests?clientId=${userProfile?.id}`
+        `/quotes?clientId=${userProfile?.id}`
       );
       const data = response.data.data || response.data || [];
       setRequests(data);

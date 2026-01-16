@@ -188,12 +188,15 @@ export default function LoginPage() {
                       <Label htmlFor="password" className="text-sm font-medium">
                         Senha
                       </Label>
+                      {/* Recuperar senha temporariamente desabilitado - aguardando implementação no backend */}
+                      {/* 
                       <Link
                         href="/recuperar-senha"
                         className="text-sm text-accent hover:text-accent/80 font-medium transition-colors"
                       >
                         Esqueceu a senha?
                       </Link>
+                      */}
                     </div>
                     <div className="relative group">
                       <Lock className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground group-focus-within:text-accent transition-colors" />
@@ -225,6 +228,8 @@ export default function LoginPage() {
                   </Button>
                 </form>
 
+                {/* Google OAuth temporariamente desabilitado - aguardando implementação no backend */}
+                {/* 
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t border-border/30" />
@@ -263,6 +268,7 @@ export default function LoginPage() {
                   </svg>
                   Entrar com Google
                 </Button>
+                */}
 
                 <div className="text-center pt-4">
                   <span className="text-sm text-muted-foreground">

@@ -140,20 +140,25 @@ export async function deleteEquipment(equipmentId: string): Promise<void> {
 /**
  * Upload equipment images through backend API
  * Backend handles Supabase Storage internally
+ * 
+ * TODO: Backend endpoint não implementado ainda
+ * Por enquanto, retorna URLs vazias
  */
 export async function uploadEquipmentImages(
   files: File[],
   userId: string
 ): Promise<string[]> {
+  console.warn("[data-service] Upload de imagens não implementado no backend");
+  // Retorna URLs vazias por enquanto
+  return [];
+  
+  /* Código para quando backend implementar:
   try {
     const uploadPromises = files.map(async (file) => {
-      // Create FormData for file upload
       const formData = new FormData();
       formData.append("file", file);
       formData.append("ownerId", userId);
 
-      // Upload through backend API
-      // Backend will handle Supabase Storage upload
       const response = await apiClient.post("/equipments/upload", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
@@ -169,14 +174,22 @@ export async function uploadEquipmentImages(
     console.error("[data-service] Error uploading equipment images:", error);
     throw new Error("Erro ao fazer upload das imagens");
   }
+  */
 }
 
 /**
  * Delete equipment images through backend API
+ * 
+ * TODO: Backend endpoint não implementado ainda
  */
 export async function deleteEquipmentImages(
   imageUrls: string[]
 ): Promise<void> {
+  console.warn("[data-service] Delete de imagens não implementado no backend");
+  // Não faz nada por enquanto
+  return;
+  
+  /* Código para quando backend implementar:
   try {
     await apiClient.post("/equipments/delete-images", {
       imageUrls,
@@ -185,6 +198,7 @@ export async function deleteEquipmentImages(
     console.error("[data-service] Error deleting equipment images:", error);
     throw new Error("Erro ao excluir imagens");
   }
+  */
 }
 
 /**

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import {
   Card,
@@ -17,7 +17,7 @@ import { Plus, Trash2, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function PortfolioPage() {
-  const { userProfile } = useAuth();
+  const { userProfile, loading } = useAuth();
   const router = useRouter();
   const [portfolioItems, setPortfolioItems] = useState([
     {
@@ -52,8 +52,26 @@ export default function PortfolioPage() {
     setPortfolioItems(portfolioItems.filter((item) => item.id !== id));
   };
 
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!loading && !userProfile) {
+      router.push("/login");
+    }
+  }, [userProfile, loading, router]);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated
   if (!userProfile) {
-    router.push("/login");
     return null;
   }
 

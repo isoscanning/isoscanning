@@ -13,10 +13,20 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AlertCircle, CheckCircle2, Trash2, Plus, Calendar as CalendarIcon, Upload, ImageIcon } from "lucide-react"
+import { AlertCircle, CheckCircle2, Trash2, Plus, Calendar as CalendarIcon, Upload, ImageIcon, Eye, EyeOff, X, Globe } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { cn } from "@/lib/utils"
@@ -57,7 +67,7 @@ export default function PerfilPage() {
   const [formData, setFormData] = useState({
     displayName: "",
     artisticName: "",
-    specialty: "",
+    specialties: [] as string[],
     description: "",
     city: "",
     state: "",
@@ -65,6 +75,7 @@ export default function PerfilPage() {
     portfolioLink: "",
     instagram: "", // UI only for now
     linkedin: "",  // UI only for now
+    isPublished: false,
   })
 
   // Portfolio State
@@ -83,12 +94,15 @@ export default function PerfilPage() {
     endTime: "18:00"
   })
 
-  // Loading States
+  // Loading States and Modals
   const [savingProfile, setSavingProfile] = useState(false)
   const [loadingPortfolio, setLoadingPortfolio] = useState(false)
   const [loadingAvailability, setLoadingAvailability] = useState(false)
   const [successMsg, setSuccessMsg] = useState("")
   const [errorMsg, setErrorMsg] = useState("")
+  const [showPublishModal, setShowPublishModal] = useState(false)
+  const [showSaveSuccessModal, setShowSaveSuccessModal] = useState(false)
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
 
   useEffect(() => {
     if (!loading && !userProfile) {
@@ -99,7 +113,7 @@ export default function PerfilPage() {
       setFormData({
         displayName: userProfile.displayName || "",
         artisticName: userProfile.artisticName || "",
-        specialty: userProfile.specialty || "",
+        specialties: userProfile.specialties || [],
         description: userProfile.description || "",
         city: userProfile.city || "",
         state: userProfile.state || "",
@@ -107,6 +121,7 @@ export default function PerfilPage() {
         portfolioLink: userProfile.portfolioLink || "",
         instagram: "",
         linkedin: "",
+        isPublished: userProfile.isPublished || false,
       })
 
       // Load additional data
@@ -141,20 +156,104 @@ export default function PerfilPage() {
       await updateProfile({
         displayName: formData.displayName,
         artisticName: formData.artisticName,
-        specialty: formData.specialty,
+        specialties: formData.specialties,
         description: formData.description,
         city: formData.city,
         state: formData.state,
         phone: formData.phone,
         portfolioLink: formData.portfolioLink,
+        isPublished: formData.isPublished,
       })
-      setSuccessMsg("Perfil atualizado com sucesso!")
-      setTimeout(() => setSuccessMsg(""), 3000)
+      setShowSaveSuccessModal(true)
     } catch (err: any) {
       setErrorMsg(err.message || "Erro ao salvar perfil.")
     } finally {
       setSavingProfile(false)
     }
+  }
+
+  const validateProfile = () => {
+    const errors: string[] = []
+    const missingFieldNames: string[] = []
+
+    if (!formData.displayName) {
+      errors.push("displayName")
+      missingFieldNames.push("Nome Completo")
+    }
+    if (formData.specialties.length === 0) {
+      errors.push("specialties")
+      missingFieldNames.push("Especialidades")
+    }
+    if (!formData.description) {
+      errors.push("description")
+      missingFieldNames.push("Descrição")
+    }
+    if (!formData.city) {
+      errors.push("city")
+      missingFieldNames.push("Cidade")
+    }
+    if (!formData.state) {
+      errors.push("state")
+      missingFieldNames.push("Estado")
+    }
+
+    setValidationErrors(errors)
+
+    if (errors.length > 0) {
+      setErrorMsg(`Para publicar, preencha: ${missingFieldNames.join(", ")}`)
+      return false
+    }
+
+    return true
+  }
+
+  const handlePublishToggle = async (checked: boolean) => {
+    // If trying to publish (toggle ON), validate first
+    if (checked) {
+      if (!validateProfile()) {
+        // Validation failed, do not update state
+        return
+      }
+    }
+
+    // Update state and save
+    setFormData(prev => ({ ...prev, isPublished: checked }))
+
+    try {
+      setSavingProfile(true)
+      await updateProfile({
+        isPublished: checked
+      })
+
+      if (checked) {
+        setShowPublishModal(true)
+      } else {
+        setSuccessMsg("Perfil ocultado.")
+        setTimeout(() => setSuccessMsg(""), 3000)
+      }
+
+    } catch (err: any) {
+      setErrorMsg("Erro ao atualizar status do perfil.")
+      // Revert in case of error
+      setFormData(prev => ({ ...prev, isPublished: !checked }))
+    } finally {
+      setSavingProfile(false)
+    }
+  }
+
+  const toggleSpecialty = (specialty: string) => {
+    setFormData(prev => {
+      const exists = prev.specialties.includes(specialty)
+      if (exists) {
+        return { ...prev, specialties: prev.specialties.filter(s => s !== specialty) }
+      } else {
+        return { ...prev, specialties: [...prev.specialties, specialty] }
+      }
+    })
+  }
+
+  const removeSpecialty = (specialty: string) => {
+    setFormData(prev => ({ ...prev, specialties: prev.specialties.filter(s => s !== specialty) }))
   }
 
   const handleAddPortfolioItem = async () => {
@@ -248,9 +347,24 @@ export default function PerfilPage() {
 
       <main className="flex-1 py-12 px-4">
         <div className="container mx-auto max-w-4xl space-y-8">
-          <div>
-            <h1 className="text-3xl font-bold">Meu Perfil</h1>
-            <p className="text-muted-foreground mt-2">Gerencie suas informações, portfólio e agenda</p>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold">Meu Perfil</h1>
+              <p className="text-muted-foreground mt-2">Gerencie suas informações, portfólio e agenda</p>
+            </div>
+
+            <div className="flex items-center gap-4 bg-muted/50 p-4 rounded-lg border">
+              <div className="flex flex-col">
+                <span className="font-medium text-sm">Visibilidade do Perfil</span>
+                <span className="text-xs text-muted-foreground">
+                  {formData.isPublished ? "Público e visível na busca" : "Privado, visível apenas para você"}
+                </span>
+              </div>
+              <Switch
+                checked={formData.isPublished}
+                onCheckedChange={handlePublishToggle}
+              />
+            </div>
           </div>
 
           {(successMsg || errorMsg) && (
@@ -292,7 +406,13 @@ export default function PerfilPage() {
                         <Input
                           id="displayName"
                           value={formData.displayName}
-                          onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                          onChange={(e) => {
+                            setFormData({ ...formData, displayName: e.target.value })
+                            if (validationErrors.includes("displayName")) {
+                              setValidationErrors(prev => prev.filter(f => f !== "displayName"))
+                            }
+                          }}
+                          className={cn(validationErrors.includes("displayName") && "border-destructive focus-visible:ring-destructive")}
                           required
                         />
                       </div>
@@ -308,20 +428,41 @@ export default function PerfilPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="specialty">Especialidade Principal *</Label>
-                      <Select
-                        value={formData.specialty}
-                        onValueChange={(value) => setFormData({ ...formData, specialty: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ESPECIALIDADES.map((esp) => (
-                            <SelectItem key={esp} value={esp}>{esp}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label className={cn(validationErrors.includes("specialties") && "text-destructive")}>Especialidades (Selecione quantas precisar) *</Label>
+                      <div className={cn(
+                        "flex flex-wrap gap-2 mb-2 p-2 min-h-[40px] border rounded-md bg-background",
+                        validationErrors.includes("specialties") && "border-destructive ring-1 ring-destructive"
+                      )}>
+                        {formData.specialties.length === 0 && <span className="text-muted-foreground text-sm self-center px-1">Nenhuma selecionada</span>}
+                        {formData.specialties.map(spec => (
+                          <Badge key={spec} variant="secondary" className="flex items-center gap-1">
+                            {spec}
+                            <button type="button" onClick={() => removeSpecialty(spec)} className="hover:text-destructive">
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="border rounded-md max-h-[200px] overflow-y-auto p-1">
+                        {ESPECIALIDADES.map(spec => {
+                          const isSelected = formData.specialties.includes(spec)
+                          return (
+                            <div
+                              key={spec}
+                              onClick={() => toggleSpecialty(spec)}
+                              className={cn(
+                                "flex items-center gap-2 p-2 rounded-sm cursor-pointer hover:bg-accent text-sm",
+                                isSelected && "bg-accent/50"
+                              )}
+                            >
+                              <div className={cn("w-4 h-4 border rounded flex items-center justify-center", isSelected ? "bg-primary border-primary text-primary-foreground" : "border-input")}>
+                                {isSelected && <CheckCircle2 className="w-3 h-3" />}
+                              </div>
+                              {spec}
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -329,9 +470,15 @@ export default function PerfilPage() {
                       <Textarea
                         id="description"
                         value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        onChange={(e) => {
+                          setFormData({ ...formData, description: e.target.value })
+                          if (validationErrors.includes("description")) {
+                            setValidationErrors(prev => prev.filter(f => f !== "description"))
+                          }
+                        }}
                         placeholder="Fale sobre seus serviços, equipamentos e experiência..."
                         rows={5}
+                        className={cn(validationErrors.includes("description") && "border-destructive focus-visible:ring-destructive")}
                         required
                       />
                     </div>
@@ -342,7 +489,13 @@ export default function PerfilPage() {
                         <Input
                           id="city"
                           value={formData.city}
-                          onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                          onChange={(e) => {
+                            setFormData({ ...formData, city: e.target.value })
+                            if (validationErrors.includes("city")) {
+                              setValidationErrors(prev => prev.filter(f => f !== "city"))
+                            }
+                          }}
+                          className={cn(validationErrors.includes("city") && "border-destructive focus-visible:ring-destructive")}
                           required
                         />
                       </div>
@@ -350,9 +503,14 @@ export default function PerfilPage() {
                         <Label htmlFor="state">Estado *</Label>
                         <Select
                           value={formData.state}
-                          onValueChange={(value) => setFormData({ ...formData, state: value })}
+                          onValueChange={(value) => {
+                            setFormData({ ...formData, state: value })
+                            if (validationErrors.includes("state")) {
+                              setValidationErrors(prev => prev.filter(f => f !== "state"))
+                            }
+                          }}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className={cn(validationErrors.includes("state") && "border-destructive focus:ring-destructive")}>
                             <SelectValue placeholder="UF" />
                           </SelectTrigger>
                           <SelectContent>
@@ -566,6 +724,46 @@ export default function PerfilPage() {
               </Card>
             </TabsContent>
           </Tabs>
+
+          <Dialog open={showPublishModal} onOpenChange={setShowPublishModal}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Globe className="h-5 w-5 text-primary" />
+                  Perfil Publicado com Sucesso!
+                </DialogTitle>
+                <DialogDescription className="pt-2">
+                  Seu perfil agora está visível para todos os usuários na busca de profissionais.
+                  <br /><br />
+                  Você pode ocultá-lo a qualquer momento usando o botão de visibilidade no topo da página.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button onClick={() => setShowPublishModal(false)}>
+                  Entendi
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={showSaveSuccessModal} onOpenChange={setShowSaveSuccessModal}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  Dados Salvos com Sucesso!
+                </DialogTitle>
+                <DialogDescription className="pt-2">
+                  Suas alterações no perfil foram salvas com sucesso.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button onClick={() => setShowSaveSuccessModal(false)}>
+                  Ok, entendi
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </main>
 

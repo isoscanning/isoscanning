@@ -26,12 +26,13 @@ export interface UserProfile {
   phone?: string;
   city?: string;
   state?: string;
-  specialty?: string;
+  specialties?: string[];
   artisticName?: string;
   description?: string;
   portfolioLink?: string;
   avatarUrl?: string;
   isActive: boolean;
+  isPublished: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -82,7 +83,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         let profile: UserProfile | null = null;
 
-        if (savedProfile) {
+        if (savedProfile && token) {
           // Load profile from localStorage first
           console.log("[auth-context] Loading profile from localStorage...");
           profile = JSON.parse(savedProfile);

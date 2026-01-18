@@ -37,14 +37,16 @@ export default function AuthCallbackPage() {
           const redirectUrl = localStorage.getItem("redirectAfterLogin") || "/dashboard";
           localStorage.removeItem("redirectAfterLogin");
 
-          router.push(redirectUrl);
+          // Use window.location.href to force a full page reload.
+          // This ensures AuthContext re-initializes and picks up the new token immediately.
+          window.location.href = redirectUrl;
         } else {
           // If no session immediately, wait for onAuthStateChange
           const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             if (event === 'SIGNED_IN' && session) {
               console.log("[auth-callback] Signed in via event, redirecting...");
               localStorage.setItem("auth_token", session.access_token);
-              router.push("/dashboard");
+              window.location.href = "/dashboard";
             }
           });
 

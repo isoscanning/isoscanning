@@ -37,6 +37,8 @@ apiClient.interceptors.response.use(
 
         if (!skipRedirect) {
           localStorage.removeItem("auth_token");
+          localStorage.removeItem("refresh_token");
+          localStorage.removeItem("user_profile");
           window.location.href = "/login";
         }
       }

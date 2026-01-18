@@ -72,7 +72,7 @@ const ESTADOS = [
 
 export default function NovoEquipamentoPage() {
   const router = useRouter();
-  const { user, userProfile, loading } = useAuth();
+  const { userProfile, loading } = useAuth();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -96,10 +96,10 @@ export default function NovoEquipamentoPage() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !userProfile) {
       router.push("/login");
     }
-  }, [user, loading, router]);
+  }, [userProfile, loading, router]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -154,10 +154,10 @@ export default function NovoEquipamentoPage() {
       let imageUrls: string[] = [];
 
       // Upload images if selected
-      if (selectedImages.length > 0 && user?.uid) {
+      if (selectedImages.length > 0 && userProfile?.id) {
         try {
           console.log(`Fazendo upload de ${selectedImages.length} imagens...`);
-          imageUrls = await uploadEquipmentImages(selectedImages, user.uid);
+          imageUrls = await uploadEquipmentImages(selectedImages, userProfile.id);
           console.log("Upload das imagens concluído:", imageUrls);
         } catch (imageError: any) {
           console.error("Erro no upload das imagens:", imageError);
@@ -172,13 +172,14 @@ export default function NovoEquipamentoPage() {
         console.log("Criando equipamento...");
         await createEquipment({
           ...formData,
+          negotiationType: formData.negotiationType as "sale" | "rent" | "free",
+          condition: formData.condition as "new" | "refurbished" | "used",
+          rentPeriod: formData.rentPeriod as "day" | "week" | "month",
           price: formData.price ? Number.parseFloat(formData.price) : undefined,
           imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
-          ownerId: user?.uid || "",
+          ownerId: userProfile?.id || "",
           ownerName: userProfile?.displayName || "",
-          available: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          isAvailable: true,
         });
         console.log("Equipamento criado com sucesso!");
 
@@ -206,7 +207,7 @@ export default function NovoEquipamentoPage() {
     );
   }
 
-  if (!user || !userProfile) {
+  if (!userProfile) {
     return null;
   }
 

@@ -1,4 +1,5 @@
 import apiClient from "./api-service";
+import { supabase } from "./supabase";
 
 export interface Equipment {
   id: string;
@@ -102,7 +103,11 @@ export async function createEquipment(
   data: CreateEquipmentData
 ): Promise<string> {
   try {
-    const response = await apiClient.post("/equipments", data);
+    const response = await apiClient.post("/equipments", data, {
+      headers: {
+        "X-Skip-Auth-Redirect": "true",
+      },
+    });
     return response.data.id;
   } catch (error) {
     console.error("[data-service] Error creating equipment:", error);
@@ -118,8 +123,19 @@ export async function updateEquipment(
   data: Partial<CreateEquipmentData>
 ): Promise<void> {
   try {
-    await apiClient.put(`/equipments/${equipmentId}`, data);
+    if (typeof window !== "undefined" && !localStorage.getItem("auth_token")) {
+      throw new Error("Sessão expirada. Por favor, faça login novamente.");
+    }
+
+    await apiClient.put(`/equipments/${equipmentId}`, data, {
+      headers: {
+        "X-Skip-Auth-Redirect": "true",
+      },
+    });
   } catch (error) {
+    if ((error as any).message === "Sessão expirada. Por favor, faça login novamente.") {
+      throw error;
+    }
     console.error("[data-service] Error updating equipment:", error);
     throw new Error("Erro ao atualizar equipamento");
   }
@@ -148,33 +164,42 @@ export async function uploadEquipmentImages(
   files: File[],
   userId: string
 ): Promise<string[]> {
-  console.warn("[data-service] Upload de imagens não implementado no backend");
-  // Retorna URLs vazias por enquanto
-  return [];
-  
-  /* Código para quando backend implementar:
   try {
-    const uploadPromises = files.map(async (file) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("ownerId", userId);
+    // Ensure Supabase client has the session from localStorage
+    const token = localStorage.getItem("auth_token");
+    const refreshToken = localStorage.getItem("refresh_token");
 
-      const response = await apiClient.post("/equipments/upload", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+    if (token) {
+      await supabase.auth.setSession({
+        access_token: token,
+        refresh_token: refreshToken || "",
       });
+    }
 
-      return response.data.url || response.data.uploadUrl;
+    const uploadPromises = files.map(async (file) => {
+      const fileExt = file.name.split('.').pop();
+      // Sanitize filename
+      const safeName = file.name.replace(/[^a-zA-Z0-9]/g, '');
+      const fileName = `${userId}/${Date.now()}-${safeName}.${fileExt}`;
+
+      const { error } = await supabase.storage
+        .from('equipments')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('equipments')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
     });
 
-    const urls = await Promise.all(uploadPromises);
-    return urls;
+    return await Promise.all(uploadPromises);
   } catch (error) {
     console.error("[data-service] Error uploading equipment images:", error);
     throw new Error("Erro ao fazer upload das imagens");
   }
-  */
 }
 
 /**
@@ -188,7 +213,7 @@ export async function deleteEquipmentImages(
   console.warn("[data-service] Delete de imagens não implementado no backend");
   // Não faz nada por enquanto
   return;
-  
+
   /* Código para quando backend implementar:
   try {
     await apiClient.post("/equipments/delete-images", {
@@ -216,5 +241,140 @@ export async function fetchProfessionals(): Promise<Professional[]> {
   } catch (error) {
     console.error("[data-service] Error fetching professionals:", error);
     throw new Error("Erro ao buscar profissionais");
+  }
+}
+
+// --- PORTFOLIO ---
+
+export interface CreatePortfolioItemData {
+  title: string;
+  description?: string;
+  mediaUrl: string;
+  mediaType: "image" | "video";
+  professionalId: string;
+}
+
+export interface PortfolioItem {
+  id: string;
+  title: string;
+  description?: string;
+  mediaUrl: string;
+  mediaType: "image" | "video";
+  professionalId: string;
+  createdAt: Date;
+}
+
+export async function fetchPortfolio(professionalId: string): Promise<PortfolioItem[]> {
+  try {
+    const response = await apiClient.get(`/portfolio?professionalId=${professionalId}`);
+    return response.data.data || [];
+  } catch (error) {
+    console.error("[data-service] Error fetching portfolio:", error);
+    return []; // Return empty array instead of throwing to avoid breaking UI
+  }
+}
+
+export async function createPortfolioItem(data: CreatePortfolioItemData): Promise<PortfolioItem> {
+  try {
+    const response = await apiClient.post("/portfolio", data);
+    return response.data;
+  } catch (error) {
+    console.error("[data-service] Error creating portfolio item:", error);
+    throw new Error("Erro ao adicionar item ao portfólio");
+  }
+}
+
+export async function deletePortfolioItem(id: string): Promise<void> {
+  try {
+    await apiClient.delete(`/portfolio/${id}`);
+  } catch (error) {
+    console.error("[data-service] Error deleting portfolio item:", error);
+    throw new Error("Erro ao excluir item do portfólio");
+  }
+}
+
+export async function uploadPortfolioItemImage(
+  file: File,
+  userId: string
+): Promise<string> {
+  try {
+    // Ensure Supabase client has the session from localStorage
+    const token = localStorage.getItem("auth_token");
+    const refreshToken = localStorage.getItem("refresh_token");
+
+    if (token) {
+      await supabase.auth.setSession({
+        access_token: token,
+        refresh_token: refreshToken || "",
+      });
+    }
+
+    const fileExt = file.name.split('.').pop();
+    const safeName = file.name.replace(/[^a-zA-Z0-9]/g, '');
+    const fileName = `${userId}/${Date.now()}-${safeName}.${fileExt}`;
+
+    const { error } = await supabase.storage
+      .from('portfolio')
+      .upload(fileName, file);
+
+    if (error) throw error;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('portfolio')
+      .getPublicUrl(fileName);
+
+    return publicUrl;
+  } catch (error) {
+    console.error("[data-service] Error uploading portfolio image:", error);
+    throw new Error("Erro ao fazer upload da imagem do portfólio");
+  }
+}
+
+// --- AVAILABILITY ---
+
+export interface CreateAvailabilityData {
+  date: string; // ISO date string YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string;   // HH:mm
+  isBooked: boolean;
+  professionalId: string;
+}
+
+export interface AvailabilitySlot {
+  id: string;
+  professionalId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  isBooked: boolean;
+  createdAt: Date;
+}
+
+export async function fetchAvailability(professionalId: string): Promise<AvailabilitySlot[]> {
+  try {
+    const response = await apiClient.get(`/availability?professionalId=${professionalId}`);
+    return response.data || [];
+  } catch (error) {
+    console.error("[data-service] Error fetching availability:", error);
+    return [];
+  }
+}
+
+export async function createAvailability(data: CreateAvailabilityData): Promise<AvailabilitySlot> {
+  try {
+    const response = await apiClient.post("/availability", data);
+    return response.data;
+  } catch (error) {
+    console.error("[data-service] Error creating availability:", error);
+    throw new Error("Erro ao adicionar disponibilidade");
+  }
+}
+
+export async function deleteAvailability(id: string): Promise<void> {
+  try {
+    await apiClient.delete(`/availability/${id}`);
+  } catch (error) {
+    console.error("[data-service] Error deleting availability:", error);
+    throw new Error("Erro ao excluir disponibilidade");
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/header";
@@ -18,12 +18,37 @@ import Link from "next/link";
 export default function DashboardPage() {
   const router = useRouter();
   const { userProfile, loading } = useAuth();
+  const [googleName, setGoogleName] = useState("");
 
   useEffect(() => {
     if (!loading && !userProfile) {
       router.push("/login");
     }
   }, [userProfile, loading, router]);
+
+  useEffect(() => {
+    // Fallback to get name from Supabase local storage if profile name is empty
+    if (userProfile && !userProfile.displayName) {
+      try {
+        // Search for Supabase auth token in localStorage
+        const keys = Object.keys(localStorage);
+        const sbKey = keys.find(key => key.startsWith("sb-") && key.endsWith("-auth-token"));
+
+        if (sbKey) {
+          const sessionData = localStorage.getItem(sbKey);
+          if (sessionData) {
+            const session = JSON.parse(sessionData);
+            const name = session.user?.user_metadata?.full_name || session.user?.user_metadata?.name; // Some providers might map differently, but full_name is standard
+            if (name && typeof name === 'string') {
+              setGoogleName(name);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error parsing user metadata from localStorage", error);
+      }
+    }
+  }, [userProfile]);
 
   if (loading) {
     return (
@@ -48,7 +73,7 @@ export default function DashboardPage() {
           {/* Welcome Section */}
           <div className="space-y-2">
             <h1 className="text-3xl font-bold">
-              Olá, {userProfile.displayName}!
+              Olá, {userProfile.displayName || googleName}!
             </h1>
             <p className="text-muted-foreground">
               {isProfessional
@@ -192,14 +217,14 @@ export default function DashboardPage() {
             )}
 
             <Card className="hover:border-primary transition-colors cursor-pointer">
-              <Link href="/dashboard/configuracoes">
+              <Link href="/dashboard/perfil">
                 <CardHeader>
                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                    <Settings className="h-5 w-5 text-primary" />
+                    <User className="h-5 w-5 text-primary" />
                   </div>
-                  <CardTitle>Configurações</CardTitle>
+                  <CardTitle>Meu Perfil</CardTitle>
                   <CardDescription>
-                    Gerencie sua conta e preferências
+                    Gerencie seus dados e preferências
                   </CardDescription>
                 </CardHeader>
               </Link>

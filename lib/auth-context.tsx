@@ -27,7 +27,9 @@ export interface UserProfile {
   city?: string;
   state?: string;
   specialty?: string;
+  artisticName?: string;
   description?: string;
+  portfolioLink?: string;
   avatarUrl?: string;
   isActive: boolean;
   createdAt: Date;
@@ -78,19 +80,49 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const token = localStorage.getItem("auth_token");
         const savedProfile = localStorage.getItem("user_profile");
 
+        let profile: UserProfile | null = null;
+
         if (savedProfile) {
           // Load profile from localStorage first
           console.log("[auth-context] Loading profile from localStorage...");
-          const profile = JSON.parse(savedProfile);
-          setUserProfile(profile);
+          profile = JSON.parse(savedProfile);
         } else if (token) {
           // If no saved profile, fetch from API
           console.log("[auth-context] Token found, fetching profile...");
           const response = await apiClient.get("/auth/me");
-          setUserProfile(response.data);
+          profile = response.data;
           localStorage.setItem("user_profile", JSON.stringify(response.data));
           console.log("[auth-context] Profile loaded successfully");
         }
+
+        // Enrich with Google Data if missing info
+        if (profile) {
+          try {
+            if (!profile.displayName || !profile.avatarUrl) {
+              const keys = Object.keys(localStorage);
+              const sbKey = keys.find(key => key.startsWith("sb-") && key.endsWith("-auth-token"));
+              if (sbKey) {
+                const sessionData = localStorage.getItem(sbKey);
+                if (sessionData) {
+                  const session = JSON.parse(sessionData);
+                  const metadata = session.user?.user_metadata;
+                  if (metadata) {
+                    if (!profile.displayName) {
+                      profile.displayName = metadata.full_name || metadata.name || "";
+                    }
+                    if (!profile.avatarUrl) {
+                      profile.avatarUrl = metadata.avatar_url || metadata.picture || "";
+                    }
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.error("Error enriching profile", e);
+          }
+          setUserProfile(profile);
+        }
+
       } catch (error) {
         console.error("[auth-context] Error loading profile:", error);
         if (typeof window !== "undefined") {

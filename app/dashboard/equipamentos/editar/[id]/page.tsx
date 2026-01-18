@@ -73,7 +73,7 @@ const ESTADOS = [
 export default function EditarEquipamentoPage() {
   const router = useRouter();
   const params = useParams();
-  const { user, userProfile, loading, isAnonymous } = useAuth();
+  const { userProfile, loading, isAnonymous } = useAuth();
   const equipmentId = params.id as string;
 
   const [formData, setFormData] = useState({
@@ -99,14 +99,14 @@ export default function EditarEquipamentoPage() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !userProfile) {
       router.push("/login");
     }
 
-    if (user && equipmentId) {
+    if (userProfile && equipmentId) {
       loadEquipment();
     }
-  }, [user, loading, router, equipmentId]);
+  }, [userProfile, loading, router, equipmentId]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -152,11 +152,11 @@ export default function EditarEquipamentoPage() {
   };
 
   const loadEquipment = async () => {
-    if (!user || !equipmentId) return;
+    if (!userProfile || !equipmentId) return;
 
     setLoadingEquipment(true);
     try {
-      const equipments = await fetchUserEquipments(user.uid);
+      const equipments = await fetchUserEquipments(userProfile.id);
       const equipment = equipments.find((eq) => eq.id === equipmentId);
 
       if (!equipment) {
@@ -202,10 +202,10 @@ export default function EditarEquipamentoPage() {
       let imageUrls = imagePreviews.filter(url => !url.startsWith('data:')); // Keep existing URLs that are not data URLs
 
       // Upload new images if selected
-      if (selectedImages.length > 0 && user?.uid) {
+      if (selectedImages.length > 0 && userProfile?.id) {
         try {
           console.log(`Fazendo upload de ${selectedImages.length} novas imagens...`);
-          const newImageUrls = await uploadEquipmentImages(selectedImages, user.uid);
+          const newImageUrls = await uploadEquipmentImages(selectedImages, userProfile.id);
           imageUrls = [...imageUrls, ...newImageUrls]; // Combine existing and new URLs
           console.log("Upload das imagens concluído:", newImageUrls);
         } catch (imageError: any) {
@@ -222,14 +222,14 @@ export default function EditarEquipamentoPage() {
         await updateEquipment(equipmentId, {
           name: formData.name,
           category: formData.category,
-          negotiationType: formData.negotiationType,
-          condition: formData.condition,
+          negotiationType: formData.negotiationType as "sale" | "rent" | "free",
+          condition: formData.condition as "new" | "refurbished" | "used",
           description: formData.description,
           brand: formData.brand,
           model: formData.model,
           price: formData.price ? Number.parseFloat(formData.price) : undefined,
           rentPeriod:
-            formData.negotiationType === "rent" ? formData.rentPeriod : undefined,
+            formData.negotiationType === "rent" ? (formData.rentPeriod as "day" | "week" | "month") : undefined,
           city: formData.city,
           state: formData.state,
           imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
@@ -260,7 +260,7 @@ export default function EditarEquipamentoPage() {
     );
   }
 
-  if (!user) {
+  if (!userProfile) {
     return null;
   }
 

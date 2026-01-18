@@ -17,7 +17,10 @@ apiClient.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
     const token = localStorage.getItem("auth_token");
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers = config.headers || {};
+      // Ensure we don't overwrite if already set (though usually we want to enforce the token)
+      // Use bracket notation to be safe with Axios header objects
+      config.headers["Authorization"] = `Bearer ${token}`;
     }
   }
   return config;
@@ -29,8 +32,13 @@ apiClient.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       if (typeof window !== "undefined") {
-        localStorage.removeItem("auth_token");
-        window.location.href = "/login";
+        // Check for specific header or config to skip redirect
+        const skipRedirect = error.config?.headers?.["X-Skip-Auth-Redirect"];
+
+        if (!skipRedirect) {
+          localStorage.removeItem("auth_token");
+          window.location.href = "/login";
+        }
       }
     }
     return Promise.reject(error);

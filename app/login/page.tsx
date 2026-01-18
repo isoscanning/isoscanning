@@ -228,8 +228,6 @@ export default function LoginPage() {
                   </Button>
                 </form>
 
-                {/* Google OAuth temporariamente desabilitado - aguardando implementação no backend */}
-                {/* 
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t border-border/30" />
@@ -268,7 +266,6 @@ export default function LoginPage() {
                   </svg>
                   Entrar com Google
                 </Button>
-                */}
 
                 <div className="text-center pt-4">
                   <span className="text-sm text-muted-foreground">

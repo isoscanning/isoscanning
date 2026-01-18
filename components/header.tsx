@@ -17,54 +17,97 @@ import {
   LogIn,
   Settings,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export function Header() {
   const { userProfile, signOut, loading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [googleName, setGoogleName] = useState("");
+  const [googleAvatar, setGoogleAvatar] = useState("");
+
+  useEffect(() => {
+    // Fallback to get name/avatar from Supabase local storage if profile info is missing
+    if (userProfile && (!userProfile.displayName || !userProfile.avatarUrl)) {
+      try {
+        const keys = Object.keys(localStorage);
+        const sbKey = keys.find(key => key.startsWith("sb-") && key.endsWith("-auth-token"));
+
+        if (sbKey) {
+          const sessionData = localStorage.getItem(sbKey);
+          if (sessionData) {
+            const session = JSON.parse(sessionData);
+            const metadata = session.user?.user_metadata;
+
+            if (metadata) {
+              // Get Name
+              if (!userProfile.displayName) {
+                const name = metadata.full_name || metadata.name;
+                if (name && typeof name === 'string') setGoogleName(name);
+              }
+
+              // Get Avatar
+              if (!userProfile.avatarUrl) {
+                const avatar = metadata.avatar_url || metadata.picture;
+                if (avatar && typeof avatar === 'string') setGoogleAvatar(avatar);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error parsing user metadata from localStorage", error);
+      }
+    }
+  }, [userProfile]);
 
   const isAuthenticated = !!userProfile && !loading;
 
   return (
     <header className="sticky top-0 z-[80] w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-3">
-          <Image
-            src="/logo-cortada.png"
-            alt="ISO Scanning"
-            width={220}
-            height={40}
-            className="h-9 w-auto drop-shadow"
-            priority
-          />
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link href="/" className="flex items-center gap-3">
+            <Image
+              src="/logo-cortada.png"
+              alt="ISO Scanning"
+              width={220}
+              height={40}
+              className="h-9 w-auto drop-shadow"
+              priority
+            />
+          </Link>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-7 text-foreground/85">
-          <Link
-            href="/profissionais"
-            className="text-sm font-medium transition-colors hover:text-primary focus-visible:text-primary"
-          >
-            Encontrar Profissionais
-          </Link>
-          <Link
-            href="/equipamentos"
-            className="text-sm font-medium transition-colors hover:text-primary focus-visible:text-primary"
-          >
-            Equipamentos
-          </Link>
-          {isAuthenticated && (
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center gap-6 text-foreground/85">
             <Link
-              href="/dashboard/equipamentos"
+              href="/profissionais"
               className="text-sm font-medium transition-colors hover:text-primary focus-visible:text-primary"
             >
-              Meus Equipamentos
+              Encontrar Profissionais
             </Link>
-          )}
-        </nav>
+            <Link
+              href="/equipamentos"
+              className="text-sm font-medium transition-colors hover:text-primary focus-visible:text-primary"
+            >
+              Equipamentos
+            </Link>
+            {isAuthenticated && (
+              <Link
+                href="/dashboard/equipamentos"
+                className="text-sm font-medium transition-colors hover:text-primary focus-visible:text-primary"
+              >
+                Meus Equipamentos
+              </Link>
+            )}
+          </nav>
+        </div>
 
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-3">
+          {isAuthenticated && (
+            <span className="text-sm font-medium mr-2">
+              Olá, {userProfile?.displayName || googleName}!
+            </span>
+          )}
           <ThemeToggle />
           <UserNav />
         </div>
@@ -122,8 +165,8 @@ export function Header() {
                     <div className="flex items-center gap-3">
                       <Avatar className="h-10 w-10 ring-2 ring-border/50 shadow-sm">
                         <AvatarImage
-                          src={userProfile?.photoURL || undefined}
-                          alt={userProfile?.displayName || "Usuário"}
+                          src={userProfile?.avatarUrl || googleAvatar || undefined}
+                          alt={userProfile?.displayName || googleName || "Usuário"}
                         />
                         <AvatarFallback className="bg-primary text-primary-foreground">
                           {userProfile?.displayName?.[0]?.toUpperCase() ||

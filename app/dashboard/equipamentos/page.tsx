@@ -22,8 +22,9 @@ interface Equipment {
   category: string;
   negotiationType: string;
   price?: number;
-  available: boolean;
+  isAvailable: boolean;
   imageUrl?: string;
+  imageUrls?: string[];
 }
 
 export default function MeusEquipamentosPage() {
@@ -45,8 +46,9 @@ export default function MeusEquipamentosPage() {
           category: equip.category,
           negotiationType: equip.negotiationType,
           price: equip.price,
-          available: equip.available,
-          imageUrl: equip.imageUrl,
+          isAvailable: equip.isAvailable,
+          imageUrl: equip.imageUrls?.[0], // simple fallback
+          imageUrls: equip.imageUrls,
         }))
       );
     } catch (error) {
@@ -171,9 +173,9 @@ export default function MeusEquipamentosPage() {
 
                     <div className="flex items-center gap-2">
                       <Badge
-                        variant={equip.available ? "default" : "secondary"}
+                        variant={equip.isAvailable ? "default" : "secondary"}
                       >
-                        {equip.available ? "Disponível" : "Indisponível"}
+                        {equip.isAvailable ? "Disponível" : "Indisponível"}
                       </Badge>
                       <Badge variant="outline">{equip.negotiationType}</Badge>
                     </div>

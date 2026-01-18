@@ -24,9 +24,10 @@ interface Equipment {
   city: string
   state: string
   imageUrl?: string
+  imageUrls?: string[]
   ownerId: string
   ownerName: string
-  available: boolean
+  isAvailable: boolean
 }
 
 const CATEGORIAS = [
@@ -93,7 +94,11 @@ export default function EquipamentosPage() {
     setLoading(true)
     try {
       const data = await fetchEquipments()
-      setEquipments(data as any)
+      const mappedData = data.map((item: any) => ({
+        ...item,
+        imageUrl: item.imageUrls?.[0] || item.imageUrl,
+      }))
+      setEquipments(mappedData as any)
     } catch (error) {
       console.error("[v0] Error loading equipments:", error)
     } finally {
@@ -306,9 +311,9 @@ export default function EquipamentosPage() {
                 <Card key={equip.id} className="hover:border-primary transition-colors overflow-hidden">
                   <Link href={`/equipamentos/${equip.id}`}>
                     <div className="aspect-video bg-muted relative overflow-hidden">
-                      {equip.imageUrl ? (
+                      {equip.imageUrl || (equip.imageUrls && equip.imageUrls.length > 0) ? (
                         <img
-                          src={equip.imageUrl || "/placeholder.svg"}
+                          src={equip.imageUrl || equip.imageUrls?.[0] || "/placeholder.svg"}
                           alt={equip.name}
                           className="h-full w-full object-cover"
                         />

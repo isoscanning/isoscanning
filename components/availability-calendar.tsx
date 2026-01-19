@@ -67,7 +67,7 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
                     month={currentMonth}
                     onMonthChange={setCurrentMonth}
                     locale={ptBR}
-                    className="p-0 pointer-events-none" // Disable interaction for now as it's just display
+                    className="p-0"
                     modifiers={{
                         available: (date) => availabilitySlots.some(slot =>
                             slot.type === 'available' &&
@@ -114,7 +114,7 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
                         // Disable navigation on second calendar
                         disableNavigation
                         locale={ptBR}
-                        className="p-0 pointer-events-none"
+                        className="p-0"
                         modifiers={{
                             available: (date) => availabilitySlots.some(slot =>
                                 slot.type === 'available' &&
@@ -152,6 +152,61 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
                         }}
                     />
                 </div>
+            </div>
+
+            <div className="mt-8 border-t border-gray-100 pt-8">
+                {date ? (
+                    (() => {
+                        const selectedSlot = availabilitySlots.find(slot =>
+                            format(new Date(slot.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+                        );
+
+                        if (!selectedSlot) {
+                            return (
+                                <div className="text-center text-gray-500">
+                                    <p className="font-medium">Nenhuma informação de disponibilidade para este dia.</p>
+                                </div>
+                            );
+                        }
+
+                        if (selectedSlot.type === 'blocked') {
+                            return (
+                                <div className="text-center">
+                                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-full font-medium">
+                                        <div className="w-2 h-2 rounded-full bg-red-600" />
+                                        Indisponível
+                                    </div>
+                                </div>
+                            );
+                        }
+
+                        // Available slot
+                        const isAllDay = selectedSlot.startTime === '00:00' && selectedSlot.endTime === '23:59';
+
+                        return (
+                            <div className="text-center">
+                                <p className="text-sm text-gray-500 mb-2 font-medium uppercase tracking-wider">
+                                    Disponibilidade para {format(date, "dd 'de' MMMM", { locale: ptBR })}
+                                </p>
+                                {isAllDay ? (
+                                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full font-bold text-lg">
+                                        <div className="w-3 h-3 rounded-full bg-green-600" />
+                                        Dia Inteiro
+                                    </div>
+                                ) : (
+                                    <div className="inline-flex items-center gap-2 px-6 py-3 bg-green-50 text-green-700 rounded-xl font-bold text-xl border border-green-100">
+                                        <div className="w-3 h-3 rounded-full bg-green-600" />
+                                        {selectedSlot.startTime} - {selectedSlot.endTime}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()
+                ) : (
+                    <div className="text-center text-gray-400">
+                        Selecione uma data para ver detalhes
+                    </div>
+                )}
             </div>
         </div>
     );

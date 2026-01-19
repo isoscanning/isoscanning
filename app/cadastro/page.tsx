@@ -37,9 +37,7 @@ export default function CadastroPage() {
   const searchParams = useSearchParams();
   const { signUp, signInWithGoogle, getRedirectUrl } = useAuth();
 
-  const [userType, setUserType] = useState<"client" | "professional">(
-    searchParams.get("tipo") === "profissional" ? "professional" : "client"
-  );
+  const [userType, setUserType] = useState<"client" | "professional">("professional");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -198,52 +196,22 @@ export default function CadastroPage() {
                   </Alert>
                 )}
 
-                <Tabs
-                  value={userType}
-                  onValueChange={(v) =>
-                    setUserType(v as "client" | "professional")
-                  }
-                  className="w-full"
-                >
-                  <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50">
-                    <TabsTrigger
-                      value="client"
-                      className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white"
-                    >
-                      <UserCircle className="h-4 w-4" />
-                      Cliente
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="professional"
-                      className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white"
-                    >
-                      <Briefcase className="h-4 w-4" />
-                      Profissional
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="client" className="mt-4">
-                    <div className="p-4 rounded-lg bg-accent/5 border border-accent/20">
-                      <p className="text-sm text-foreground">
-                        <strong className="text-accent">Conta Cliente:</strong>{" "}
-                        Perfeita para quem busca contratar fotógrafos
-                        profissionais e alugar equipamentos de qualidade.
-                      </p>
+                {/* 
+                  Temporarily forcing Professional account type as per requirements.
+                  Tabs for selecting Client/Professional are hidden.
+                */}
+                <div className="w-full">
+                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-primary font-semibold">
+                      <Briefcase className="h-5 w-5" />
+                      <span>Conta Profissional</span>
                     </div>
-                  </TabsContent>
-
-                  <TabsContent value="professional" className="mt-4">
-                    <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                      <p className="text-sm text-foreground">
-                        <strong className="text-primary">
-                          Conta Profissional:
-                        </strong>{" "}
-                        Ideal para fotógrafos que desejam oferecer serviços,
-                        alugar equipamentos e expandir sua rede de clientes.
-                      </p>
-                    </div>
-                  </TabsContent>
-                </Tabs>
+                    <p className="text-sm text-foreground">
+                      Ideal para fotógrafos que desejam oferecer serviços,
+                      alugar equipamentos e expandir sua rede de clientes.
+                    </p>
+                  </div>
+                </div>
 
                 <Button
                   type="button"

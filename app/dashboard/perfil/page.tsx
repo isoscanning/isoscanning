@@ -98,14 +98,104 @@ export default function PerfilPage() {
   })
 
   // Loading States and Modals
-  const [savingProfile, setSavingProfile] = useState(false)
   const [loadingPortfolio, setLoadingPortfolio] = useState(false)
   const [loadingAvailability, setLoadingAvailability] = useState(false)
-  const [successMsg, setSuccessMsg] = useState("")
-  const [errorMsg, setErrorMsg] = useState("")
-  const [showPublishModal, setShowPublishModal] = useState(false)
+  const [savingProfile, setSavingProfile] = useState(false)
   const [showSaveSuccessModal, setShowSaveSuccessModal] = useState(false)
+  const [showPublishModal, setShowPublishModal] = useState(false)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [errorMsg, setErrorMsg] = useState("")
+  const [successMsg, setSuccessMsg] = useState("")
+
+  // Country Selector State
+  interface Country {
+    name: { common: string };
+    flags: { svg: string };
+    idd: { root: string; suffixes: string[] };
+    cca2: string;
+    flag: string; // Emoji
+  }
+  const [countries, setCountries] = useState<Country[]>([])
+  const [selectedCountryCode, setSelectedCountryCode] = useState("+55")
+
+  useEffect(() => {
+    // Fetch countries
+    fetch("https://restcountries.com/v3.1/all?fields=name,flags,idd,cca2,flag")
+      .then(res => res.json())
+      .then((data: Country[]) => {
+        // Filter out countries without IDD
+        const validCountries = data
+          .filter(c => c.idd?.root);
+
+        // Remove duplicates by calling code
+        // We prefer specific countries if possible, but for now just taking the first one is simpler
+        // or sorting by population/relevance if we had that data.
+        // Let's at least prefer the exact formatted calling code.
+
+        const uniqueDialCodes = new Map();
+
+        validCountries.forEach(country => {
+          const code = `${country.idd.root}${country.idd.suffixes?.[0] || ''}`;
+          if (!uniqueDialCodes.has(code)) {
+            uniqueDialCodes.set(code, country);
+          } else {
+            // Optional: If we want to prioritize certain countries for shared codes
+            // e.g., US for +1 instead of CA/others, or AU for +61
+            // For now, let's look for "specific" codes.
+            // Actually, +1 is shared by US and CA. RestCountries returns +1 for US and +1 for CA.
+            // Ideally we want both? No, the selector is just for the prefix.
+            // If we want to show multiple countries with same prefix, we MUST use a unique value for SelectItem
+            // but we are using the prefix as the value.
+            // So we MUST dedup by prefix.
+
+            // Hardcoded preferences for common shared codes
+            const current = uniqueDialCodes.get(code);
+            if (code === "+1" && country.cca2 === "US") uniqueDialCodes.set(code, country);
+            else if (code === "+7" && country.cca2 === "RU") uniqueDialCodes.set(code, country);
+            else if (code === "+44" && country.cca2 === "GB") uniqueDialCodes.set(code, country);
+            else if (code === "+61" && country.cca2 === "AU") uniqueDialCodes.set(code, country);
+            // Keep existing otherwise
+          }
+        });
+
+        const dedupedCountries = Array.from(uniqueDialCodes.values())
+          .sort((a, b) => {
+            // Brazil first
+            if (a.cca2 === "BR") return -1;
+            if (b.cca2 === "BR") return 1;
+            // Then ascending by code
+            const codeA = Number.parseInt(`${a.idd.root}${a.idd.suffixes?.[0] || ''}`.replace('+', ''));
+            const codeB = Number.parseInt(`${b.idd.root}${b.idd.suffixes?.[0] || ''}`.replace('+', ''));
+            return codeA - codeB;
+          });
+
+        setCountries(dedupedCountries);
+      })
+      .catch(err => console.error("Error fetching countries:", err));
+  }, []);
+
+  // Initialize selectedCountryCode from profile or default
+  useEffect(() => {
+    if (formData.phone) {
+      // Simple check: if starts with +, try to extract code
+      // This is tricky because codes have variable length.
+      // Heuristic: If starts with +55, it's Brazil.
+      // If not, maybe use default +55 and treat whole string as number?
+      // Or try to match against loaded countries?
+      if (formData.phone.startsWith("+")) {
+        // Try to find matching code
+        const match = countries.find(c => {
+          const code = `${c.idd.root}${c.idd.suffixes?.[0] || ''}`;
+          return formData.phone.startsWith(code + " "); // Expect space separator
+        });
+        if (match) {
+          const code = `${match.idd.root}${match.idd.suffixes?.[0] || ''}`;
+          setSelectedCountryCode(code);
+        }
+      }
+    }
+  }, [formData.phone, countries]);
+
   const [isInitialLoading, setIsInitialLoading] = useState(true)
 
   const [hasFetchedProfile, setHasFetchedProfile] = useState(false)
@@ -133,6 +223,38 @@ export default function PerfilPage() {
           const freshProfile = response.data
           console.log("[perfil] Fresh profile data received:", freshProfile)
 
+
+          let initialPhone = freshProfile.phone || "";
+          let codeToSet = "+55"; // Default if nothing found
+
+          if (freshProfile.phoneCountryCode) {
+            // Case 1: Database has separate code (New / Migrated)
+            codeToSet = freshProfile.phoneCountryCode;
+
+            // Cleanup: remove code from phone body if present
+            const rawCode = codeToSet.replace(/\D/g, '');
+            if (initialPhone.startsWith(codeToSet)) {
+              initialPhone = initialPhone.substring(codeToSet.length);
+            } else if (initialPhone.startsWith(rawCode)) {
+              initialPhone = initialPhone.substring(rawCode.length);
+            }
+          } else if (initialPhone && initialPhone.startsWith("+")) {
+            // Case 2: Legacy data (Code inside Phone)
+            // Try to extract known code or default to Brazil if starts with +55
+            if (initialPhone.startsWith("+55")) {
+              codeToSet = "+55";
+              initialPhone = initialPhone.substring(3);
+            } else {
+              // Try to match other codes? For now let's stick to simple logic
+              // or just leave it as is.
+              // If we can't guess, we default to +55 but user sees weird number.
+              // Let's at least try to match the first 2-3 digits against our list? 
+              // Too heavy. Let's assume most are +55.
+            }
+          }
+
+          setSelectedCountryCode(codeToSet);
+
           setFormData({
             displayName: freshProfile.displayName || userProfile.displayName || "",
             artisticName: freshProfile.artisticName || "",
@@ -140,7 +262,7 @@ export default function PerfilPage() {
             description: freshProfile.description || "",
             city: freshProfile.city || "",
             state: freshProfile.state || "",
-            phone: freshProfile.phone || "",
+            phone: initialPhone, // Use cleaned phone
             portfolioLink: freshProfile.portfolioLink || "",
             instagram: "",
             linkedin: "",
@@ -227,6 +349,22 @@ export default function PerfilPage() {
     setSavingProfile(true)
 
     try {
+      // Clean phone number: remove all non-digits
+      let cleanPhone = formData.phone.replace(/\D/g, "");
+
+      // Get numeric country code (e.g., 55 from +55)
+      const countryCodeDigits = selectedCountryCode.replace(/\D/g, '');
+
+      // If the clean phone starts with the country code digits, likely the user pasted full number.
+      // We want to store ONLY the national number (area code + number).
+      // Example: Code +55, Phone 5532999... -> Store 32999...
+      if (cleanPhone.startsWith(countryCodeDigits)) {
+        cleanPhone = cleanPhone.substring(countryCodeDigits.length);
+      }
+
+      // If the user pasted +55..., the \D replaced the +, so we have 55... which is handled above.
+      // This ensures we don't double store the country code.
+
       await updateProfile({
         displayName: formData.displayName,
         artisticName: formData.artisticName,
@@ -234,7 +372,8 @@ export default function PerfilPage() {
         description: formData.description,
         city: formData.city,
         state: formData.state,
-        phone: formData.phone,
+        phone: cleanPhone,
+        phoneCountryCode: selectedCountryCode,
         portfolioLink: formData.portfolioLink,
         isPublished: formData.isPublished,
       })
@@ -550,28 +689,36 @@ export default function PerfilPage() {
     <div className="min-h-screen flex flex-col">
       <Header />
 
-      <main className="flex-1 py-12 px-4">
-        <div className="container mx-auto max-w-4xl space-y-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold">Meu Perfil</h1>
-              <p className="text-muted-foreground mt-2">Gerencie suas informações, portfólio e agenda</p>
+      <main className="flex-1 py-8 md:py-12 px-4">
+        <div className="container mx-auto max-w-5xl space-y-6">
+          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+            <div className="space-y-1">
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Meu Perfil</h1>
+              <p className="text-muted-foreground text-base">Gerencie suas informações, portfólio e agenda</p>
             </div>
 
             <div className={cn(
-              "flex items-center gap-4 p-4 rounded-lg border transition-colors duration-200",
-              formData.isPublished ? "bg-green-50 border-green-200" : "bg-muted/50 border-border"
+              "flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-300 shadow-sm",
+              formData.isPublished
+                ? "bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-300 dark:border-green-700"
+                : "bg-muted/30 dark:bg-muted/10 border-border hover:border-muted-foreground/20"
             )}>
-              <div className="flex flex-col">
-                <span className="font-medium text-sm">Visibilidade do Perfil</span>
-                <span className="text-xs text-muted-foreground">
-                  {formData.isPublished ? "Público e visível na busca" : "Privado, visível apenas para você"}
+              <div className="flex flex-col min-w-[180px]">
+                <span className="font-semibold text-sm flex items-center gap-2">
+                  {formData.isPublished ? (
+                    <><Globe className="h-4 w-4 text-green-600 dark:text-green-400" /> Perfil Público</>
+                  ) : (
+                    <><EyeOff className="h-4 w-4 text-muted-foreground" /> Perfil Privado</>
+                  )}
+                </span>
+                <span className="text-xs text-muted-foreground mt-0.5">
+                  {formData.isPublished ? "Visível na busca" : "Apenas para você"}
                 </span>
               </div>
               <Switch
                 checked={formData.isPublished}
                 onCheckedChange={handlePublishToggle}
-                className="data-[state=checked]:bg-green-600"
+                className="data-[state=checked]:bg-green-600 dark:data-[state=checked]:bg-green-500"
               />
             </div>
           </div>
@@ -594,25 +741,25 @@ export default function PerfilPage() {
           )}
 
           <Tabs defaultValue="info" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="info">Dados Pessoais</TabsTrigger>
-              <TabsTrigger value="portfolio">Portfólio</TabsTrigger>
-              <TabsTrigger value="agenda">Agenda</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3 h-12 bg-muted/50 dark:bg-muted/30 p-1">
+              <TabsTrigger value="info" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Dados Pessoais</TabsTrigger>
+              <TabsTrigger value="portfolio" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Portfólio</TabsTrigger>
+              <TabsTrigger value="agenda" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Agenda</TabsTrigger>
             </TabsList>
 
             {/* TAB: INFO */}
-            <TabsContent value="info">
+            <TabsContent value="info" className="mt-6">
               <form onSubmit={handleProfileSubmit}>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Informações Básicas</CardTitle>
-                    <CardDescription>Seus dados de contato e apresentação</CardDescription>
+                <Card className="border-2 shadow-sm">
+                  <CardHeader className="space-y-1 pb-6">
+                    <CardTitle className="text-2xl">Informações Básicas</CardTitle>
+                    <CardDescription className="text-base">Seus dados de contato e apresentação</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-6">
                     {/* Avatar Upload */}
-                    <div className="flex flex-col items-center gap-4 mb-6">
-                      <div className="relative">
-                        <div className="w-28 h-28 rounded-full bg-muted border-2 border-dashed border-border overflow-hidden flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-4 pb-6 border-b">
+                      <div className="relative group">
+                        <div className="w-32 h-32 rounded-full bg-gradient-to-br from-muted to-muted/50 border-4 border-background shadow-lg overflow-hidden flex items-center justify-center ring-2 ring-border/50">
                           {avatarPreview ? (
                             <img
                               src={avatarPreview}
@@ -620,17 +767,20 @@ export default function PerfilPage() {
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <Camera className="w-10 h-10 text-muted-foreground" />
+                            <Camera className="w-12 h-12 text-muted-foreground" />
                           )}
                         </div>
                         <label
                           htmlFor="avatar-upload"
-                          className="absolute bottom-0 right-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center cursor-pointer hover:bg-primary/90 transition-colors shadow-lg"
+                          className="absolute inset-0 rounded-full flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                         >
                           {uploadingAvatar ? (
-                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
                           ) : (
-                            <Plus className="w-4 h-4 text-primary-foreground" />
+                            <div className="flex flex-col items-center gap-1">
+                              <Camera className="w-6 h-6 text-white" />
+                              <span className="text-xs text-white font-medium">Editar</span>
+                            </div>
                           )}
                         </label>
                         <input
@@ -641,7 +791,10 @@ export default function PerfilPage() {
                           className="hidden"
                         />
                       </div>
-                      <span className="text-sm text-muted-foreground">Foto de Perfil</span>
+                      <div className="text-center">
+                        <p className="font-medium">Foto de Perfil</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Clique para alterar (máx 5MB)</p>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -671,41 +824,59 @@ export default function PerfilPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label className={cn(validationErrors.includes("specialties") && "text-destructive")}>Especialidades (Selecione quantas precisar) *</Label>
+                    <div className="space-y-3">
+                      <Label className={cn(
+                        "text-base font-semibold",
+                        validationErrors.includes("specialties") && "text-destructive"
+                      )}>Especialidades *</Label>
+                      <p className="text-sm text-muted-foreground -mt-1">Selecione suas áreas de atuação</p>
+
+                      {/* Selected Specialties */}
                       <div className={cn(
-                        "flex flex-wrap gap-2 mb-2 p-2 min-h-[40px] border rounded-md bg-background",
-                        validationErrors.includes("specialties") && "border-destructive ring-1 ring-destructive"
+                        "flex flex-wrap gap-2 p-3 min-h-[56px] border-2 rounded-lg bg-background transition-colors",
+                        validationErrors.includes("specialties")
+                          ? "border-destructive ring-2 ring-destructive/20"
+                          : "border-border hover:border-muted-foreground/30"
                       )}>
-                        {formData.specialties.length === 0 && <span className="text-muted-foreground text-sm self-center px-1">Nenhuma selecionada</span>}
+                        {formData.specialties.length === 0 && <span className="text-muted-foreground text-sm self-center px-1">Nenhuma especialidade selecionada</span>}
                         {formData.specialties.map(spec => (
-                          <Badge key={spec} variant="secondary" className="flex items-center gap-1">
+                          <Badge key={spec} variant="secondary" className="flex items-center gap-1.5 px-3 py-1.5 text-sm">
                             {spec}
-                            <button type="button" onClick={() => removeSpecialty(spec)} className="hover:text-destructive">
-                              <X className="h-3 w-3" />
+                            <button type="button" onClick={() => removeSpecialty(spec)} className="hover:text-destructive transition-colors">
+                              <X className="h-3.5 w-3.5" />
                             </button>
                           </Badge>
                         ))}
                       </div>
-                      <div className="border rounded-md max-h-[200px] overflow-y-auto p-1">
-                        {availableSpecialties.map(spec => {
-                          const isSelected = formData.specialties.includes(spec.name)
-                          return (
-                            <div
-                              key={spec.id}
-                              onClick={() => toggleSpecialty(spec.name)}
-                              className={cn(
-                                "flex items-center gap-2 p-2 rounded-sm cursor-pointer hover:bg-accent text-sm",
-                                isSelected && "bg-accent/50"
-                              )}
-                            >
-                              <div className={cn("w-4 h-4 border rounded flex items-center justify-center", isSelected ? "bg-primary border-primary text-primary-foreground" : "border-input")}>
-                                {isSelected && <CheckCircle2 className="w-3 h-3" />}
+
+                      {/* Available Specialties */}
+                      <div className="border-2 rounded-lg max-h-[240px] overflow-y-auto p-2 bg-muted/20">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                          {availableSpecialties.map(spec => {
+                            const isSelected = formData.specialties.includes(spec.name)
+                            return (
+                              <div
+                                key={spec.id}
+                                onClick={() => toggleSpecialty(spec.name)}
+                                className={cn(
+                                  "flex items-center gap-3 p-3 rounded-md cursor-pointer transition-all",
+                                  "hover:bg-accent hover:shadow-sm",
+                                  isSelected && "bg-primary/10 dark:bg-primary/20 border border-primary/30"
+                                )}
+                              >
+                                <div className={cn(
+                                  "w-5 h-5 border-2 rounded-md flex items-center justify-center transition-all",
+                                  isSelected
+                                    ? "bg-primary border-primary text-primary-foreground scale-110"
+                                    : "border-input hover:border-primary/50"
+                                )}>
+                                  {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
+                                </div>
+                                <span className="text-sm font-medium">{spec.name}</span>
                               </div>
-                              {spec.name}
-                            </div>
-                          )
-                        })}
+                            )
+                          })}
+                        </div>
                       </div>
                     </div>
 
@@ -768,41 +939,85 @@ export default function PerfilPage() {
 
                     <div className="space-y-2">
                       <Label htmlFor="phone">Telefone / WhatsApp</Label>
-                      <Input
-                        id="phone"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        placeholder="(00) 00000-0000"
-                      />
+                      <div className="flex gap-2">
+                        <Select
+                          value={selectedCountryCode}
+                          onValueChange={(value) => {
+                            setSelectedCountryCode(value)
+                            // Do NOT update formData.phone here. Keep them separate.
+                          }}
+                        >
+                          <SelectTrigger className="w-[140px]">
+                            <SelectValue placeholder="País" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {countries.map((country) => {
+                              const code = `${country.idd.root}${country.idd.suffixes?.[0] || ''}`;
+                              return (
+                                <SelectItem key={code} value={code}>
+                                  <span className="flex items-center gap-2">
+                                    <span>{country.flag}</span>
+                                    <span>{code}</span>
+                                  </span>
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          id="phone"
+                          value={formData.phone}
+                          onChange={(e) => {
+                            // Just update the phone field directly
+                            setFormData({ ...formData, phone: e.target.value })
+                          }}
+                          placeholder="00 00000-0000"
+                          className="flex-1"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Selecione o país e digite o número com DDD (ex: 32 99999-9999)
+                      </p>
                     </div>
 
                     {/* Social Media Section - UI Only for now */}
-                    <div className="border-t pt-4 mt-4">
-                      <h3 className="font-medium mb-4">Redes Sociais e Portfólio Externo</h3>
+                    <div className="border-t-2 pt-6 mt-2 space-y-4">
+                      <div>
+                        <h3 className="text-lg font-semibold">Redes Sociais e Portfólio Externo</h3>
+                        <p className="text-sm text-muted-foreground mt-1">Links adicionais para seus trabalhos</p>
+                      </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="portfolioLink">Site / Portfólio (URL)</Label>
+                          <Label htmlFor="portfolioLink" className="flex items-center gap-2">
+                            <Globe className="h-4 w-4" />
+                            Site / Portfólio (URL)
+                          </Label>
                           <Input
                             id="portfolioLink"
                             value={formData.portfolioLink}
                             onChange={(e) => setFormData({ ...formData, portfolioLink: e.target.value })}
                             placeholder="https://seu-site.com"
+                            className="h-11"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="instagram">Instagram (URL)</Label>
+                          <Label htmlFor="instagram" className="flex items-center gap-2">
+                            <ImageIcon className="h-4 w-4" />
+                            Instagram (URL)
+                          </Label>
                           <Input
                             id="instagram"
                             value={formData.instagram}
                             onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
                             placeholder="https://instagram.com/..."
+                            className="h-11"
                           />
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex justify-end pt-4">
-                      <Button type="submit" disabled={savingProfile}>
+                    <div className="flex justify-end pt-4 border-t">
+                      <Button type="submit" disabled={savingProfile} size="lg" className="min-w-[200px]">
                         {savingProfile ? "Salvando..." : "Salvar Alterações"}
                       </Button>
                     </div>
@@ -812,23 +1027,23 @@ export default function PerfilPage() {
             </TabsContent>
 
             {/* TAB: PORTFOLIO */}
-            <TabsContent value="portfolio">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Meu Portfólio</CardTitle>
-                  <CardDescription>Adicione fotos e vídeos dos seus trabalhos anteriores</CardDescription>
+            <TabsContent value="portfolio" className="mt-6">
+              <Card className="border-2 shadow-sm">
+                <CardHeader className="space-y-1 pb-6">
+                  <CardTitle className="text-2xl">Meu Portfólio</CardTitle>
+                  <CardDescription className="text-base">Adicione fotos e vídeos dos seus trabalhos anteriores (máx 9 itens)</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Add New Item */}
-                  <div className="bg-muted/50 p-4 rounded-lg space-y-4 border">
-                    <h4 className="font-medium flex items-center gap-2">
-                      <Plus className="h-4 w-4" /> Adicionar Novo Item
+                  <div className="bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/30 dark:to-muted/10 p-6 rounded-xl space-y-4 border-2 border-dashed border-border hover:border-primary/50 transition-colors">
+                    <h4 className="font-semibold text-lg flex items-center gap-2">
+                      <Plus className="h-5 w-5 text-primary" /> Adicionar Novo Item
                     </h4>
 
                     {portfolioItems.length >= 9 && (
-                      <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
+                      <Alert className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
+                        <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        <AlertDescription className="text-amber-800 dark:text-amber-200">
                           Você atingiu o limite de 9 itens no portfólio. Exclua um item para adicionar outro.
                         </AlertDescription>
                       </Alert>
@@ -906,66 +1121,71 @@ export default function PerfilPage() {
                   </div>
 
                   {/* List Items */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {portfolioItems.map((item) => (
-                      <div key={item.id} className="group relative rounded-lg border overflow-hidden">
-                        <div className="aspect-video bg-muted relative">
-                          {item.mediaType === 'video' ? (
-                            <video
-                              src={item.mediaUrl}
-                              className="w-full h-full object-cover"
-                              controls
-                            />
-                          ) : (
-                            <img
-                              src={item.mediaUrl}
-                              alt={item.title}
-                              className="w-full h-full object-cover"
-                              onError={(e) => { e.currentTarget.src = "/placeholder.svg" }}
-                            />
-                          )}
-                          <button
-                            onClick={() => handleDeletePortfolioItem(item.id)}
-                            className="absolute top-2 right-2 p-1.5 bg-destructive text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                            title="Excluir"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                        <div className="p-3">
-                          <p className="font-medium truncate">{item.title}</p>
-                          <p className="text-xs text-muted-foreground capitalize flex items-center gap-1">
+                  <div>
+                    <h4 className="font-semibold text-lg mb-4">Seus Trabalhos</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {portfolioItems.map((item) => (
+                        <div key={item.id} className="group relative rounded-xl border-2 overflow-hidden transition-all hover:shadow-lg hover:border-primary/50">
+                          <div className="aspect-video bg-gradient-to-br from-muted to-muted/50 relative">
                             {item.mediaType === 'video' ? (
-                              <>
-                                <span className="inline-block w-2 h-2 bg-red-500 rounded-full"></span>
-                                Vídeo
-                              </>
+                              <video
+                                src={item.mediaUrl}
+                                className="w-full h-full object-cover"
+                                controls
+                              />
                             ) : (
-                              <>
-                                <span className="inline-block w-2 h-2 bg-blue-500 rounded-full"></span>
-                                Imagem
-                              </>
+                              <img
+                                src={item.mediaUrl}
+                                alt={item.title}
+                                className="w-full h-full object-cover"
+                                onError={(e) => { e.currentTarget.src = "/placeholder.svg" }}
+                              />
                             )}
-                          </p>
+                            <button
+                              onClick={() => handleDeletePortfolioItem(item.id)}
+                              className="absolute top-2 right-2 p-2 bg-destructive/90 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-destructive hover:scale-110 shadow-lg"
+                              title="Excluir"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <div className="p-4 bg-card">
+                            <p className="font-semibold truncate">{item.title}</p>
+                            <p className="text-xs text-muted-foreground capitalize flex items-center gap-1.5 mt-1">
+                              {item.mediaType === 'video' ? (
+                                <>
+                                  <span className="inline-block w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                                  Vídeo
+                                </>
+                              ) : (
+                                <>
+                                  <span className="inline-block w-2 h-2 bg-blue-500 rounded-full"></span>
+                                  Imagem
+                                </>
+                              )}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                    {portfolioItems.length === 0 && !loadingPortfolio && (
-                      <div className="col-span-full text-center py-8 text-muted-foreground">
-                        Nenhum item no portfólio.
-                      </div>
-                    )}
+                      ))}
+                      {portfolioItems.length === 0 && !loadingPortfolio && (
+                        <div className="col-span-full text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">
+                          <ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                          <p className="font-medium">Nenhum item no portfólio.</p>
+                          <p className="text-sm">Adicione fotos ou vídeos dos seus trabalhos acima.</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
 
             {/* TAB: AGENDA */}
-            <TabsContent value="agenda">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Minha Disponibilidade</CardTitle>
-                  <CardDescription>Gerencie os dias e horários que você está disponível</CardDescription>
+            <TabsContent value="agenda" className="mt-6">
+              <Card className="border-2 shadow-sm">
+                <CardHeader className="space-y-1 pb-6">
+                  <CardTitle className="text-2xl">Minha Disponibilidade</CardTitle>
+                  <CardDescription className="text-base">Gerencie os dias e horários que você está disponível para serviços</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-8">
@@ -1119,23 +1339,25 @@ export default function PerfilPage() {
             </DialogContent>
           </Dialog>
         </div>
-      </main>
+      </main >
 
       <Footer />
 
-      {isInitialLoading && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="relative flex items-center justify-center">
-            <div className="h-20 w-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="h-10 w-10 rounded-full bg-primary/10 animate-pulse"></div>
+      {
+        isInitialLoading && (
+          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="relative flex items-center justify-center">
+              <div className="h-20 w-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-full bg-primary/10 animate-pulse"></div>
+              </div>
             </div>
+            <p className="mt-4 font-medium text-muted-foreground animate-pulse">
+              Carregando seu perfil...
+            </p>
           </div>
-          <p className="mt-4 font-medium text-muted-foreground animate-pulse">
-            Carregando seu perfil...
-          </p>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   )
 }

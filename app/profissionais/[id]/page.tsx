@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  MessageCircle,
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
@@ -267,31 +268,87 @@ export default function ProfessionalProfilePage() {
                   </span>
                 </div>
               )}
+
+              {/* Biography */}
+              {professional.description && (
+                <div className="max-w-2xl mx-auto pt-2">
+                  <p className="text-gray-600 text-center leading-relaxed">
+                    {professional.description}
+                  </p>
+                </div>
+              )}
             </div>
 
-            {/* Social Icons */}
-            <div className="flex gap-4">
-              <Button
-                variant="secondary"
-                size="icon"
-                className="rounded-full h-10 w-10 bg-gray-100 hover:bg-gray-200 text-gray-600"
-              >
-                <Instagram className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="secondary"
-                size="icon"
-                className="rounded-full h-10 w-10 bg-gray-100 hover:bg-gray-200 text-gray-600"
-              >
-                <Linkedin className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="secondary"
-                size="icon"
-                className="rounded-full h-10 w-10 bg-gray-100 hover:bg-gray-200 text-gray-600"
-              >
-                <Globe className="h-5 w-5" />
-              </Button>
+            {/* Actions */}
+            <div className="flex flex-col items-center gap-4">
+              {/* Social Icons */}
+              <div className="flex gap-4">
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="rounded-full h-10 w-10 bg-gray-100 hover:bg-gray-200 text-gray-600"
+                >
+                  <Instagram className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="rounded-full h-10 w-10 bg-gray-100 hover:bg-gray-200 text-gray-600"
+                >
+                  <Linkedin className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="rounded-full h-10 w-10 bg-gray-100 hover:bg-gray-200 text-gray-600"
+                >
+                  <Globe className="h-5 w-5" />
+                </Button>
+              </div>
+
+              {/* WhatsApp Button */}
+              {professional.phone && (
+                <Button
+                  className="bg-green-600 hover:bg-green-700 text-white rounded-full px-8 h-12 gap-2 shadow-lg shadow-green-200"
+                  onClick={() => {
+                    let phone = professional.phone || '';
+                    // Remove non-digits and non-plus
+                    // Actually for wa.me we need clean digits.
+
+                    // Logic:
+                    // If phoneCountryCode exists, use it + phone.
+                    // Else fallback to legacy logic.
+
+                    let cleanNumber = '';
+
+                    if (professional.phoneCountryCode && professional.phone) {
+                      // New format: We have separate code and number.
+                      const code = professional.phoneCountryCode.replace(/\D/g, '');
+                      const num = professional.phone.replace(/\D/g, '');
+                      cleanNumber = `${code}${num}`;
+                    } else {
+                      // Legacy fallback
+                      const phone = professional.phone || '';
+                      const isInternational = phone.startsWith('+');
+                      let cleanPhone = phone.replace(/\D/g, '');
+
+                      if (!isInternational && cleanPhone.length <= 11) {
+                        // Likely a legacy Brazilian number without DDI
+                        cleanNumber = `55${cleanPhone}`;
+                      } else {
+                        cleanNumber = cleanPhone;
+                      }
+                    }
+
+                    if (cleanNumber) {
+                      window.open(`https://wa.me/${cleanNumber}`, '_blank');
+                    }
+                  }}
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  <span className="font-bold">Entrar em contato</span>
+                </Button>
+              )}
             </div>
           </div>
 

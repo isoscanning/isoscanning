@@ -91,12 +91,19 @@ export default function EditarEquipamentoPage() {
     additionalConditions: "",
   });
 
+  // Image State Management
+  interface ImageItem {
+    id: string;
+    preview: string;
+    file?: File;
+    isExisting: boolean;
+  }
+
+  const [items, setItems] = useState<ImageItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [loadingEquipment, setLoadingEquipment] = useState(true);
-  const [selectedImages, setSelectedImages] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
   useEffect(() => {
     if (!loading && !userProfile) {
@@ -114,7 +121,7 @@ export default function EditarEquipamentoPage() {
     if (files.length === 0) return;
 
     // Check total number of images (existing + new)
-    const totalImages = imagePreviews.length + files.length;
+    const totalImages = items.length + files.length;
     if (totalImages > 5) {
       setError("Máximo de 5 imagens por equipamento");
       return;
@@ -122,14 +129,12 @@ export default function EditarEquipamentoPage() {
 
     // Validate each file
     for (const file of files) {
-      // Validate file size (1MB)
       const maxSize = 1024 * 1024; // 1MB
       if (file.size > maxSize) {
         setError(`Imagem "${file.name}" deve ter no máximo 1MB`);
         return;
       }
 
-      // Validate file type
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
       if (!allowedTypes.includes(file.type)) {
         setError(`Tipo de arquivo não permitido para "${file.name}". Use apenas JPEG, PNG ou WebP`);
@@ -137,17 +142,37 @@ export default function EditarEquipamentoPage() {
       }
     }
 
-    setSelectedImages(prev => [...prev, ...files]);
-    setError("");
+    // Process new files
+    const newItems: ImageItem[] = [];
 
-    // Create previews for new files
     files.forEach(file => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
-        setImagePreviews(prev => [...prev, result]);
+        setItems(prev => [...prev, {
+          id: Math.random().toString(36).substr(2, 9),
+          preview: result,
+          file: file,
+          isExisting: false
+        }]);
       };
       reader.readAsDataURL(file);
+    });
+
+    setError("");
+  };
+
+  const handleDeleteImage = (index: number) => {
+    setItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleMakeMain = (index: number) => {
+    if (index === 0) return; // Already main
+    setItems(prev => {
+      const newItems = [...prev];
+      const [item] = newItems.splice(index, 1);
+      newItems.unshift(item);
+      return newItems;
     });
   };
 
@@ -181,9 +206,14 @@ export default function EditarEquipamentoPage() {
         additionalConditions: "",
       });
 
-      // Set image previews if equipment has images
+      // Initialize items from existing URLS
       if (equipment.imageUrls && equipment.imageUrls.length > 0) {
-        setImagePreviews(equipment.imageUrls);
+        const existingItems: ImageItem[] = equipment.imageUrls.map(url => ({
+          id: Math.random().toString(36).substr(2, 9),
+          preview: url,
+          isExisting: true
+        }));
+        setItems(existingItems);
       }
     } catch (err: any) {
       setError(err.message || "Erro ao carregar equipamento.");
@@ -199,22 +229,45 @@ export default function EditarEquipamentoPage() {
     setSaving(true);
 
     try {
-      let imageUrls = imagePreviews.filter(url => !url.startsWith('data:')); // Keep existing URLs that are not data URLs
+      // 1. Separate items needing upload vs existing
+      const existingUrls = items.filter(i => i.isExisting).map(i => i.preview);
+      const newFiles = items.filter(i => !i.isExisting && i.file).map(i => i.file as File);
 
-      // Upload new images if selected
-      if (selectedImages.length > 0 && userProfile?.id) {
+      // 2. Upload new files if any
+      let uploadedUrls: string[] = [];
+      if (newFiles.length > 0 && userProfile?.id) {
         try {
-          console.log(`Fazendo upload de ${selectedImages.length} novas imagens...`);
-          const newImageUrls = await uploadEquipmentImages(selectedImages, userProfile.id);
-          imageUrls = [...imageUrls, ...newImageUrls]; // Combine existing and new URLs
-          console.log("Upload das imagens concluído:", newImageUrls);
+          console.log(`Fazendo upload de ${newFiles.length} novas imagens...`);
+          uploadedUrls = await uploadEquipmentImages(newFiles, userProfile.id);
+          console.log("Upload concluído:", uploadedUrls);
         } catch (imageError: any) {
-          console.error("Erro no upload das imagens:", imageError);
-          setError(`Erro no upload das imagens: ${imageError.message}`);
+          console.error("Erro no upload:", imageError);
+          setError(`Erro no upload: ${imageError.message}`);
           setSaving(false);
           return;
         }
       }
+
+      // 3. Construct final ordered array
+      // Problem: We need to respect the order in 'items'.
+      // 'items' has a mix of existing (ref by preview url) and new (ref by file object).
+      // We have 'existingUrls' (subset) and 'uploadedUrls' (subset).
+      // We need to map 'items' to their final URLs.
+
+      const finalImageUrls: string[] = [];
+      let uploadIndex = 0;
+
+      items.forEach(item => {
+        if (item.isExisting) {
+          finalImageUrls.push(item.preview);
+        } else {
+          // It's a new file, grab from uploadedUrls
+          if (uploadedUrls[uploadIndex]) {
+            finalImageUrls.push(uploadedUrls[uploadIndex]);
+            uploadIndex++;
+          }
+        }
+      });
 
       // Update equipment
       try {
@@ -232,7 +285,7 @@ export default function EditarEquipamentoPage() {
             formData.negotiationType === "rent" ? (formData.rentPeriod as "day" | "week" | "month") : undefined,
           city: formData.city,
           state: formData.state,
-          imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+          imageUrls: finalImageUrls.length > 0 ? finalImageUrls : undefined,
         });
         console.log("Equipamento atualizado com sucesso!");
 
@@ -481,29 +534,51 @@ export default function EditarEquipamentoPage() {
                       Máximo 5 imagens, 1MB cada. Formatos: JPEG, PNG, WebP
                     </p>
 
-                    {imagePreviews.length > 0 && (
+                    {items.length > 0 && (
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {imagePreviews.map((preview, index) => (
-                          <div key={index} className="relative">
+                        {items.map((item, index) => (
+                          <div key={item.id} className="relative group">
                             <img
-                              src={preview}
+                              src={item.preview}
                               alt={`Preview ${index + 1}`}
-                              className="w-full h-32 object-cover rounded-lg border"
+                              className={`w-full h-32 object-cover rounded-lg border-2 ${index === 0 ? "border-primary" : "border-border"}`}
                             />
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="sm"
-                              className="absolute top-1 right-1 h-6 w-6 p-0"
-                              onClick={() => {
-                                const newImages = selectedImages.filter((_, i) => i !== index);
-                                const newPreviews = imagePreviews.filter((_, i) => i !== index);
-                                setSelectedImages(newImages);
-                                setImagePreviews(newPreviews);
-                              }}
-                            >
-                              ×
-                            </Button>
+
+                            {/* Badges/Actions */}
+                            <div className="absolute top-2 left-2 flex gap-1">
+                              {index === 0 && (
+                                <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full font-medium shadow-sm">
+                                  Principal
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="absolute top-1 right-1 flex gap-1">
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                className="h-6 w-6 p-0 rounded-full"
+                                onClick={() => handleDeleteImage(index)}
+                              >
+                                ×
+                              </Button>
+                            </div>
+
+                            {/* "Make Main" Overlay */}
+                            {index !== 0 && (
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg pointer-events-none">
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  size="sm"
+                                  className="pointer-events-auto"
+                                  onClick={() => handleMakeMain(index)}
+                                >
+                                  Definir Principal
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>

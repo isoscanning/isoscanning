@@ -38,6 +38,7 @@ export interface Professional {
   averageRating?: number;
   totalReviews?: number;
   phone?: string;
+  phoneCountryCode?: string;
   portfolioLink?: string;
   isActive?: boolean;
 }

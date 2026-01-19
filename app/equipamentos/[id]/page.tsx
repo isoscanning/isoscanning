@@ -7,7 +7,7 @@ import { Footer } from "@/components/footer"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { MapPin, Package, MessageSquare, User } from "lucide-react"
+import { MapPin, Package, MessageSquare, User, ChevronLeft, ChevronRight, X, Maximize2, MessageCircle } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
 import apiClient from "@/lib/api-service"
@@ -30,6 +30,7 @@ interface EquipmentDetails {
   ownerId: string
   ownerName: string
   ownerPhone?: string
+  ownerPhoneCountryCode?: string
   available: boolean
   additionalConditions?: string
 }
@@ -43,6 +44,39 @@ export default function EquipmentDetailsPage() {
   const [equipment, setEquipment] = useState<EquipmentDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false)
+
+  const openLightbox = (index: number) => {
+    setCurrentImageIndex(index)
+    setIsLightboxOpen(true)
+  }
+
+  const closeLightbox = () => {
+    setIsLightboxOpen(false)
+  }
+
+  const nextImage = (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    setCurrentImageIndex((prev) => (prev === (equipment?.imageUrls?.length || 1) - 1 ? 0 : prev + 1))
+  }
+
+  const prevImage = (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    setCurrentImageIndex((prev) => (prev === 0 ? (equipment?.imageUrls?.length || 1) - 1 : prev - 1))
+  }
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isLightboxOpen) return
+      if (e.key === "Escape") closeLightbox()
+      if (e.key === "ArrowRight") nextImage()
+      if (e.key === "ArrowLeft") prevImage()
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [isLightboxOpen])
 
   useEffect(() => {
     fetchEquipment()
@@ -53,6 +87,7 @@ export default function EquipmentDetailsPage() {
       setLoading(true)
       // Chamada ao Backend API
       const response = await apiClient.get(`/equipments/${equipmentId}`)
+      console.log("[EquipmentDetails] Fetched data:", response.data);
       setEquipment(response.data)
     } catch (error) {
       console.error("Erro ao buscar equipamento:", error)
@@ -126,13 +161,23 @@ export default function EquipmentDetailsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Images */}
             <div className="space-y-4">
-              <div className="aspect-video bg-muted rounded-lg overflow-hidden relative">
+              <div
+                className="aspect-video bg-muted rounded-lg overflow-hidden relative cursor-pointer group"
+                onClick={() => openLightbox(currentImageIndex)}
+              >
                 {displayImages[currentImageIndex] ? (
-                  <img
-                    src={displayImages[currentImageIndex] || "/placeholder.svg"}
-                    alt={equipment.name}
-                    className="h-full w-full object-cover"
-                  />
+                  <>
+                    <img
+                      src={displayImages[currentImageIndex] || "/placeholder.svg"}
+                      alt={equipment.name}
+                      className="h-full w-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                      <div className="opacity-0 group-hover:opacity-100 bg-black/50 text-white p-2 rounded-full transition-opacity">
+                        <Maximize2 className="h-6 w-6" />
+                      </div>
+                    </div>
+                  </>
                 ) : (
                   <div className="h-full w-full flex items-center justify-center">
                     <Package className="h-24 w-24 text-muted-foreground" />
@@ -241,8 +286,38 @@ export default function EquipmentDetailsPage() {
                     <span>{equipment.ownerName}</span>
                   </div>
                   {equipment.ownerPhone && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <span>{equipment.ownerPhone}</span>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <User className="h-4 w-4" /> {/* Just aligning icons */}
+                        <span className="text-sm">Contato disponível</span>
+                      </div>
+
+                      <Button
+                        className="w-full bg-green-600 hover:bg-green-700 text-white gap-2"
+                        onClick={() => {
+                          let cleanNumber = '';
+                          if (equipment.ownerPhoneCountryCode && equipment.ownerPhone) {
+                            const code = equipment.ownerPhoneCountryCode.replace(/\D/g, '');
+                            const num = equipment.ownerPhone.replace(/\D/g, '');
+                            cleanNumber = `${code}${num}`;
+                          } else {
+                            // Legacy fallback
+                            const phone = equipment.ownerPhone || '';
+                            const isInternational = phone.startsWith('+');
+                            let cleanPhone = phone.replace(/\D/g, '');
+
+                            if (!isInternational && cleanPhone.length <= 11) {
+                              cleanNumber = `55${cleanPhone}`;
+                            } else {
+                              cleanNumber = cleanPhone;
+                            }
+                          }
+                          window.open(`https://wa.me/${cleanNumber}`, '_blank');
+                        }}
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        Conversar no WhatsApp
+                      </Button>
                     </div>
                   )}
                   <Link href={`/profissionais/${equipment.ownerId}`}>
@@ -285,6 +360,49 @@ export default function EquipmentDetailsPage() {
       </main>
 
       <Footer />
+
+      {/* Lightbox Modal */}
+      {isLightboxOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
+          onClick={closeLightbox}
+        >
+          <button
+            onClick={closeLightbox}
+            className="absolute top-4 right-4 p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors z-50"
+          >
+            <X className="h-8 w-8" />
+          </button>
+
+          <img
+            src={displayImages[currentImageIndex] || "/placeholder.svg"}
+            alt={equipment.name}
+            className="max-w-full max-h-[90vh] object-contain select-none"
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          {displayImages.length > 1 && (
+            <>
+              <button
+                onClick={prevImage}
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+              >
+                <ChevronLeft className="h-8 w-8" />
+              </button>
+              <button
+                onClick={nextImage}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+              >
+                <ChevronRight className="h-8 w-8" />
+              </button>
+
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/50 text-sm">
+                {currentImageIndex + 1} / {displayImages.length}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

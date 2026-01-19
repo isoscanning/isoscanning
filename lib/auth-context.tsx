@@ -24,6 +24,7 @@ export interface UserProfile {
   displayName: string;
   userType: "client" | "professional";
   phone?: string;
+  phoneCountryCode?: string;
   city?: string;
   state?: string;
   specialties?: string[];
@@ -180,7 +181,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         email,
         password,
         displayName: userData.displayName || email.split("@")[0],
-        userType: userData.userType || "client",
+        userType: userData.userType || "professional",
         ...userData,
       });
 

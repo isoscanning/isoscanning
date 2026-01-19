@@ -30,6 +30,7 @@ export interface Professional {
   email?: string;
   artisticName?: string;
   specialty?: string;
+  specialties?: string[];
   city?: string;
   state?: string;
   avatarUrl?: string;
@@ -39,6 +40,11 @@ export interface Professional {
   phone?: string;
   portfolioLink?: string;
   isActive?: boolean;
+}
+
+export interface Specialty {
+  id: string;
+  name: string;
 }
 
 export interface CreateEquipmentData {
@@ -241,6 +247,16 @@ export async function fetchProfessionals(): Promise<Professional[]> {
   } catch (error) {
     console.error("[data-service] Error fetching professionals:", error);
     throw new Error("Erro ao buscar profissionais");
+  }
+}
+
+export async function fetchSpecialties(): Promise<Specialty[]> {
+  try {
+    const response = await apiClient.get("/specialties");
+    return response.data || [];
+  } catch (error) {
+    console.error("[data-service] Error fetching specialties:", error);
+    return [];
   }
 }
 

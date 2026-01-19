@@ -30,6 +30,7 @@ import {
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { cn } from "@/lib/utils"
+import apiClient from "@/lib/api-service"
 import {
   fetchPortfolio,
   createPortfolioItem,
@@ -37,23 +38,12 @@ import {
   fetchAvailability,
   createAvailability,
   deleteAvailability,
+  fetchSpecialties,
   type PortfolioItem,
-  type AvailabilitySlot
+  type AvailabilitySlot,
+  type Specialty
 } from "@/lib/data-service"
-import apiClient from "@/lib/api-service"
 
-const ESPECIALIDADES = [
-  "Fotógrafo",
-  "Videomaker",
-  "Editor de Vídeo",
-  "Editor de Fotos",
-  "Produtor Audiovisual",
-  "Drone Pilot",
-  "Fotógrafo de Eventos",
-  "Fotógrafo de Produtos",
-  "Fotógrafo de Retratos",
-  "Cinegrafista",
-]
 
 const ESTADOS = [
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
@@ -79,6 +69,8 @@ export default function PerfilPage() {
     isPublished: false,
     avatarUrl: "",
   })
+
+  const [availableSpecialties, setAvailableSpecialties] = useState<Specialty[]>([])
 
   // Avatar Upload State
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -109,6 +101,14 @@ export default function PerfilPage() {
   const [showPublishModal, setShowPublishModal] = useState(false)
   const [showSaveSuccessModal, setShowSaveSuccessModal] = useState(false)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
+
+  useEffect(() => {
+    const loadSpecialties = async () => {
+      const data = await fetchSpecialties()
+      setAvailableSpecialties(data)
+    }
+    loadSpecialties()
+  }, [])
 
   useEffect(() => {
     if (!loading && !userProfile) {
@@ -577,12 +577,12 @@ export default function PerfilPage() {
                         ))}
                       </div>
                       <div className="border rounded-md max-h-[200px] overflow-y-auto p-1">
-                        {ESPECIALIDADES.map(spec => {
-                          const isSelected = formData.specialties.includes(spec)
+                        {availableSpecialties.map(spec => {
+                          const isSelected = formData.specialties.includes(spec.name)
                           return (
                             <div
-                              key={spec}
-                              onClick={() => toggleSpecialty(spec)}
+                              key={spec.id}
+                              onClick={() => toggleSpecialty(spec.name)}
                               className={cn(
                                 "flex items-center gap-2 p-2 rounded-sm cursor-pointer hover:bg-accent text-sm",
                                 isSelected && "bg-accent/50"
@@ -591,7 +591,7 @@ export default function PerfilPage() {
                               <div className={cn("w-4 h-4 border rounded flex items-center justify-center", isSelected ? "bg-primary border-primary text-primary-foreground" : "border-input")}>
                                 {isSelected && <CheckCircle2 className="w-3 h-3" />}
                               </div>
-                              {spec}
+                              {spec.name}
                             </div>
                           )
                         })}

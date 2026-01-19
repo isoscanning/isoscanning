@@ -170,17 +170,35 @@ export default function ProfessionalProfilePage() {
             </div>
 
             {/* Info */}
-            <div className="space-y-2">
-              <h1 className="text-4xl font-bold text-gray-900">
+            <div className="space-y-4">
+              <h1 className="text-4xl font-bold text-gray-900 tracking-tight">
                 {professional.artisticName || professional.displayName}
               </h1>
-              <p className="text-lg text-gray-600 font-medium">
-                {professional.specialty || "Profissional"}
-              </p>
+
+              {/* Specialties */}
+              <div className="flex flex-wrap justify-center gap-2">
+                {professional.specialties && professional.specialties.length > 0 ? (
+                  professional.specialties.map((spec) => (
+                    <Badge
+                      key={spec}
+                      variant="secondary"
+                      className="bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-100 px-3 py-1 font-semibold"
+                    >
+                      {spec}
+                    </Badge>
+                  ))
+                ) : (
+                  <p className="text-lg text-gray-600 font-medium">
+                    {professional.specialty || "Profissional"}
+                  </p>
+                )}
+              </div>
+
+              {/* Location */}
               {(professional.city || professional.state) && (
-                <div className="flex items-center justify-center gap-1 text-sm text-gray-400">
-                  <MapPin className="h-3 w-3" />
-                  <span>
+                <div className="flex items-center justify-center gap-1.5 text-gray-600 bg-gray-50 px-4 py-2 rounded-full w-fit mx-auto border border-gray-100 shadow-sm">
+                  <MapPin className="h-4 w-4 text-amber-500" />
+                  <span className="text-sm font-semibold">
                     {professional.city}
                     {professional.city && professional.state && ", "}
                     {professional.state}

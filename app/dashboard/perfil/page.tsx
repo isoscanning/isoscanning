@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AlertCircle, CheckCircle2, Trash2, Plus, Calendar as CalendarIcon, Upload, ImageIcon, Eye, EyeOff, X, Globe } from "lucide-react"
+import { AlertCircle, CheckCircle2, Trash2, Plus, Calendar as CalendarIcon, Upload, ImageIcon, Eye, EyeOff, X, Globe, Camera } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -77,7 +77,12 @@ export default function PerfilPage() {
     instagram: "", // UI only for now
     linkedin: "",  // UI only for now
     isPublished: false,
+    avatarUrl: "",
   })
+
+  // Avatar Upload State
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
 
   // Portfolio State
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([])
@@ -132,7 +137,12 @@ export default function PerfilPage() {
             instagram: "",
             linkedin: "",
             isPublished: freshProfile.isPublished || false,
+            avatarUrl: freshProfile.avatarUrl || userProfile.avatarUrl || "",
           })
+          // Set avatar preview if exists
+          if (freshProfile.avatarUrl) {
+            setAvatarPreview(freshProfile.avatarUrl)
+          }
         } catch (error: any) {
           console.error("[perfil] Error fetching fresh profile:", error?.response?.status, error?.response?.data || error.message)
           // Fallback to cached userProfile data
@@ -149,7 +159,12 @@ export default function PerfilPage() {
             instagram: "",
             linkedin: "",
             isPublished: userProfile.isPublished || false,
+            avatarUrl: userProfile.avatarUrl || "",
           })
+          // Set avatar preview if exists
+          if (userProfile.avatarUrl) {
+            setAvatarPreview(userProfile.avatarUrl)
+          }
         }
       }
 
@@ -160,6 +175,14 @@ export default function PerfilPage() {
       loadAvailability()
     }
   }, [userProfile, loading, router])
+
+  // Success message timeout management
+  useEffect(() => {
+    if (successMsg) {
+      const timer = setTimeout(() => setSuccessMsg(""), 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [successMsg])
 
   const loadPortfolio = async () => {
     if (!userProfile?.id) return
@@ -260,7 +283,6 @@ export default function PerfilPage() {
         setShowPublishModal(true)
       } else {
         setSuccessMsg("Perfil ocultado.")
-        setTimeout(() => setSuccessMsg(""), 3000)
       }
 
     } catch (err: any) {
@@ -285,6 +307,51 @@ export default function PerfilPage() {
 
   const removeSpecialty = (specialty: string) => {
     setFormData(prev => ({ ...prev, specialties: prev.specialties.filter(s => s !== specialty) }))
+  }
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !userProfile?.id) return
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setErrorMsg("Por favor, selecione um arquivo de imagem.")
+      return
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg("A imagem deve ter no máximo 5MB.")
+      return
+    }
+
+    setUploadingAvatar(true)
+    setErrorMsg("")
+
+    try {
+      // Create a preview and base64 using FileReader
+      const reader = new FileReader()
+      reader.onloadend = async () => {
+        const base64 = reader.result as string
+        setAvatarPreview(base64)
+        setFormData(prev => ({ ...prev, avatarUrl: base64 }))
+
+        // Auto-save to database
+        try {
+          await apiClient.put(`/profiles/${userProfile.id}`, { avatarUrl: base64 })
+          setSuccessMsg("Foto de perfil atualizada!")
+        } catch (err: any) {
+          console.error("[perfil] Error saving avatar:", err)
+          setErrorMsg("Erro ao salvar foto de perfil.")
+        } finally {
+          setUploadingAvatar(false)
+        }
+      }
+      reader.readAsDataURL(file)
+    } catch (err) {
+      setErrorMsg("Erro ao processar imagem.")
+      setUploadingAvatar(false)
+    }
   }
 
   const handleAddPortfolioItem = async () => {
@@ -401,8 +468,8 @@ export default function PerfilPage() {
           {(successMsg || errorMsg) && (
             <div className="mb-4">
               {successMsg && (
-                <Alert>
-                  <CheckCircle2 className="h-4 w-4" />
+                <Alert className="bg-green-50 border-green-200 text-green-800 animate-in fade-in duration-500">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
                   <AlertDescription>{successMsg}</AlertDescription>
                 </Alert>
               )}
@@ -431,6 +498,41 @@ export default function PerfilPage() {
                     <CardDescription>Seus dados de contato e apresentação</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {/* Avatar Upload */}
+                    <div className="flex flex-col items-center gap-4 mb-6">
+                      <div className="relative">
+                        <div className="w-28 h-28 rounded-full bg-muted border-2 border-dashed border-border overflow-hidden flex items-center justify-center">
+                          {avatarPreview ? (
+                            <img
+                              src={avatarPreview}
+                              alt="Avatar"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Camera className="w-10 h-10 text-muted-foreground" />
+                          )}
+                        </div>
+                        <label
+                          htmlFor="avatar-upload"
+                          className="absolute bottom-0 right-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center cursor-pointer hover:bg-primary/90 transition-colors shadow-lg"
+                        >
+                          {uploadingAvatar ? (
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          ) : (
+                            <Plus className="w-4 h-4 text-primary-foreground" />
+                          )}
+                        </label>
+                        <input
+                          type="file"
+                          id="avatar-upload"
+                          accept="image/*"
+                          onChange={handleAvatarChange}
+                          className="hidden"
+                        />
+                      </div>
+                      <span className="text-sm text-muted-foreground">Foto de Perfil</span>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="displayName">Nome Completo *</Label>

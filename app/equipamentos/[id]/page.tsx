@@ -26,7 +26,7 @@ interface EquipmentDetails {
   city: string
   state: string
   imageUrl?: string
-  images?: string[]
+  imageUrls?: string[]
   ownerId: string
   ownerName: string
   ownerPhone?: string
@@ -115,7 +115,7 @@ export default function EquipmentDetailsPage() {
     )
   }
 
-  const displayImages = equipment.images && equipment.images.length > 0 ? equipment.images : [equipment.imageUrl]
+  const displayImages = equipment.imageUrls && equipment.imageUrls.length > 0 ? equipment.imageUrls : (equipment.imageUrl ? [equipment.imageUrl] : [])
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -146,9 +146,8 @@ export default function EquipmentDetailsPage() {
                     <button
                       key={idx}
                       onClick={() => setCurrentImageIndex(idx)}
-                      className={`aspect-video bg-muted rounded overflow-hidden border-2 ${
-                        idx === currentImageIndex ? "border-primary" : "border-transparent"
-                      }`}
+                      className={`aspect-video bg-muted rounded overflow-hidden border-2 ${idx === currentImageIndex ? "border-primary" : "border-transparent"
+                        }`}
                     >
                       <img
                         src={img || "/placeholder.svg"}

@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   MapPin,
   Star,
@@ -155,18 +156,17 @@ export default function ProfessionalProfilePage() {
           {/* Profile Header */}
           <div className="flex flex-col items-center text-center space-y-6">
             {/* Avatar */}
-            <div className="relative h-40 w-40 rounded-full p-1 bg-gradient-to-tr from-amber-200 to-amber-100 shadow-lg">
-              <div className="h-full w-full rounded-full overflow-hidden bg-white border-4 border-white">
-                <img
-                  src={
-                    professional.avatarUrl ||
-                    getMockAvatar(professional.id) ||
-                    "/placeholder.svg"
-                  }
+            <div className="relative h-40 w-40 rounded-full p-1 bg-gradient-to-tr from-amber-200 to-amber-100 shadow-lg flex items-center justify-center">
+              <Avatar className="h-full w-full border-4 border-white shadow-inner">
+                <AvatarImage
+                  src={professional.avatarUrl || undefined}
                   alt={professional.displayName}
-                  className="h-full w-full object-cover"
+                  className="object-cover"
                 />
-              </div>
+                <AvatarFallback className="text-4xl bg-white text-gray-400">
+                  {professional.displayName?.charAt(0).toUpperCase() || "P"}
+                </AvatarFallback>
+              </Avatar>
             </div>
 
             {/* Info */}

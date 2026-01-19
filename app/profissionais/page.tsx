@@ -9,7 +9,7 @@ import { MapPin, Star } from "lucide-react";
 import Link from "next/link";
 import { fetchProfessionals, type Professional } from "@/lib/data-service";
 import { SearchBar } from "@/components/search-bar";
-import { getMockAvatar } from "@/lib/mock-data";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const ESPECIALIDADES = [
   "Todos",
@@ -155,16 +155,17 @@ export default function ProfissionaisPage() {
                     <CardContent className="p-0">
                       <Link href={`/profissionais/${prof.id}`}>
                         {/* Image/Avatar Area - Mimicking the prototype's large image style */}
-                        <div className="relative h-64 bg-gray-100 overflow-hidden">
-                          <img
-                            src={
-                              prof.avatarUrl ||
-                              getMockAvatar(prof.id) ||
-                              "/placeholder.svg"
-                            }
-                            alt={prof.displayName}
-                            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          />
+                        <div className="relative h-64 bg-gray-100 overflow-hidden flex items-center justify-center">
+                          <Avatar className="h-full w-full rounded-none">
+                            <AvatarImage
+                              src={prof.avatarUrl || undefined}
+                              alt={prof.displayName}
+                              className="object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
+                            <AvatarFallback className="text-2xl bg-muted text-muted-foreground rounded-none">
+                              {prof.displayName?.charAt(0).toUpperCase() || "P"}
+                            </AvatarFallback>
+                          </Avatar>
                         </div>
 
                         <div className="p-6">

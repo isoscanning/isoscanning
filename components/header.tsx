@@ -91,12 +91,8 @@ export function Header() {
               Equipamentos
             </Link>
             {isAuthenticated && (
-              <Link
-                href="/dashboard/equipamentos"
-                className="text-sm font-medium transition-colors hover:text-primary focus-visible:text-primary"
-              >
-                Meus Equipamentos
-              </Link>
+              // Link removed - accessible via Dashboard
+              null
             )}
           </nav>
         </div>
@@ -145,14 +141,8 @@ export function Header() {
               Equipamentos
             </Link>
             {isAuthenticated && (
-              <Link
-                href="/dashboard/equipamentos"
-                className="flex items-center gap-3 text-sm font-medium hover:text-success transition-colors hover:bg-success/10 p-3 rounded-lg"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <Package className="h-4 w-4 text-success" />
-                Meus Equipamentos
-              </Link>
+              // Link removed as per redesign - accessible via Dashboard
+              null
             )}
             <div className="border-t border-border/50 pt-4 flex flex-col gap-3">
               <div className="flex items-center justify-between">

@@ -25,9 +25,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronLeft, Upload, X } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { createEquipment, uploadEquipmentImages } from "@/lib/data-service";
+import { ScrollReveal } from "@/components/scroll-reveal";
 
 const CATEGORIAS = [
   "Câmeras",
@@ -94,6 +95,7 @@ export default function NovoEquipamentoPage() {
   const [error, setError] = useState("");
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     if (!loading && !userProfile) {
@@ -103,7 +105,10 @@ export default function NovoEquipamentoPage() {
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    processFiles(files);
+  };
 
+  const processFiles = (files: File[]) => {
     if (files.length === 0) return;
 
     // Check total number of images
@@ -115,14 +120,12 @@ export default function NovoEquipamentoPage() {
 
     // Validate each file
     for (const file of files) {
-      // Validate file size (1MB)
       const maxSize = 1024 * 1024; // 1MB
       if (file.size > maxSize) {
         setError(`Imagem "${file.name}" deve ter no máximo 1MB`);
         return;
       }
 
-      // Validate file type
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
       if (!allowedTypes.includes(file.type)) {
         setError(`Tipo de arquivo não permitido para "${file.name}". Use apenas JPEG, PNG ou WebP`);
@@ -201,7 +204,7 @@ export default function NovoEquipamentoPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
@@ -212,20 +215,30 @@ export default function NovoEquipamentoPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background">
       <Header />
 
       <main className="flex-1 py-12 px-4">
-        <div className="container mx-auto max-w-3xl space-y-8">
-          <div>
-            <h1 className="text-3xl font-bold">Adicionar Equipamento</h1>
-            <p className="text-muted-foreground mt-2">
-              Cadastre um equipamento para venda, aluguel ou disponibilização
-            </p>
-          </div>
+        <div className="container mx-auto max-w-6xl space-y-8">
+          {/* Header */}
+          <ScrollReveal>
+            <div className="flex items-center gap-4 mb-4">
+              <Button variant="ghost" size="icon" onClick={() => router.back()}>
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600">
+                  Novo Equipamento
+                </h1>
+                <p className="text-muted-foreground">
+                  Cadastre um equipamento para venda ou aluguel
+                </p>
+              </div>
+            </div>
+          </ScrollReveal>
 
           {success && (
-            <Alert>
+            <Alert className="bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400">
               <CheckCircle2 className="h-4 w-4" />
               <AlertDescription>
                 Equipamento cadastrado com sucesso! Redirecionando...
@@ -241,291 +254,342 @@ export default function NovoEquipamentoPage() {
           )}
 
           <form onSubmit={handleSubmit}>
-            <Card>
-              <CardHeader>
-                <CardTitle>Informações do Equipamento</CardTitle>
-                <CardDescription>
-                  Preencha os dados do equipamento
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome do Equipamento *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    placeholder="Ex: Canon EOS R5"
-                    required
-                  />
-                </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Categoria *</Label>
-                    <Select
-                      value={formData.category}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, category: value })
-                      }
-                      required
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CATEGORIAS.map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+              {/* Main Column - Left (2/3) */}
+              <div className="lg:col-span-2 space-y-6">
 
-                  <div className="space-y-2">
-                    <Label htmlFor="negotiationType">
-                      Tipo de Negociação *
-                    </Label>
-                    <Select
-                      value={formData.negotiationType}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, negotiationType: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="sale">Venda</SelectItem>
-                        <SelectItem value="rent">Aluguel</SelectItem>
-                        <SelectItem value="free">
-                          Disponibilização Gratuita
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="brand">Marca</Label>
-                    <Input
-                      id="brand"
-                      value={formData.brand}
-                      onChange={(e) =>
-                        setFormData({ ...formData, brand: e.target.value })
-                      }
-                      placeholder="Ex: Canon"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="model">Modelo</Label>
-                    <Input
-                      id="model"
-                      value={formData.model}
-                      onChange={(e) =>
-                        setFormData({ ...formData, model: e.target.value })
-                      }
-                      placeholder="Ex: EOS R5"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="condition">Estado de Conservação *</Label>
-                  <Select
-                    value={formData.condition}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, condition: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="new">Novo</SelectItem>
-                      <SelectItem value="refurbished">Seminovo</SelectItem>
-                      <SelectItem value="used">Usado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {formData.negotiationType !== "free" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="price">
-                        {formData.negotiationType === "sale"
-                          ? "Preço de Venda"
-                          : "Valor do Aluguel"}{" "}
-                        *
-                      </Label>
-                      <Input
-                        id="price"
-                        type="number"
-                        step="0.01"
-                        value={formData.price}
-                        onChange={(e) =>
-                          setFormData({ ...formData, price: e.target.value })
-                        }
-                        placeholder="0.00"
-                        required={formData.negotiationType !== "free"}
-                      />
-                    </div>
-
-                    {formData.negotiationType === "rent" && (
+                {/* Basic Info Card */}
+                <ScrollReveal delay={0.1}>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Informações Básicas</CardTitle>
+                      <CardDescription>
+                        Dados principais do seu equipamento
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="rentPeriod">Período</Label>
+                        <Label htmlFor="name">Título do Anúncio *</Label>
+                        <Input
+                          id="name"
+                          value={formData.name}
+                          onChange={(e) =>
+                            setFormData({ ...formData, name: e.target.value })
+                          }
+                          placeholder="Ex: Câmera Canon EOS R5 Body"
+                          required
+                          className="text-lg font-medium"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="category">Categoria *</Label>
+                          <Select
+                            value={formData.category}
+                            onValueChange={(value) =>
+                              setFormData({ ...formData, category: value })
+                            }
+                            required
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CATEGORIAS.map((cat) => (
+                                <SelectItem key={cat} value={cat}>
+                                  {cat}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="condition">Condição *</Label>
+                          <Select
+                            value={formData.condition}
+                            onValueChange={(value) =>
+                              setFormData({ ...formData, condition: value })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="new">Novo (Lacrado)</SelectItem>
+                              <SelectItem value="refurbished">Seminovo (Como novo)</SelectItem>
+                              <SelectItem value="used">Usado (Com marcas de uso)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="brand">Marca</Label>
+                          <Input
+                            id="brand"
+                            value={formData.brand}
+                            onChange={(e) =>
+                              setFormData({ ...formData, brand: e.target.value })
+                            }
+                            placeholder="Ex: Canon"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="model">Modelo</Label>
+                          <Input
+                            id="model"
+                            value={formData.model}
+                            onChange={(e) =>
+                              setFormData({ ...formData, model: e.target.value })
+                            }
+                            placeholder="Ex: EOS R5"
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </ScrollReveal>
+
+                {/* Description Card */}
+                <ScrollReveal delay={0.2}>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Detalhes e Descrição</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="description">Descrição Completa *</Label>
+                        <Textarea
+                          id="description"
+                          value={formData.description}
+                          onChange={(e) =>
+                            setFormData({ ...formData, description: e.target.value })
+                          }
+                          placeholder="Descreva detalhes técnicos, tempo de uso, motivo da venda, etc..."
+                          rows={8}
+                          required
+                          className="resize-none leading-relaxed"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="additionalConditions">
+                          Observações Adicionais
+                        </Label>
+                        <Textarea
+                          id="additionalConditions"
+                          value={formData.additionalConditions}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              additionalConditions: e.target.value,
+                            })
+                          }
+                          placeholder="Informações sobre garantia, nota fiscal, caixa original, etc..."
+                          rows={3}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </ScrollReveal>
+              </div>
+
+              {/* Sidebar - Right (1/3) */}
+              <div className="space-y-6">
+
+                {/* Images Card */}
+                <ScrollReveal delay={0.3}>
+                  <Card className="overflow-hidden">
+                    <CardHeader className="bg-muted/30">
+                      <CardTitle className="text-base">Galeria de Fotos</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="space-y-4">
+                        <div
+                          className="border-2 border-dashed rounded-xl p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer relative"
+                          onClick={() => document.getElementById('images-input')?.click()}
+                        >
+                          <input
+                            id="images-input"
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                            multiple
+                            onChange={handleImageSelect}
+                            className="hidden"
+                          />
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                              <Upload className="h-5 w-5" />
+                            </div>
+                            <div className="text-sm font-medium">Clique para adicionar fotos</div>
+                            <div className="text-xs text-muted-foreground">
+                              Máximo 5 imagens (1MB cada)
+                            </div>
+                          </div>
+                        </div>
+
+                        {imagePreviews.length > 0 && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {imagePreviews.map((preview, index) => (
+                              <div key={index} className="relative group aspect-square rounded-lg overflow-hidden border">
+                                <img
+                                  src={preview}
+                                  alt={`Preview ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  className="absolute top-1 right-1 h-6 w-6 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const newImages = selectedImages.filter((_, i) => i !== index);
+                                    const newPreviews = imagePreviews.filter((_, i) => i !== index);
+                                    setSelectedImages(newImages);
+                                    setImagePreviews(newPreviews);
+                                  }}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                                {index === 0 && (
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] text-center py-1">
+                                    Capa
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </ScrollReveal>
+
+                {/* Negociation Card */}
+                <ScrollReveal delay={0.4}>
+                  <Card>
+                    <CardHeader className="bg-muted/30">
+                      <CardTitle className="text-base">Valor e Localização</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6 space-y-4">
+                      <div className="space-y-2">
+                        <Label>Tipo de Negociação *</Label>
                         <Select
-                          value={formData.rentPeriod}
+                          value={formData.negotiationType}
                           onValueChange={(value) =>
-                            setFormData({ ...formData, rentPeriod: value })
+                            setFormData({ ...formData, negotiationType: value })
                           }
                         >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="day">Por dia</SelectItem>
-                            <SelectItem value="week">Por semana</SelectItem>
-                            <SelectItem value="month">Por mês</SelectItem>
+                            <SelectItem value="sale">Venda</SelectItem>
+                            <SelectItem value="rent">Aluguel</SelectItem>
+                            <SelectItem value="free">Doação / Gratuito</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-                    )}
-                  </div>
-                )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="description">Descrição *</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    placeholder="Descreva o equipamento, suas características e condições..."
-                    rows={5}
-                    required
-                  />
-                </div>
+                      {formData.negotiationType !== "free" && (
+                        <div className="space-y-2">
+                          <Label>
+                            {formData.negotiationType === "sale" ? "Preço de Venda (R$)" : "Valor do Aluguel (R$)"} *
+                          </Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={formData.price}
+                            onChange={(e) =>
+                              setFormData({ ...formData, price: e.target.value })
+                            }
+                            placeholder="0,00"
+                            required={formData.negotiationType !== "free"}
+                            className="text-lg font-bold"
+                          />
+                        </div>
+                      )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="images">Fotos do Equipamento</Label>
-                  <div className="space-y-4">
-                    <Input
-                      id="images"
-                      type="file"
-                      accept="image/jpeg,image/jpg,image/png,image/webp"
-                      multiple
-                      onChange={handleImageSelect}
-                      className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Máximo 5 imagens, 1MB cada. Formatos: JPEG, PNG, WebP
-                    </p>
+                      {formData.negotiationType === "rent" && (
+                        <div className="space-y-2">
+                          <Label>Período de Cobrança</Label>
+                          <Select
+                            value={formData.rentPeriod}
+                            onValueChange={(value) =>
+                              setFormData({ ...formData, rentPeriod: value })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="day">Por Dia</SelectItem>
+                              <SelectItem value="week">Por Semana</SelectItem>
+                              <SelectItem value="month">Por Mês</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
 
-                    {imagePreviews.length > 0 && (
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {imagePreviews.map((preview, index) => (
-                          <div key={index} className="relative">
-                            <img
-                              src={preview}
-                              alt={`Preview ${index + 1}`}
-                              className="w-full h-32 object-cover rounded-lg border"
+                      <div className="pt-4 border-t space-y-4">
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="col-span-2 space-y-2">
+                            <Label>Cidade *</Label>
+                            <Input
+                              value={formData.city}
+                              onChange={(e) =>
+                                setFormData({ ...formData, city: e.target.value })
+                              }
+                              required
+                              placeholder="Cidade"
                             />
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="sm"
-                              className="absolute top-1 right-1 h-6 w-6 p-0"
-                              onClick={() => {
-                                const newImages = selectedImages.filter((_, i) => i !== index);
-                                const newPreviews = imagePreviews.filter((_, i) => i !== index);
-                                setSelectedImages(newImages);
-                                setImagePreviews(newPreviews);
-                              }}
-                            >
-                              ×
-                            </Button>
                           </div>
-                        ))}
+                          <div className="space-y-2">
+                            <Label>UF *</Label>
+                            <Select
+                              value={formData.state}
+                              onValueChange={(value) =>
+                                setFormData({ ...formData, state: value })
+                              }
+                              required
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="UF" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ESTADOS.map((estado) => (
+                                  <SelectItem key={estado} value={estado}>
+                                    {estado}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="city">Cidade *</Label>
-                    <Input
-                      id="city"
-                      value={formData.city}
-                      onChange={(e) =>
-                        setFormData({ ...formData, city: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="state">Estado *</Label>
-                    <Select
-                      value={formData.state}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, state: value })
-                      }
-                      required
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="UF" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ESTADOS.map((estado) => (
-                          <SelectItem key={estado} value={estado}>
-                            {estado}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="additionalConditions">
-                    Condições Adicionais
-                  </Label>
-                  <Textarea
-                    id="additionalConditions"
-                    value={formData.additionalConditions}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        additionalConditions: e.target.value,
-                      })
-                    }
-                    placeholder="Regras de uso, garantia, forma de entrega, etc..."
-                    rows={3}
-                  />
-                </div>
-
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => router.back()}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={saving || success}>
-                    {saving ? "Salvando..." : "Cadastrar Equipamento"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                      <div className="pt-4">
+                        <Button type="submit" className="w-full" size="lg" disabled={saving || success}>
+                          {saving ? "Publicando..." : "Publicar Anúncio"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="w-full mt-2"
+                          onClick={() => router.back()}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </ScrollReveal>
+              </div>
+            </div>
           </form>
         </div>
       </main>

@@ -370,10 +370,12 @@ export async function uploadPortfolioItemImage(
 // --- AVAILABILITY ---
 
 export interface CreateAvailabilityData {
-  date: string; // ISO date string YYYY-MM-DD
-  startTime: string; // HH:mm
-  endTime: string;   // HH:mm
-  isBooked: boolean;
+  date?: string; // ISO date string YYYY-MM-DD (legacy single date)
+  dates?: string[]; // Multiple dates (new feature)
+  startTime?: string; // HH:mm (optional when isAllDay)
+  endTime?: string;   // HH:mm (optional when isAllDay)
+  isAllDay?: boolean; // When true, ignores time and sets full day
+  type?: "available" | "blocked";
   professionalId: string;
 }
 
@@ -383,7 +385,8 @@ export interface AvailabilitySlot {
   date: string;
   startTime: string;
   endTime: string;
-  isBooked: boolean;
+  type?: string;
+  reason?: string;
   createdAt: Date;
 }
 
@@ -397,9 +400,13 @@ export async function fetchAvailability(professionalId: string): Promise<Availab
   }
 }
 
-export async function createAvailability(data: CreateAvailabilityData): Promise<AvailabilitySlot> {
+export async function createAvailability(data: CreateAvailabilityData): Promise<AvailabilitySlot | AvailabilitySlot[]> {
   try {
-    const response = await apiClient.post("/availability", data);
+    const payload = {
+      ...data,
+      type: data.type || "available",
+    };
+    const response = await apiClient.post("/availability", payload);
     return response.data;
   } catch (error) {
     console.error("[data-service] Error creating availability:", error);

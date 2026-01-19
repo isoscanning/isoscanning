@@ -90,7 +90,8 @@ export default function PerfilPage() {
 
   // Availability State
   const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([])
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
+  const [selectedDates, setSelectedDates] = useState<Date[]>([])
+  const [isAllDay, setIsAllDay] = useState(false)
   const [newSlot, setNewSlot] = useState({
     startTime: "09:00",
     endTime: "18:00"
@@ -492,23 +493,26 @@ export default function PerfilPage() {
   }
 
   const handleAddAvailability = async () => {
-    if (!userProfile?.id || !selectedDate) {
-      setErrorMsg("Selecione uma data.")
+    if (!userProfile?.id || selectedDates.length === 0) {
+      setErrorMsg("Selecione pelo menos uma data.")
       return
     }
 
     try {
       setLoadingAvailability(true)
-      const dateStr = format(selectedDate, "yyyy-MM-dd")
+      const dates = selectedDates.map(date => format(date, "yyyy-MM-dd"))
+
       await createAvailability({
-        date: dateStr,
-        startTime: newSlot.startTime,
-        endTime: newSlot.endTime,
-        isBooked: false,
+        dates,
+        startTime: isAllDay ? undefined : newSlot.startTime,
+        endTime: isAllDay ? undefined : newSlot.endTime,
+        isAllDay,
         professionalId: userProfile.id
       })
+
       await loadAvailability()
-      setSuccessMsg("Disponibilidade adicionada!")
+      setSelectedDates([])
+      setSuccessMsg(`${dates.length} disponibilidade(s) adicionada(s)!`)
     } catch (err: any) {
       setErrorMsg("Erro ao adicionar disponibilidade.")
     } finally {
@@ -969,33 +973,59 @@ export default function PerfilPage() {
                     <div className="space-y-4">
                       <div className="border rounded-md p-4">
                         <Calendar
-                          mode="single"
-                          selected={selectedDate}
-                          onSelect={setSelectedDate}
+                          mode="multiple"
+                          selected={selectedDates}
+                          onSelect={(dates) => setSelectedDates(dates || [])}
                           locale={ptBR}
                           className="rounded-md"
                         />
                       </div>
 
-                      <div className="space-y-2">
-                        <Label>Horário</Label>
+                      {selectedDates.length > 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          {selectedDates.length} data(s) selecionada(s)
+                        </p>
+                      )}
+
+                      <div className="space-y-3">
+                        {/* All Day Toggle */}
                         <div className="flex items-center gap-2">
-                          <Input
-                            type="time"
-                            value={newSlot.startTime}
-                            onChange={(e) => setNewSlot({ ...newSlot, startTime: e.target.value })}
+                          <input
+                            type="checkbox"
+                            id="isAllDay"
+                            checked={isAllDay}
+                            onChange={(e) => setIsAllDay(e.target.checked)}
+                            className="w-4 h-4 rounded border-gray-300"
                           />
-                          <span>até</span>
-                          <Input
-                            type="time"
-                            value={newSlot.endTime}
-                            onChange={(e) => setNewSlot({ ...newSlot, endTime: e.target.value })}
-                          />
+                          <Label htmlFor="isAllDay" className="cursor-pointer">
+                            Dia Inteiro
+                          </Label>
                         </div>
+
+                        {/* Time Inputs - hidden when all day */}
+                        {!isAllDay && (
+                          <div className="space-y-2">
+                            <Label>Horário</Label>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="time"
+                                value={newSlot.startTime}
+                                onChange={(e) => setNewSlot({ ...newSlot, startTime: e.target.value })}
+                              />
+                              <span>até</span>
+                              <Input
+                                type="time"
+                                value={newSlot.endTime}
+                                onChange={(e) => setNewSlot({ ...newSlot, endTime: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                        )}
+
                         <Button
-                          className="w-full mt-2"
+                          className="w-full"
                           onClick={handleAddAvailability}
-                          disabled={loadingAvailability}
+                          disabled={loadingAvailability || selectedDates.length === 0}
                         >
                           Adicionar Disponibilidade
                         </Button>
@@ -1019,9 +1049,15 @@ export default function PerfilPage() {
                                     <p className="font-medium">
                                       {format(new Date(slot.date), "dd 'de' MMMM, yyyy", { locale: ptBR })}
                                     </p>
-                                    <p className="text-sm text-muted-foreground">
-                                      {slot.startTime} - {slot.endTime}
-                                    </p>
+                                    {slot.startTime === "00:00" && slot.endTime === "23:59" ? (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                                        ⭐ Dia Inteiro
+                                      </span>
+                                    ) : (
+                                      <p className="text-sm text-muted-foreground">
+                                        {slot.startTime} - {slot.endTime}
+                                      </p>
+                                    )}
                                   </div>
                                 </div>
                                 <Button

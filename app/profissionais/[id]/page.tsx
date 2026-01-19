@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
-import type { Professional } from "@/lib/data-service";
+import { type Professional, type AvailabilitySlot, fetchAvailability } from "@/lib/data-service";
 import { AvailabilityCalendar } from "@/components/availability-calendar";
 import {
   getMockAvatar,
@@ -55,6 +55,7 @@ export default function ProfessionalProfilePage() {
   const [professional, setProfessional] = useState<Professional | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
+  const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Lightbox state
@@ -120,6 +121,14 @@ export default function ProfessionalProfilePage() {
         setReviews(reviewsData);
       } catch (error) {
         console.error("[profissional-detail] Error fetching reviews:", error);
+      }
+
+      // Fetch availability
+      try {
+        const availabilityData = await fetchAvailability(professionalId);
+        setAvailability(availabilityData);
+      } catch (error) {
+        console.error("[profissional-detail] Error fetching availability:", error);
       }
     } catch (error) {
       console.error(
@@ -435,7 +444,7 @@ export default function ProfessionalProfilePage() {
                   Disponibilidade
                 </h2>
               </div>
-              <AvailabilityCalendar />
+              <AvailabilityCalendar availabilitySlots={availability} />
             </TabsContent>
           </Tabs>
         </div>

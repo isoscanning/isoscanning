@@ -8,7 +8,13 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 
-export function AvailabilityCalendar() {
+import { AvailabilitySlot } from "@/lib/data-service";
+
+interface AvailabilityCalendarProps {
+    availabilitySlots?: AvailabilitySlot[];
+}
+
+export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCalendarProps) {
     const [date, setDate] = React.useState<Date | undefined>(new Date());
     const [currentMonth, setCurrentMonth] = React.useState<Date>(new Date());
 
@@ -62,6 +68,20 @@ export function AvailabilityCalendar() {
                     onMonthChange={setCurrentMonth}
                     locale={ptBR}
                     className="p-0 pointer-events-none" // Disable interaction for now as it's just display
+                    modifiers={{
+                        available: (date) => availabilitySlots.some(slot =>
+                            slot.type === 'available' &&
+                            format(new Date(slot.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+                        ),
+                        blocked: (date) => availabilitySlots.some(slot =>
+                            slot.type === 'blocked' &&
+                            format(new Date(slot.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+                        ),
+                    }}
+                    modifiersClassNames={{
+                        available: "bg-green-100 text-green-700 hover:bg-green-200 font-bold",
+                        blocked: "bg-red-100 text-red-700 hover:bg-red-200 font-bold opacity-100",
+                    }}
                     classNames={{
                         month: "space-y-4",
                         caption: "hidden", // Hide default caption as we have custom header
@@ -95,6 +115,20 @@ export function AvailabilityCalendar() {
                         disableNavigation
                         locale={ptBR}
                         className="p-0 pointer-events-none"
+                        modifiers={{
+                            available: (date) => availabilitySlots.some(slot =>
+                                slot.type === 'available' &&
+                                format(new Date(slot.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+                            ),
+                            blocked: (date) => availabilitySlots.some(slot =>
+                                slot.type === 'blocked' &&
+                                format(new Date(slot.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+                            ),
+                        }}
+                        modifiersClassNames={{
+                            available: "bg-green-100 text-green-700 hover:bg-green-200 font-bold",
+                            blocked: "bg-red-100 text-red-700 hover:bg-red-200 font-bold opacity-100",
+                        }}
                         classNames={{
                             month: "space-y-4",
                             caption: "hidden",

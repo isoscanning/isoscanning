@@ -40,6 +40,7 @@ import {
   type PortfolioItem,
   type AvailabilitySlot
 } from "@/lib/data-service"
+import apiClient from "@/lib/api-service"
 
 const ESPECIALIDADES = [
   "Fotógrafo",
@@ -107,22 +108,52 @@ export default function PerfilPage() {
   useEffect(() => {
     if (!loading && !userProfile) {
       router.push("/login")
+      return
     }
 
     if (userProfile) {
-      setFormData({
-        displayName: userProfile.displayName || "",
-        artisticName: userProfile.artisticName || "",
-        specialties: userProfile.specialties || [],
-        description: userProfile.description || "",
-        city: userProfile.city || "",
-        state: userProfile.state || "",
-        phone: userProfile.phone || "",
-        portfolioLink: userProfile.portfolioLink || "",
-        instagram: "",
-        linkedin: "",
-        isPublished: userProfile.isPublished || false,
-      })
+      // Fetch fresh profile data from API to ensure we have latest from DB
+      const fetchFreshProfile = async () => {
+        try {
+          console.log("[perfil] Fetching fresh profile for user:", userProfile.id)
+          const response = await apiClient.get(`/profiles/${userProfile.id}`)
+          const freshProfile = response.data
+          console.log("[perfil] Fresh profile data received:", freshProfile)
+
+          setFormData({
+            displayName: freshProfile.displayName || userProfile.displayName || "",
+            artisticName: freshProfile.artisticName || "",
+            specialties: freshProfile.specialties || [],
+            description: freshProfile.description || "",
+            city: freshProfile.city || "",
+            state: freshProfile.state || "",
+            phone: freshProfile.phone || "",
+            portfolioLink: freshProfile.portfolioLink || "",
+            instagram: "",
+            linkedin: "",
+            isPublished: freshProfile.isPublished || false,
+          })
+        } catch (error: any) {
+          console.error("[perfil] Error fetching fresh profile:", error?.response?.status, error?.response?.data || error.message)
+          // Fallback to cached userProfile data
+          console.log("[perfil] Falling back to cached userProfile data:", userProfile)
+          setFormData({
+            displayName: userProfile.displayName || "",
+            artisticName: userProfile.artisticName || "",
+            specialties: userProfile.specialties || [],
+            description: userProfile.description || "",
+            city: userProfile.city || "",
+            state: userProfile.state || "",
+            phone: userProfile.phone || "",
+            portfolioLink: userProfile.portfolioLink || "",
+            instagram: "",
+            linkedin: "",
+            isPublished: userProfile.isPublished || false,
+          })
+        }
+      }
+
+      fetchFreshProfile()
 
       // Load additional data
       loadPortfolio()

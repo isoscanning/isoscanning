@@ -7,26 +7,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MapPin, Star } from "lucide-react";
 import Link from "next/link";
-import { fetchProfessionals, type Professional } from "@/lib/data-service";
+import { fetchProfessionals, fetchSpecialties, type Professional, type Specialty } from "@/lib/data-service";
 import { SearchBar } from "@/components/search-bar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const ESPECIALIDADES = [
-  "Todos",
-  "Fotógrafo",
-  "Videomaker",
-  "Editor de Vídeo",
-  "Editor de Fotos",
-  "Produtor Audiovisual",
-  "Drone Pilot",
-  "Fotógrafo de Eventos",
-  "Fotógrafo de Produtos",
-  "Fotógrafo de Retratos",
-  "Cinegrafista",
-];
-
 export default function ProfissionaisPage() {
   const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [availableSpecialties, setAvailableSpecialties] = useState<string[]>(["Todos"]);
   const [loading, setLoading] = useState(true);
 
   // Filters
@@ -35,8 +22,15 @@ export default function ProfissionaisPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
 
   useEffect(() => {
+    loadSpecialties();
     loadProfessionals();
   }, []);
+
+  const loadSpecialties = async () => {
+    const data = await fetchSpecialties();
+    const names = data.map(s => s.name);
+    setAvailableSpecialties(["Todos", ...names]);
+  };
 
   const loadProfessionals = async () => {
     setLoading(true);
@@ -95,7 +89,7 @@ export default function ProfissionaisPage() {
             <div className="relative z-10 -mb-28 md:-mb-32">
               <SearchBar
                 onSearch={handleSearch}
-                specialties={ESPECIALIDADES}
+                specialties={availableSpecialties}
                 className="shadow-xl"
               />
             </div>

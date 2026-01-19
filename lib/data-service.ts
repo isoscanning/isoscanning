@@ -47,6 +47,19 @@ export interface Specialty {
   name: string;
 }
 
+export const DEFAULT_SPECIALTIES: Specialty[] = [
+  { id: "1", name: "Fotógrafo" },
+  { id: "2", name: "Videomaker" },
+  { id: "3", name: "Editor de Vídeo" },
+  { id: "4", name: "Editor de Fotos" },
+  { id: "5", name: "Produtor Audiovisual" },
+  { id: "6", name: "Drone Pilot" },
+  { id: "7", name: "Fotógrafo de Eventos" },
+  { id: "8", name: "Fotógrafo de Produtos" },
+  { id: "9", name: "Fotógrafo de Retratos" },
+  { id: "10", name: "Cinegrafista" },
+];
+
 export interface CreateEquipmentData {
   name: string;
   category: string;
@@ -252,11 +265,19 @@ export async function fetchProfessionals(): Promise<Professional[]> {
 
 export async function fetchSpecialties(): Promise<Specialty[]> {
   try {
+    console.log("[data-service] Fetching specialties...");
     const response = await apiClient.get("/specialties");
-    return response.data || [];
+
+    if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+      console.log(`[data-service] Found ${response.data.length} specialties`);
+      return response.data;
+    }
+
+    console.log("[data-service] No specialties returned from API, using default list");
+    return DEFAULT_SPECIALTIES;
   } catch (error) {
     console.error("[data-service] Error fetching specialties:", error);
-    return [];
+    return DEFAULT_SPECIALTIES;
   }
 }
 

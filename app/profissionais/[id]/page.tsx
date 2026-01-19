@@ -16,6 +16,9 @@ import {
   Linkedin,
   Globe,
   Play,
+  ChevronLeft,
+  ChevronRight,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
@@ -40,6 +43,8 @@ interface PortfolioItem {
   title: string;
   description?: string;
   imageUrls?: string[];
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video';
   category?: string;
 }
 
@@ -51,6 +56,10 @@ export default function ProfessionalProfilePage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Lightbox state
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   useEffect(() => {
     fetchProfessionalData();
@@ -73,10 +82,14 @@ export default function ProfessionalProfilePage() {
             id: item.id,
             title: item.title,
             description: item.description,
+            mediaUrl: item.mediaUrl,
+            mediaType: item.mediaType,
             imageUrls:
               item.imageUrls && item.imageUrls.length > 0
                 ? item.imageUrls
-                : [getMockPortfolioImage(item.id)],
+                : item.mediaUrl
+                  ? [item.mediaUrl]
+                  : [getMockPortfolioImage(item.id)],
             category: item.category,
           })
         );
@@ -117,6 +130,46 @@ export default function ProfessionalProfilePage() {
       setLoading(false);
     }
   };
+
+  // Lightbox functions
+  const openLightbox = (index: number) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
+
+  const closeLightbox = () => {
+    setLightboxOpen(false);
+  };
+
+  const goToPrevious = () => {
+    setLightboxIndex((prev) => (prev === 0 ? portfolio.length - 1 : prev - 1));
+  };
+
+  const goToNext = () => {
+    setLightboxIndex((prev) => (prev === portfolio.length - 1 ? 0 : prev + 1));
+  };
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!lightboxOpen) return;
+
+      switch (e.key) {
+        case 'Escape':
+          closeLightbox();
+          break;
+        case 'ArrowLeft':
+          goToPrevious();
+          break;
+        case 'ArrowRight':
+          goToNext();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxOpen, portfolio.length]);
 
   if (loading) {
     return (
@@ -261,27 +314,45 @@ export default function ProfessionalProfilePage() {
             <TabsContent value="portfolio" className="mt-0 space-y-12">
               {portfolio.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {portfolio.map((item) => (
-                    <div
-                      key={item.id}
-                      className="group relative aspect-square bg-gray-100 rounded-2xl overflow-hidden cursor-pointer"
-                    >
-                      <img
-                        src={item.imageUrls?.[0] || "/placeholder.svg"}
-                        alt={item.title}
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
-                      {/* Video Overlay Mock - Assuming some items might be videos based on category or just visual style */}
-                      {(item.category === "Vídeo" ||
-                        item.category === "Videomaker") && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-colors">
-                            <div className="h-12 w-12 bg-white rounded-full flex items-center justify-center shadow-lg">
-                              <Play className="h-5 w-5 text-gray-900 fill-gray-900 ml-1" />
+                  {portfolio.map((item, index) => {
+                    const mediaUrl = item.mediaUrl || item.imageUrls?.[0] || "/placeholder.svg";
+                    const isVideo = item.mediaType === 'video';
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="group relative aspect-square bg-gray-100 rounded-2xl overflow-hidden cursor-pointer"
+                        onClick={() => openLightbox(index)}
+                      >
+                        {isVideo ? (
+                          <>
+                            <video
+                              src={mediaUrl}
+                              className="h-full w-full object-cover"
+                              muted
+                              loop
+                              onMouseEnter={(e) => e.currentTarget.play()}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.pause();
+                                e.currentTarget.currentTime = 0;
+                              }}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-colors pointer-events-none">
+                              <div className="h-12 w-12 bg-white rounded-full flex items-center justify-center shadow-lg">
+                                <Play className="h-5 w-5 text-gray-900 fill-gray-900 ml-1" />
+                              </div>
                             </div>
-                          </div>
+                          </>
+                        ) : (
+                          <img
+                            src={mediaUrl}
+                            alt={item.title}
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
                         )}
-                    </div>
-                  ))}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-12">
@@ -371,6 +442,80 @@ export default function ProfessionalProfilePage() {
       </main>
 
       <Footer />
+
+      {/* Lightbox Modal */}
+      {lightboxOpen && portfolio[lightboxIndex] && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+          onClick={closeLightbox}
+        >
+          {/* Close Button */}
+          <button
+            onClick={closeLightbox}
+            className="absolute top-4 right-4 p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors z-50"
+            aria-label="Fechar"
+          >
+            <X className="h-8 w-8" />
+          </button>
+
+          {/* Previous Button */}
+          {portfolio.length > 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                goToPrevious();
+              }}
+              className="absolute left-4 top-1/2 -translate-y-1/2 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors z-50"
+              aria-label="Anterior"
+            >
+              <ChevronLeft className="h-10 w-10" />
+            </button>
+          )}
+
+          {/* Next Button */}
+          {portfolio.length > 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                goToNext();
+              }}
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors z-50"
+              aria-label="Próximo"
+            >
+              <ChevronRight className="h-10 w-10" />
+            </button>
+          )}
+
+          {/* Media Content */}
+          <div
+            className="max-w-[90vw] max-h-[90vh] flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {portfolio[lightboxIndex].mediaType === 'video' ? (
+              <video
+                src={portfolio[lightboxIndex].mediaUrl || portfolio[lightboxIndex].imageUrls?.[0]}
+                className="max-w-full max-h-[80vh] object-contain rounded-lg"
+                controls
+                autoPlay
+              />
+            ) : (
+              <img
+                src={portfolio[lightboxIndex].mediaUrl || portfolio[lightboxIndex].imageUrls?.[0]}
+                alt={portfolio[lightboxIndex].title}
+                className="max-w-full max-h-[80vh] object-contain rounded-lg"
+              />
+            )}
+
+            {/* Title and Counter */}
+            <div className="mt-4 text-center">
+              <p className="text-white text-lg font-medium">{portfolio[lightboxIndex].title}</p>
+              <p className="text-white/60 text-sm mt-1">
+                {lightboxIndex + 1} de {portfolio.length}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -35,6 +35,7 @@ import {
   fetchPortfolio,
   createPortfolioItem,
   deletePortfolioItem,
+  uploadPortfolioItemImage,
   fetchAvailability,
   createAvailability,
   deleteAvailability,
@@ -83,6 +84,9 @@ export default function PerfilPage() {
     mediaUrl: "",
     mediaType: "image" as "image" | "video"
   })
+  const [portfolioFile, setPortfolioFile] = useState<File | null>(null)
+  const [portfolioPreview, setPortfolioPreview] = useState<string | null>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
 
   // Availability State
   const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([])
@@ -101,6 +105,9 @@ export default function PerfilPage() {
   const [showPublishModal, setShowPublishModal] = useState(false)
   const [showSaveSuccessModal, setShowSaveSuccessModal] = useState(false)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [isInitialLoading, setIsInitialLoading] = useState(true)
+
+  const [hasFetchedProfile, setHasFetchedProfile] = useState(false)
 
   useEffect(() => {
     const loadSpecialties = async () => {
@@ -116,11 +123,11 @@ export default function PerfilPage() {
       return
     }
 
-    if (userProfile) {
-      // Fetch fresh profile data from API to ensure we have latest from DB
+    if (userProfile && !hasFetchedProfile) {
+      // Fetch fresh profile data from API only ONCE on mount
       const fetchFreshProfile = async () => {
         try {
-          console.log("[perfil] Fetching fresh profile for user:", userProfile.id)
+          console.log("[perfil] Fetching initial fresh profile for user:", userProfile.id)
           const response = await apiClient.get(`/profiles/${userProfile.id}`)
           const freshProfile = response.data
           console.log("[perfil] Fresh profile data received:", freshProfile)
@@ -139,14 +146,21 @@ export default function PerfilPage() {
             isPublished: freshProfile.isPublished || false,
             avatarUrl: freshProfile.avatarUrl || userProfile.avatarUrl || "",
           })
-          // Set avatar preview if exists
+
           if (freshProfile.avatarUrl) {
             setAvatarPreview(freshProfile.avatarUrl)
           }
+
+          // Load other data based on fresh profile and wait
+          await Promise.all([
+            loadPortfolio(),
+            loadAvailability()
+          ])
+
+          setHasFetchedProfile(true)
         } catch (error: any) {
           console.error("[perfil] Error fetching fresh profile:", error?.response?.status, error?.response?.data || error.message)
           // Fallback to cached userProfile data
-          console.log("[perfil] Falling back to cached userProfile data:", userProfile)
           setFormData({
             displayName: userProfile.displayName || "",
             artisticName: userProfile.artisticName || "",
@@ -161,20 +175,25 @@ export default function PerfilPage() {
             isPublished: userProfile.isPublished || false,
             avatarUrl: userProfile.avatarUrl || "",
           })
-          // Set avatar preview if exists
+
+
           if (userProfile.avatarUrl) {
             setAvatarPreview(userProfile.avatarUrl)
           }
+
+          await Promise.all([
+            loadPortfolio(),
+            loadAvailability()
+          ])
+
+          setHasFetchedProfile(true)
+        } finally {
+          setIsInitialLoading(false)
         }
       }
-
       fetchFreshProfile()
-
-      // Load additional data
-      loadPortfolio()
-      loadAvailability()
     }
-  }, [userProfile, loading, router])
+  }, [loading, userProfile, router, hasFetchedProfile])
 
   // Success message timeout management
   useEffect(() => {
@@ -309,6 +328,69 @@ export default function PerfilPage() {
     setFormData(prev => ({ ...prev, specialties: prev.specialties.filter(s => s !== specialty) }))
   }
 
+  const validateVideoDuration = (file: File): Promise<number> => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.onloadedmetadata = () => {
+        window.URL.revokeObjectURL(video.src);
+        resolve(video.duration);
+      };
+      video.src = URL.createObjectURL(file);
+    });
+  };
+
+  const handlePortfolioFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    console.log('[Portfolio] handlePortfolioFileChange called, file:', file)
+    if (!file) return
+
+    setFileError(null)
+
+    // Auto-detect media type from file MIME type
+    const isVideo = file.type.startsWith('video/')
+    const isImage = file.type.startsWith('image/')
+
+    console.log('[Portfolio] File type:', file.type, 'isImage:', isImage, 'isVideo:', isVideo)
+
+    if (!isImage && !isVideo) {
+      setFileError("Por favor, selecione uma imagem ou vídeo.")
+      return
+    }
+
+    // Validate based on detected type
+    if (isImage) {
+      if (file.size > 5 * 1024 * 1024) {
+        setFileError("Fotos devem ter no máximo 5MB.")
+        return
+      }
+      console.log('[Portfolio] Setting mediaType to image')
+      setNewPortfolioItem(prev => ({ ...prev, mediaType: 'image' }))
+    } else if (isVideo) {
+      if (file.size > 50 * 1024 * 1024) {
+        setFileError("Vídeos devem ter no máximo 50MB.")
+        return
+      }
+
+      const duration = await validateVideoDuration(file)
+      console.log('[Portfolio] Video duration:', duration)
+      if (duration > 90) { // 1m30s
+        setFileError("Vídeos devem ter no máximo 1 minuto e 30 segundos.")
+        return
+      }
+      console.log('[Portfolio] Setting mediaType to video')
+      setNewPortfolioItem(prev => ({ ...prev, mediaType: 'video' }))
+    }
+
+    const previewUrl = URL.createObjectURL(file)
+    console.log('[Portfolio] Created preview URL:', previewUrl)
+
+    setPortfolioFile(file)
+    setPortfolioPreview(previewUrl)
+
+    console.log('[Portfolio] States updated - file set, preview set')
+  }
+
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !userProfile?.id) return
@@ -355,22 +437,43 @@ export default function PerfilPage() {
   }
 
   const handleAddPortfolioItem = async () => {
-    if (!userProfile?.id || !newPortfolioItem.title || !newPortfolioItem.mediaUrl) {
-      setErrorMsg("Preencha o título e o link da imagem/vídeo.")
+    if (!userProfile?.id || !newPortfolioItem.title || !portfolioFile) {
+      setErrorMsg("Preencha o título e selecione um arquivo.")
+      return
+    }
+
+    if (portfolioItems.length >= 9) {
+      setErrorMsg("Você já atingiu o limite de 9 itens no portfólio.")
       return
     }
 
     try {
       setLoadingPortfolio(true)
+      setErrorMsg("")
+
+      // Upload file to Supabase Storage
+      const mediaUrl = await uploadPortfolioItemImage(portfolioFile, userProfile.id)
+
+      // Create portfolio item with the uploaded URL
       await createPortfolioItem({
-        ...newPortfolioItem,
+        title: newPortfolioItem.title,
+        mediaUrl: mediaUrl,
+        mediaType: newPortfolioItem.mediaType,
         professionalId: userProfile.id
       })
+
       await loadPortfolio()
+
+      // Reset form
       setNewPortfolioItem({ title: "", mediaUrl: "", mediaType: "image" })
+      setPortfolioFile(null)
+      setPortfolioPreview(null)
+      setFileError(null)
+
       setSuccessMsg("Item adicionado ao portfólio!")
     } catch (err: any) {
-      setErrorMsg("Erro ao adicionar item ao portfólio.")
+      console.error("[perfil] Error adding portfolio item:", err)
+      setErrorMsg(err.message || "Erro ao adicionar item ao portfólio.")
     } finally {
       setLoadingPortfolio(false)
     }
@@ -451,7 +554,10 @@ export default function PerfilPage() {
               <p className="text-muted-foreground mt-2">Gerencie suas informações, portfólio e agenda</p>
             </div>
 
-            <div className="flex items-center gap-4 bg-muted/50 p-4 rounded-lg border">
+            <div className={cn(
+              "flex items-center gap-4 p-4 rounded-lg border transition-colors duration-200",
+              formData.isPublished ? "bg-green-50 border-green-200" : "bg-muted/50 border-border"
+            )}>
               <div className="flex flex-col">
                 <span className="font-medium text-sm">Visibilidade do Perfil</span>
                 <span className="text-xs text-muted-foreground">
@@ -461,6 +567,7 @@ export default function PerfilPage() {
               <Switch
                 checked={formData.isPublished}
                 onCheckedChange={handlePublishToggle}
+                className="data-[state=checked]:bg-green-600"
               />
             </div>
           </div>
@@ -713,27 +820,85 @@ export default function PerfilPage() {
                     <h4 className="font-medium flex items-center gap-2">
                       <Plus className="h-4 w-4" /> Adicionar Novo Item
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                    {portfolioItems.length >= 9 && (
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          Você atingiu o limite de 9 itens no portfólio. Exclua um item para adicionar outro.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    <div className="space-y-4">
                       <div className="space-y-2">
                         <Label>Título</Label>
                         <Input
                           value={newPortfolioItem.title}
                           onChange={(e) => setNewPortfolioItem({ ...newPortfolioItem, title: e.target.value })}
                           placeholder="Ex: Casamento na Praia"
+                          disabled={portfolioItems.length >= 9}
                         />
                       </div>
+
                       <div className="space-y-2">
-                        <Label>Link da Imagem/Vídeo</Label>
-                        <Input
-                          value={newPortfolioItem.mediaUrl}
-                          onChange={(e) => setNewPortfolioItem({ ...newPortfolioItem, mediaUrl: e.target.value })}
-                          placeholder="https://..."
-                        />
+                        <Label>Arquivo (Imagem ou Vídeo)</Label>
+                        <div className="flex flex-col gap-2">
+                          <Input
+                            type="file"
+                            accept="image/*,video/*"
+                            onChange={handlePortfolioFileChange}
+                            disabled={portfolioItems.length >= 9 || loadingPortfolio}
+                            className="cursor-pointer"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Imagens: máx 5MB • Vídeos: máx 50MB e 1min30s
+                          </p>
+                        </div>
+                        {fileError && (
+                          <p className="text-xs text-destructive">{fileError}</p>
+                        )}
+
+                        {portfolioPreview && (
+                          <div className="relative rounded-lg overflow-hidden border bg-muted">
+                            {newPortfolioItem.mediaType === 'video' ? (
+                              <video
+                                src={portfolioPreview}
+                                controls
+                                className="w-full max-h-48 object-contain bg-black"
+                              />
+                            ) : (
+                              <img
+                                src={portfolioPreview}
+                                alt="Preview"
+                                className="w-full max-h-48 object-contain"
+                                onError={(e) => {
+                                  console.error('[Portfolio] Image preview failed to load')
+                                }}
+                              />
+                            )}
+                            <button
+                              onClick={() => {
+                                setPortfolioFile(null)
+                                setPortfolioPreview(null)
+                                setFileError(null)
+                              }}
+                              className="absolute top-2 right-2 p-1 bg-destructive text-white rounded-full hover:bg-destructive/90"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
                       </div>
+
+                      <Button
+                        onClick={handleAddPortfolioItem}
+                        disabled={loadingPortfolio || !newPortfolioItem.title || !portfolioFile || portfolioItems.length >= 9}
+                        className="w-full"
+                      >
+                        {loadingPortfolio ? "Enviando..." : "Adicionar Item"}
+                      </Button>
                     </div>
-                    <Button onClick={handleAddPortfolioItem} disabled={loadingPortfolio}>
-                      {loadingPortfolio ? "Adicionando..." : "Adicionar Item"}
-                    </Button>
                   </div>
 
                   {/* List Items */}
@@ -741,12 +906,20 @@ export default function PerfilPage() {
                     {portfolioItems.map((item) => (
                       <div key={item.id} className="group relative rounded-lg border overflow-hidden">
                         <div className="aspect-video bg-muted relative">
-                          <img
-                            src={item.mediaUrl}
-                            alt={item.title}
-                            className="w-full h-full object-cover"
-                            onError={(e) => { e.currentTarget.src = "/placeholder.svg" }}
-                          />
+                          {item.mediaType === 'video' ? (
+                            <video
+                              src={item.mediaUrl}
+                              className="w-full h-full object-cover"
+                              controls
+                            />
+                          ) : (
+                            <img
+                              src={item.mediaUrl}
+                              alt={item.title}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.currentTarget.src = "/placeholder.svg" }}
+                            />
+                          )}
                           <button
                             onClick={() => handleDeletePortfolioItem(item.id)}
                             className="absolute top-2 right-2 p-1.5 bg-destructive text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
@@ -757,7 +930,19 @@ export default function PerfilPage() {
                         </div>
                         <div className="p-3">
                           <p className="font-medium truncate">{item.title}</p>
-                          <p className="text-xs text-muted-foreground capitalize">{item.mediaType}</p>
+                          <p className="text-xs text-muted-foreground capitalize flex items-center gap-1">
+                            {item.mediaType === 'video' ? (
+                              <>
+                                <span className="inline-block w-2 h-2 bg-red-500 rounded-full"></span>
+                                Vídeo
+                              </>
+                            ) : (
+                              <>
+                                <span className="inline-block w-2 h-2 bg-blue-500 rounded-full"></span>
+                                Imagem
+                              </>
+                            )}
+                          </p>
                         </div>
                       </div>
                     ))}
@@ -901,6 +1086,20 @@ export default function PerfilPage() {
       </main>
 
       <Footer />
+
+      {isInitialLoading && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="relative flex items-center justify-center">
+            <div className="h-20 w-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-full bg-primary/10 animate-pulse"></div>
+            </div>
+          </div>
+          <p className="mt-4 font-medium text-muted-foreground animate-pulse">
+            Carregando seu perfil...
+          </p>
+        </div>
+      )}
     </div>
   )
 }

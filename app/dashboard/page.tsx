@@ -12,13 +12,34 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Camera, Package, Calendar, Star, User, Settings } from "lucide-react";
+import {
+  Camera,
+  Package,
+  Calendar,
+  Star,
+  User,
+  Settings,
+  MessageSquare,
+  ArrowRight,
+  UserPlus,
+  Briefcase
+} from "lucide-react";
 import Link from "next/link";
+import apiClient from "@/lib/api-service";
+import { ScrollReveal } from "@/components/scroll-reveal";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { userProfile, loading } = useAuth();
   const [googleName, setGoogleName] = useState("");
+
+  // Dashboard Stats
+  const [stats, setStats] = useState({
+    rating: 0,
+    reviews: 0,
+    requests: 0,
+    equipments: 0
+  });
 
   useEffect(() => {
     if (!loading && !userProfile) {
@@ -27,27 +48,69 @@ export default function DashboardPage() {
   }, [userProfile, loading, router]);
 
   useEffect(() => {
-    // Fallback to get name from Supabase local storage if profile name is empty
+    // 1. Get Name from local storage if missing
     if (userProfile && !userProfile.displayName) {
       try {
-        // Search for Supabase auth token in localStorage
         const keys = Object.keys(localStorage);
         const sbKey = keys.find(key => key.startsWith("sb-") && key.endsWith("-auth-token"));
-
         if (sbKey) {
           const sessionData = localStorage.getItem(sbKey);
           if (sessionData) {
             const session = JSON.parse(sessionData);
-            const name = session.user?.user_metadata?.full_name || session.user?.user_metadata?.name; // Some providers might map differently, but full_name is standard
+            const name = session.user?.user_metadata?.full_name || session.user?.user_metadata?.name;
             if (name && typeof name === 'string') {
               setGoogleName(name);
             }
           }
         }
       } catch (error) {
-        console.error("Error parsing user metadata from localStorage", error);
+        console.error("Error parsing user metadata", error);
       }
     }
+
+    // 2. Fetch Dashboard Data
+    const fetchDashboardData = async () => {
+      if (!userProfile) return;
+
+      try {
+        // Set profile stats
+        const rating = userProfile.averageRating || 0; // The average rating is stored in profile but often dependent on separate sync in some systems. Using profile data for now.
+        const reviews = userProfile.totalReviews || 0;
+
+        // Fetch requests count
+        let requestsCount = 0;
+        try {
+          const requestsRes = await apiClient.get(`/quotes?clientId=${userProfile.id}`);
+          const requestsData = requestsRes.data.data || requestsRes.data || [];
+          requestsCount = requestsData.length;
+        } catch (e) {
+          console.error("Error fetching requests count", e);
+        }
+
+        // Fetch equipments count
+        let equipmentsCount = 0;
+        try {
+          const equipRes = await apiClient.get(`/equipments?ownerId=${userProfile.id}`);
+          const equipData = equipRes.data.data || equipRes.data || [];
+          equipmentsCount = equipData.length;
+        } catch (e) {
+          console.error("Error fetching equipments count", e);
+        }
+
+        setStats({
+          rating,
+          reviews,
+          requests: requestsCount,
+          equipments: equipmentsCount
+        });
+
+      } catch (error) {
+        console.error("Error fetching dashboard data", error);
+      }
+    };
+
+    fetchDashboardData();
+
   }, [userProfile]);
 
   if (loading) {
@@ -65,191 +128,232 @@ export default function DashboardPage() {
   const isProfessional = userProfile.userType === "professional";
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background/50">
       <Header />
 
       <main className="flex-1 py-12 px-4">
-        <div className="container mx-auto max-w-6xl space-y-8">
-          {/* Welcome Section */}
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold">
-              Olá, {userProfile.displayName || googleName}!
-            </h1>
-            <p className="text-muted-foreground">
-              {isProfessional
-                ? "Gerencie seus serviços, equipamentos e agendamentos."
-                : "Encontre profissionais e equipamentos para seus projetos."}
-            </p>
-          </div>
+        <div className="container mx-auto max-w-6xl space-y-10">
 
-          {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {isProfessional ? (
-              <>
-                <Card className="hover:border-primary transition-colors cursor-pointer">
-                  <Link href="/dashboard/perfil">
-                    <CardHeader>
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                        <User className="h-5 w-5 text-primary" />
-                      </div>
-                      <CardTitle>Meu Perfil</CardTitle>
-                      <CardDescription>
-                        Edite suas informações profissionais e portfólio
-                      </CardDescription>
-                    </CardHeader>
-                  </Link>
-                </Card>
-
-                <Card className="hover:border-primary transition-colors cursor-pointer">
-                  <Link href="/dashboard/portfolio">
-                    <CardHeader>
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                        <Camera className="h-5 w-5 text-primary" />
-                      </div>
-                      <CardTitle>Portfólio</CardTitle>
-                      <CardDescription>
-                        Adicione e gerencie seus trabalhos
-                      </CardDescription>
-                    </CardHeader>
-                  </Link>
-                </Card>
-
-                <Card className="hover:border-primary transition-colors cursor-pointer">
-                  <Link href="/dashboard/equipamentos">
-                    <CardHeader>
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                        <Package className="h-5 w-5 text-primary" />
-                      </div>
-                      <CardTitle>Meus Equipamentos</CardTitle>
-                      <CardDescription>
-                        Cadastre equipamentos para venda ou aluguel
-                      </CardDescription>
-                    </CardHeader>
-                  </Link>
-                </Card>
-
-                <Card className="hover:border-primary transition-colors cursor-pointer">
-                  <Link href="/dashboard/agenda">
-                    <CardHeader>
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                        <Calendar className="h-5 w-5 text-primary" />
-                      </div>
-                      <CardTitle>Agenda</CardTitle>
-                      <CardDescription>
-                        Gerencie sua disponibilidade e agendamentos
-                      </CardDescription>
-                    </CardHeader>
-                  </Link>
-                </Card>
-
-                <Card className="hover:border-primary transition-colors cursor-pointer">
-                  <Link href="/dashboard/avaliacoes">
-                    <CardHeader>
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                        <Star className="h-5 w-5 text-primary" />
-                      </div>
-                      <CardTitle>Avaliações</CardTitle>
-                      <CardDescription>
-                        Veja o que seus clientes estão dizendo sobre você
-                      </CardDescription>
-                    </CardHeader>
-                  </Link>
-                </Card>
-
-                <Card className="hover:border-primary transition-colors cursor-pointer">
-                  <Link href="/dashboard/solicitacoes">
-                    <CardHeader>
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                        <Calendar className="h-5 w-5 text-primary" />
-                      </div>
-                      <CardTitle>Solicitações</CardTitle>
-                      <CardDescription>
-                        Visualize e responda solicitações de orçamento
-                      </CardDescription>
-                    </CardHeader>
-                  </Link>
-                </Card>
-              </>
-            ) : (
-              <>
-                <Card className="hover:border-primary transition-colors cursor-pointer">
-                  <Link href="/profissionais">
-                    <CardHeader>
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                        <Camera className="h-5 w-5 text-primary" />
-                      </div>
-                      <CardTitle>Buscar Profissionais</CardTitle>
-                      <CardDescription>
-                        Encontre fotógrafos e videomakers
-                      </CardDescription>
-                    </CardHeader>
-                  </Link>
-                </Card>
-
-                <Card className="hover:border-primary transition-colors cursor-pointer">
-                  <Link href="/equipamentos">
-                    <CardHeader>
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                        <Package className="h-5 w-5 text-primary" />
-                      </div>
-                      <CardTitle>Equipamentos</CardTitle>
-                      <CardDescription>
-                        Alugue ou compre equipamentos
-                      </CardDescription>
-                    </CardHeader>
-                  </Link>
-                </Card>
-
-                <Card className="hover:border-primary transition-colors cursor-pointer">
-                  <Link href="/dashboard/solicitacoes">
-                    <CardHeader>
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                        <Calendar className="h-5 w-5 text-primary" />
-                      </div>
-                      <CardTitle>Minhas Solicitações</CardTitle>
-                      <CardDescription>
-                        Acompanhe seus orçamentos e agendamentos
-                      </CardDescription>
-                    </CardHeader>
-                  </Link>
-                </Card>
-              </>
-            )}
-
-            <Card className="hover:border-primary transition-colors cursor-pointer">
-              <Link href="/dashboard/perfil">
-                <CardHeader>
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                    <User className="h-5 w-5 text-primary" />
-                  </div>
-                  <CardTitle>Meu Perfil</CardTitle>
-                  <CardDescription>
-                    Gerencie seus dados e preferências
-                  </CardDescription>
-                </CardHeader>
-              </Link>
-            </Card>
-          </div>
-
-          {/* Recent Activity */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Atividade Recente</CardTitle>
-              <CardDescription>
-                Suas últimas interações na plataforma
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <p>Nenhuma atividade recente</p>
-                <p className="text-sm mt-2">
+          {/* Welcome Section with Gradient */}
+          <ScrollReveal>
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary/10 via-purple-500/10 to-blue-500/10 p-8 md:p-12 border border-primary/10">
+              <div className="relative z-10 space-y-4">
+                <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600">
+                  Olá, {userProfile.displayName || googleName}!
+                </h1>
+                <p className="text-lg text-muted-foreground max-w-2xl text-foreground/80">
                   {isProfessional
-                    ? "Complete seu perfil para começar a receber solicitações"
-                    : "Comece buscando profissionais ou equipamentos"}
+                    ? "Bem-vindo ao seu painel de controle. Acompanhe suas métricas e gerencie seus serviços."
+                    : "Bem-vindo ao ISO Scanning. Encontre os melhores profissionais e equipamentos para o seu projeto."}
                 </p>
               </div>
-            </CardContent>
-          </Card>
+              {/* Decorative elements */}
+              <div className="absolute top-0 right-0 -mt-10 -mr-10 h-64 w-64 rounded-full bg-primary/5 blur-3xl"></div>
+              <div className="absolute bottom-0 left-0 -mb-10 -ml-10 h-64 w-64 rounded-full bg-blue-500/5 blur-3xl"></div>
+            </div>
+          </ScrollReveal>
+
+          {/* Stats Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+            {/* Rating Stat */}
+            <ScrollReveal delay={0.1}>
+              <Card className="hover:shadow-md transition-all duration-300 border-primary/10 h-full">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Nota Média</CardTitle>
+                  <Star className="h-4 w-4 text-yellow-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold flex items-end gap-2">
+                    {stats.rating > 0 ? stats.rating.toFixed(1) : "—"}
+                    {stats.rating > 0 && <span className="text-sm font-normal text-muted-foreground mb-1">/ 5.0</span>}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Baseado nas avaliações
+                  </p>
+                </CardContent>
+              </Card>
+            </ScrollReveal>
+
+            {/* Reviews Stat */}
+            <ScrollReveal delay={0.2}>
+              <Card className="hover:shadow-md transition-all duration-300 border-primary/10 h-full">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Avaliações</CardTitle>
+                  <MessageSquare className="h-4 w-4 text-blue-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.reviews}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Total de feedbacks recebidos
+                  </p>
+                </CardContent>
+              </Card>
+            </ScrollReveal>
+
+            {/* Requests Stat */}
+            <ScrollReveal delay={0.3}>
+              <Card className="hover:shadow-md transition-all duration-300 border-primary/10 h-full">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Solicitações</CardTitle>
+                  <Briefcase className="h-4 w-4 text-purple-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.requests}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Orçamentos e contatos
+                  </p>
+                </CardContent>
+              </Card>
+            </ScrollReveal>
+
+            {/* Equipments Stat */}
+            <ScrollReveal delay={0.4}>
+              <Card className="hover:shadow-md transition-all duration-300 border-primary/10 h-full">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Equipamentos</CardTitle>
+                  <Package className="h-4 w-4 text-green-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.equipments}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Itens cadastrados
+                  </p>
+                </CardContent>
+              </Card>
+            </ScrollReveal>
+          </div>
+
+          {/* Quick Actions Grid */}
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <span className="w-1 h-8 bg-primary rounded-full"></span>
+              Acesso Rápido
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+              {/* START: Profile Card (Highlight) */}
+              <ScrollReveal delay={0.5}>
+                <Link href="/dashboard/perfil" className="block h-full group">
+                  <Card className="h-full border-2 border-primary/5 hover:border-primary/30 transition-all duration-300 hover:shadow-lg dark:hover:shadow-primary/5 bg-gradient-to-br from-background to-primary/5">
+                    <CardHeader>
+                      <div className="w-12 h-12 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center mb-4 shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-300">
+                        <User className="h-6 w-6" />
+                      </div>
+                      <CardTitle className="group-hover:text-primary transition-colors">Meu Perfil</CardTitle>
+                      <CardDescription>
+                        Gerencie seus dados pessoais, foto de perfil e configurações da conta.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-end">
+                      <div className="w-8 h-8 rounded-full bg-background border flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-colors">
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </ScrollReveal>
+              {/* END: Profile Card */}
+
+              {/* START: Equipments Card */}
+              <ScrollReveal delay={0.6}>
+                <Link href="/dashboard/equipamentos" className="block h-full group">
+                  <Card className="h-full border-border hover:border-green-500/50 transition-all duration-300 hover:shadow-lg bg-card">
+                    <CardHeader>
+                      <div className="w-12 h-12 rounded-2xl bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                        <Package className="h-6 w-6" />
+                      </div>
+                      <CardTitle className="group-hover:text-green-500 transition-colors">Meus Equipamentos</CardTitle>
+                      <CardDescription>
+                        Adicione, edite ou remova seus equipamentos anunciados para venda ou aluguel.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-end">
+                      <div className="w-8 h-8 rounded-full bg-background border flex items-center justify-center group-hover:bg-green-500 group-hover:text-white group-hover:border-green-500 transition-colors">
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </ScrollReveal>
+              {/* END: Equipments Card */}
+
+              {/* START: Requests Card */}
+              <ScrollReveal delay={0.7}>
+                <Link href="/dashboard/solicitacoes" className="block h-full group">
+                  <Card className="h-full border-border hover:border-purple-500/50 transition-all duration-300 hover:shadow-lg bg-card">
+                    <CardHeader>
+                      <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                        <Calendar className="h-6 w-6" />
+                      </div>
+                      <CardTitle className="group-hover:text-purple-500 transition-colors">Solicitações e Agenda</CardTitle>
+                      <CardDescription>
+                        Acompanhe pedidos de orçamento, mensagens de clientes e sua agenda.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-end">
+                      <div className="w-8 h-8 rounded-full bg-background border flex items-center justify-center group-hover:bg-purple-500 group-hover:text-white group-hover:border-purple-500 transition-colors">
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </ScrollReveal>
+              {/* END: Requests Card */}
+
+              {/* START: Portfolio Card (Only Professional) */}
+              {isProfessional && (
+                <ScrollReveal delay={0.8}>
+                  <Link href="/dashboard/portfolio" className="block h-full group">
+                    <Card className="h-full border-border hover:border-blue-500/50 transition-all duration-300 hover:shadow-lg bg-card">
+                      <CardHeader>
+                        <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                          <Camera className="h-6 w-6" />
+                        </div>
+                        <CardTitle className="group-hover:text-blue-500 transition-colors">Portfólio</CardTitle>
+                        <CardDescription>
+                          Gerencie a vitrine do seu trabalho. Adicione fotos e vídeos para atrair clientes.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex justify-end">
+                        <div className="w-8 h-8 rounded-full bg-background border flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white group-hover:border-blue-500 transition-colors">
+                          <ArrowRight className="h-4 w-4" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </ScrollReveal>
+              )}
+              {/* END: Portfolio Card */}
+
+              {/* START: Find Professionals (Only Client) */}
+              {!isProfessional && (
+                <ScrollReveal delay={0.8}>
+                  <Link href="/profissionais" className="block h-full group">
+                    <Card className="h-full border-border hover:border-blue-500/50 transition-all duration-300 hover:shadow-lg bg-card">
+                      <CardHeader>
+                        <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                          <UserPlus className="h-6 w-6" />
+                        </div>
+                        <CardTitle className="group-hover:text-blue-500 transition-colors">Buscar Profissionais</CardTitle>
+                        <CardDescription>
+                          Encontre os melhores fotógrafos e videomakers para o seu evento ou projeto.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex justify-end">
+                        <div className="w-8 h-8 rounded-full bg-background border flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white group-hover:border-blue-500 transition-colors">
+                          <ArrowRight className="h-4 w-4" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </ScrollReveal>
+              )}
+              {/* END: Find Professionals */}
+
+            </div>
+          </div>
         </div>
       </main>
 

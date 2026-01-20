@@ -65,6 +65,7 @@ export interface JobOffer {
   startDate?: string;
   endDate?: string;
   specialtyId?: string | null;
+  requiresInvoice?: boolean;
 }
 
 export interface Specialty {
@@ -119,6 +120,7 @@ export interface CreateJobOfferData {
   startDate?: string;
   endDate?: string;
   specialtyId?: string;
+  requiresInvoice?: boolean;
 }
 
 /**

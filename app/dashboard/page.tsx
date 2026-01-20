@@ -354,15 +354,15 @@ export default function DashboardPage() {
 
               {/* START: Jobs Card */}
               <ScrollReveal delay={0.9}>
-                <Link href="/vagas" className="block h-full group">
+                <Link href="/dashboard/vagas" className="block h-full group">
                   <Card className="h-full border-border hover:border-orange-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                     <CardHeader>
                       <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
                         <Briefcase className="h-6 w-6" />
                       </div>
-                      <CardTitle className="group-hover:text-orange-500 transition-colors">Minhas Vagas</CardTitle>
+                      <CardTitle className="group-hover:text-orange-500 transition-colors">Meus Jobs</CardTitle>
                       <CardDescription>
-                        Encontre oportunidades de trabalho e gerencie suas candidaturas.
+                        Acompanhe e gerencie os jobs que você cadastrou na plataforma.
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="flex justify-end">

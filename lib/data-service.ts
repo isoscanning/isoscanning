@@ -42,6 +42,27 @@ export interface Professional {
   isActive?: boolean;
 }
 
+export interface JobOffer {
+  id: string;
+  employerId: string;
+  employerName: string;
+  title: string;
+  description: string;
+  category: string;
+  jobType: "freelance" | "full_time" | "part_time" | "project";
+  locationType: "on_site" | "remote" | "hybrid";
+  city?: string | null;
+  state?: string | null;
+  budgetMin?: number | null;
+  budgetMax?: number | null;
+  requirements?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  employerAvatarUrl?: string;
+  employerCreatedAt?: string;
+}
+
 export interface Specialty {
   id: string;
   name: string;
@@ -77,6 +98,20 @@ export interface CreateEquipmentData {
   ownerId?: string;
   ownerName?: string;
   isAvailable: boolean;
+}
+
+export interface CreateJobOfferData {
+  title: string;
+  description: string;
+  category: string;
+  jobType: "freelance" | "full_time" | "part_time" | "project";
+  locationType: "on_site" | "remote" | "hybrid";
+  city?: string;
+  state?: string;
+  budgetMin?: number;
+  budgetMax?: number;
+  requirements?: string;
+  isActive?: boolean;
 }
 
 /**
@@ -420,5 +455,86 @@ export async function deleteAvailability(id: string): Promise<void> {
   } catch (error) {
     console.error("[data-service] Error deleting availability:", error);
     throw new Error("Erro ao excluir disponibilidade");
+  }
+}
+
+// --- JOB OFFERS ---
+
+/**
+ * Fetch all active job offers
+ */
+export async function fetchJobOffers(): Promise<JobOffer[]> {
+  try {
+    const response = await apiClient.get("/job-offers?isActive=true&limit=100");
+    return response.data.data || response.data;
+  } catch (error) {
+    console.error("[data-service] Error fetching job offers:", error);
+    throw new Error("Erro ao buscar vagas");
+  }
+}
+
+/**
+ * Fetch a single job offer by ID
+ */
+export async function fetchJobOfferById(id: string): Promise<JobOffer> {
+  try {
+    const response = await apiClient.get(`/job-offers/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error(`[data-service] Error fetching job offer ${id}:`, error);
+    throw new Error("Erro ao buscar detalhes da vaga");
+  }
+}
+
+/**
+ * Fetch all job offers for a specific user
+ */
+export async function fetchUserJobOffers(userId: string): Promise<JobOffer[]> {
+  try {
+    const response = await apiClient.get(`/job-offers?employerId=${userId}&limit=100`);
+    return response.data.data || response.data;
+  } catch (error) {
+    console.error("[data-service] Error fetching user job offers:", error);
+    throw new Error("Erro ao buscar suas vagas");
+  }
+}
+
+/**
+ * Create a new job offer
+ */
+export async function createJobOffer(data: CreateJobOfferData): Promise<string> {
+  try {
+    const response = await apiClient.post("/job-offers", data);
+    return response.data.id;
+  } catch (error) {
+    console.error("[data-service] Error creating job offer:", error);
+    throw new Error("Erro ao criar vaga");
+  }
+}
+
+/**
+ * Update an existing job offer
+ */
+export async function updateJobOffer(
+  id: string,
+  data: Partial<CreateJobOfferData>
+): Promise<void> {
+  try {
+    await apiClient.put(`/job-offers/${id}`, data);
+  } catch (error) {
+    console.error("[data-service] Error updating job offer:", error);
+    throw new Error("Erro ao atualizar vaga");
+  }
+}
+
+/**
+ * Delete a job offer
+ */
+export async function deleteJobOffer(id: string): Promise<void> {
+  try {
+    await apiClient.delete(`/job-offers/${id}`);
+  } catch (error) {
+    console.error("[data-service] Error deleting job offer:", error);
+    throw new Error("Erro ao excluir vaga");
   }
 }

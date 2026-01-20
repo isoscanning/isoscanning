@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, Settings, LogOut, LogIn, UserPlus } from "lucide-react";
+import { User, Settings, LogOut, LogIn, UserPlus, Briefcase } from "lucide-react";
 
 export function UserNav() {
   const { userProfile, signOut, loading } = useAuth();
@@ -152,6 +152,18 @@ export function UserNav() {
               <span>Configurações</span>
             </Link>
           </DropdownMenuItem>
+          <DropdownMenuItem
+            asChild
+            className="cursor-pointer hover:bg-accent/10 dark:hover:bg-primary/25"
+          >
+            <Link
+              href="/dashboard/vagas"
+              className="flex items-center w-full text-foreground"
+            >
+              <Briefcase className="mr-2 h-4 w-4 text-accent" />
+              <span>Minhas Vagas</span>
+            </Link>
+          </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -162,6 +174,6 @@ export function UserNav() {
           <span>Sair</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
-    </DropdownMenu>
+    </DropdownMenu >
   );
 }

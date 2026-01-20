@@ -16,6 +16,7 @@ import {
   UserPlus,
   LogIn,
   Settings,
+  Briefcase,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -90,6 +91,12 @@ export function Header() {
             >
               Equipamentos
             </Link>
+            <Link
+              href="/vagas"
+              className="text-sm font-medium transition-colors hover:text-primary focus-visible:text-primary"
+            >
+              Vagas
+            </Link>
             {isAuthenticated && (
               <Link
                 href="/dashboard/equipamentos"
@@ -143,6 +150,14 @@ export function Header() {
             >
               <Package className="h-4 w-4 text-success" />
               Equipamentos
+            </Link>
+            <Link
+              href="/vagas"
+              className="flex items-center gap-3 text-sm font-medium hover:text-primary transition-colors hover:bg-primary/10 p-3 rounded-lg"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <Briefcase className="h-4 w-4 text-primary" />
+              Vagas
             </Link>
             {isAuthenticated && (
               <Link

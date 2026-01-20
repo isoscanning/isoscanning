@@ -24,6 +24,7 @@ import {
     DollarSign,
     Pause,
     Play,
+    User,
 } from "lucide-react";
 import { fetchUserJobOffers, deleteJobOffer, updateJobOffer, type JobOffer } from "@/lib/data-service";
 import Link from "next/link";
@@ -203,6 +204,15 @@ export default function MinhasVagasPage() {
                                                     </span>
                                                 </div>
                                             ) : null}
+                                            {vaga.startDate && (
+                                                <div className="flex items-center gap-2 text-muted-foreground col-span-2">
+                                                    <Clock className="h-4 w-4" />
+                                                    <span>
+                                                        Início: {new Date(vaga.startDate).toLocaleDateString()}
+                                                        {vaga.endDate && ` - Término: ${new Date(vaga.endDate).toLocaleDateString()}`}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <p className="text-sm line-clamp-2 text-muted-foreground">
@@ -226,19 +236,27 @@ export default function MinhasVagasPage() {
                                                     </>
                                                 )}
                                             </Button>
-                                            <Button variant="outline" size="sm" className="flex-1" asChild>
-                                                <Link href={`/dashboard/vagas/editar/${vaga.id}`}>
-                                                    <Edit className="mr-2 h-4 w-4" /> Editar
-                                                </Link>
-                                            </Button>
-                                            <Button
-                                                variant="destructive"
-                                                size="sm"
-                                                className="flex-1"
-                                                onClick={() => handleDelete(vaga.id)}
-                                            >
-                                                <Trash2 className="mr-2 h-4 w-4" /> Excluir
-                                            </Button>
+                                            <div className="flex items-center gap-2">
+                                                <Button variant="outline" size="sm" asChild>
+                                                    <Link href={`/dashboard/vagas/${vaga.id}/candidatos`}>
+                                                        <User className="mr-2 h-4 w-4" />
+                                                        Candidatos
+                                                    </Link>
+                                                </Button>
+                                                <Button variant="outline" size="sm" asChild>
+                                                    <Link href={`/dashboard/vagas/editar/${vaga.id}`}>
+                                                        <Edit className="mr-2 h-4 w-4" />
+                                                        Editar
+                                                    </Link>
+                                                </Button>
+                                                <Button
+                                                    variant="destructive"
+                                                    size="sm"
+                                                    onClick={() => handleDelete(vaga.id)}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
                                         </div>
                                     </CardContent>
                                 </Card>

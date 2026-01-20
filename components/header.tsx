@@ -95,7 +95,7 @@ export function Header() {
               href="/vagas"
               className="text-sm font-medium transition-colors hover:text-primary focus-visible:text-primary"
             >
-              Vagas
+              Encontrar Jobs
             </Link>
             {isAuthenticated && (
               // Link removed - accessible via Dashboard
@@ -153,7 +153,7 @@ export function Header() {
               onClick={() => setMobileMenuOpen(false)}
             >
               <Briefcase className="h-4 w-4 text-primary" />
-              Vagas
+              Encontrar Jobs
             </Link>
             {isAuthenticated && (
               // Link removed as per redesign - accessible via Dashboard

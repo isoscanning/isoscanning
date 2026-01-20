@@ -27,19 +27,7 @@ import {
 } from "@/components/ui/select";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { fetchJobOffers, updateJobOffer, type JobOffer } from "@/lib/data-service";
-
-const CATEGORIAS = [
-    "Fotografia",
-    "Vídeo",
-    "Edição de Vídeo",
-    "Edição de Fotos",
-    "Produção Audiovisual",
-    "Drone",
-    "Iluminação",
-    "Áudio",
-    "Outros",
-];
+import { fetchJobOffers, updateJobOffer, fetchSpecialties, type JobOffer, type Specialty } from "@/lib/data-service";
 
 const TIPOS_TRABALHO = [
     { value: "freelance", label: "Freelance" },
@@ -64,9 +52,11 @@ export default function EditarVagaPage() {
     const router = useRouter();
     const { userProfile, loading } = useAuth();
 
+    const [specialties, setSpecialties] = useState<Specialty[]>([]);
     const [formData, setFormData] = useState({
         title: "",
         category: "",
+        specialtyId: "",
         jobType: "freelance",
         locationType: "on_site",
         description: "",
@@ -76,6 +66,8 @@ export default function EditarVagaPage() {
         budgetMax: "",
         requirements: "",
         isActive: true,
+        startDate: "",
+        endDate: "",
     });
 
     const [fetching, setFetching] = useState(true);
@@ -89,10 +81,16 @@ export default function EditarVagaPage() {
             return;
         }
 
-        const loadVaga = async () => {
+        const loadData = async () => {
             try {
-                const data = await fetchJobOffers();
-                const vaga = data.find((v) => v.id === params.id);
+                const [offersData, specialtiesData] = await Promise.all([
+                    fetchJobOffers(),
+                    fetchSpecialties()
+                ]);
+
+                setSpecialties(specialtiesData);
+
+                const vaga = offersData.find((v) => v.id === params.id);
 
                 if (!vaga) {
                     setError("Vaga não encontrada.");
@@ -107,6 +105,7 @@ export default function EditarVagaPage() {
                 setFormData({
                     title: vaga.title,
                     category: vaga.category,
+                    specialtyId: vaga.specialtyId || "",
                     jobType: vaga.jobType,
                     locationType: vaga.locationType,
                     description: vaga.description,
@@ -116,9 +115,11 @@ export default function EditarVagaPage() {
                     budgetMax: vaga.budgetMax?.toString() || "",
                     requirements: vaga.requirements || "",
                     isActive: vaga.isActive,
+                    startDate: vaga.startDate ? new Date(vaga.startDate).toISOString().split('T')[0] : "",
+                    endDate: vaga.endDate ? new Date(vaga.endDate).toISOString().split('T')[0] : "",
                 });
             } catch (err) {
-                console.error("Erro ao carregar vaga:", err);
+                console.error("Erro ao carregar dados:", err);
                 setError("Erro ao carregar os dados da vaga.");
             } finally {
                 setFetching(false);
@@ -126,7 +127,7 @@ export default function EditarVagaPage() {
         };
 
         if (userProfile && params.id) {
-            loadVaga();
+            loadData();
         }
     }, [userProfile, loading, params.id, router]);
 
@@ -137,12 +138,19 @@ export default function EditarVagaPage() {
         setSaving(true);
 
         try {
+            const selectedSpecialty = specialties.find(s => s.id === formData.specialtyId);
+            const categoryName = selectedSpecialty ? selectedSpecialty.name : formData.category;
+
             await updateJobOffer(params.id as string, {
                 ...formData,
+                category: categoryName,
+                specialtyId: formData.specialtyId,
                 jobType: formData.jobType as any,
                 locationType: formData.locationType as any,
                 budgetMin: formData.budgetMin ? Number.parseFloat(formData.budgetMin) : undefined,
                 budgetMax: formData.budgetMax ? Number.parseFloat(formData.budgetMax) : undefined,
+                startDate: formData.startDate || undefined,
+                endDate: formData.endDate || undefined,
             });
 
             setSuccess(true);
@@ -232,11 +240,11 @@ export default function EditarVagaPage() {
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                            <Label htmlFor="category">Categoria *</Label>
+                                            <Label htmlFor="specialtyId">Especialidade *</Label>
                                             <Select
-                                                value={formData.category}
+                                                value={formData.specialtyId}
                                                 onValueChange={(value) =>
-                                                    setFormData({ ...formData, category: value })
+                                                    setFormData({ ...formData, specialtyId: value })
                                                 }
                                                 required
                                             >
@@ -244,9 +252,9 @@ export default function EditarVagaPage() {
                                                     <SelectValue placeholder="Selecione" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    {CATEGORIAS.map((cat) => (
-                                                        <SelectItem key={cat} value={cat}>
-                                                            {cat}
+                                                    {specialties.map((spec) => (
+                                                        <SelectItem key={spec.id} value={spec.id}>
+                                                            {spec.name}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>
@@ -315,6 +323,27 @@ export default function EditarVagaPage() {
                                                     onChange={(e) => setFormData({ ...formData, budgetMax: e.target.value })}
                                                 />
                                             </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="startDate">Data de Início (Opcional)</Label>
+                                            <Input
+                                                id="startDate"
+                                                type="date"
+                                                value={formData.startDate}
+                                                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="endDate">Data de Término (Opcional)</Label>
+                                            <Input
+                                                id="endDate"
+                                                type="date"
+                                                value={formData.endDate}
+                                                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                                            />
                                         </div>
                                     </div>
 
@@ -410,9 +439,9 @@ export default function EditarVagaPage() {
                         </form>
                     )}
                 </div>
-            </main>
+            </main >
 
             <Footer />
-        </div>
+        </div >
     );
 }

@@ -62,6 +62,9 @@ export interface JobOffer {
   updatedAt: string;
   employerAvatarUrl?: string;
   employerCreatedAt?: string;
+  startDate?: string;
+  endDate?: string;
+  specialtyId?: string | null;
 }
 
 export interface Specialty {
@@ -113,6 +116,9 @@ export interface CreateJobOfferData {
   budgetMax?: number;
   requirements?: string;
   isActive?: boolean;
+  startDate?: string;
+  endDate?: string;
+  specialtyId?: string;
 }
 
 /**
@@ -539,3 +545,183 @@ export async function deleteJobOffer(id: string): Promise<void> {
     throw new Error("Erro ao excluir vaga");
   }
 }
+
+export const checkJobApplication = async (jobId: string, candidateId: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .from('job_applications')
+      .select('id')
+      .eq('job_offer_id', jobId)
+      .eq('candidate_id', candidateId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+      console.error("Error checking application:", error);
+      return false;
+    }
+
+    return !!data;
+  } catch (error) {
+    console.error("Error checking application:", error);
+    return false;
+  }
+};
+
+export const applyToJob = async (jobId: string, candidateId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('job_applications')
+      .insert({
+        job_offer_id: jobId,
+        candidate_id: candidateId,
+        status: 'pending'
+      });
+
+    if (error) {
+      console.error("Error applying to job:", error);
+      throw error;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error applying to job:", error);
+    throw error;
+  }
+};
+
+export interface JobApplication {
+  id: string;
+  jobOfferId: string;
+  candidateId: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
+  createdAt: string;
+  jobOffer: {
+    id: string;
+    title: string;
+    employerName: string;
+    city?: string;
+    state?: string;
+    jobType: string;
+    locationType: string;
+  };
+}
+
+export const fetchUserApplications = async (userId: string): Promise<JobApplication[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('job_applications')
+      .select(`
+        id,
+        job_offer_id,
+        candidate_id,
+        status,
+        created_at,
+        job_offers (
+          id,
+          title,
+          employer_name,
+          city,
+          state,
+          job_type,
+          location_type
+        )
+      `)
+      .eq('candidate_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching applications:", error);
+      throw error;
+    }
+
+    return data.map((app: any) => ({
+      id: app.id,
+      jobOfferId: app.job_offer_id,
+      candidateId: app.candidate_id,
+      status: app.status,
+      createdAt: app.created_at,
+      jobOffer: {
+        id: app.job_offers.id,
+        title: app.job_offers.title,
+        employerName: app.job_offers.employer_name,
+        city: app.job_offers.city,
+        state: app.job_offers.state,
+        jobType: app.job_offers.job_type,
+        locationType: app.job_offers.location_type,
+      }
+    }));
+  } catch (error) {
+    console.error("Error fetching applications:", error);
+    return [];
+  }
+};
+
+export interface JobCandidate {
+  id: string; // Application ID
+  candidateId: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
+  createdAt: string;
+  message?: string;
+  profile: {
+    id: string;
+    displayName: string;
+    avatarUrl?: string;
+    specialty?: string;
+    city?: string;
+    state?: string;
+    averageRating?: number;
+    totalReviews?: number;
+  };
+}
+
+export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('job_applications')
+      .select(`
+        id,
+        candidate_id,
+        status,
+        created_at,
+        message,
+        profiles (
+          id,
+          display_name,
+          avatar_url,
+          specialty,
+          city,
+          state,
+          average_rating,
+          total_reviews
+        )
+      `)
+      .eq('job_offer_id', jobId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching candidates:", error);
+      throw error;
+    }
+
+    return data.map((app: any) => ({
+      id: app.id,
+      candidateId: app.candidate_id,
+      status: app.status,
+      createdAt: app.created_at,
+      message: app.message,
+      profile: {
+        id: app.profiles.id,
+        displayName: app.profiles.display_name,
+        avatarUrl: app.profiles.avatar_url,
+        specialty: app.profiles.specialty,
+        city: app.profiles.city,
+        state: app.profiles.state,
+        averageRating: app.profiles.average_rating,
+        totalReviews: app.profiles.total_reviews,
+      }
+    }));
+  } catch (error) {
+    console.error("Error fetching candidates:", error);
+    return [];
+  }
+};

@@ -27,19 +27,7 @@ import {
 } from "@/components/ui/select";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { createJobOffer } from "@/lib/data-service";
-
-const CATEGORIAS = [
-    "Fotografia",
-    "Vídeo",
-    "Edição de Vídeo",
-    "Edição de Fotos",
-    "Produção Audiovisual",
-    "Drone",
-    "Iluminação",
-    "Áudio",
-    "Outros",
-];
+import { createJobOffer, fetchSpecialties, Specialty } from "@/lib/data-service";
 
 const TIPOS_TRABALHO = [
     { value: "freelance", label: "Freelance" },
@@ -63,9 +51,11 @@ export default function NovaVagaPage() {
     const router = useRouter();
     const { userProfile, loading } = useAuth();
 
+    const [specialties, setSpecialties] = useState<Specialty[]>([]);
     const [formData, setFormData] = useState({
         title: "",
         category: "",
+        specialtyId: "",
         jobType: "freelance",
         locationType: "on_site",
         description: "",
@@ -74,6 +64,8 @@ export default function NovaVagaPage() {
         budgetMin: "",
         budgetMax: "",
         requirements: "",
+        startDate: "",
+        endDate: "",
     });
 
     const [saving, setSaving] = useState(false);
@@ -86,6 +78,10 @@ export default function NovaVagaPage() {
         }
     }, [userProfile, loading, router]);
 
+    useEffect(() => {
+        fetchSpecialties().then(setSpecialties);
+    }, []);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
@@ -93,8 +89,12 @@ export default function NovaVagaPage() {
         setSaving(true);
 
         try {
+            const selectedSpecialty = specialties.find(s => s.id === formData.specialtyId);
+            const categoryName = selectedSpecialty ? selectedSpecialty.name : "Outros";
+
             await createJobOffer({
                 ...formData,
+                category: categoryName,
                 jobType: formData.jobType as any,
                 locationType: formData.locationType as any,
                 budgetMin: formData.budgetMin ? Number.parseFloat(formData.budgetMin) : undefined,
@@ -194,11 +194,11 @@ export default function NovaVagaPage() {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="category">Categoria *</Label>
+                                        <Label htmlFor="specialtyId">Especialidade *</Label>
                                         <Select
-                                            value={formData.category}
+                                            value={formData.specialtyId}
                                             onValueChange={(value) =>
-                                                setFormData({ ...formData, category: value })
+                                                setFormData({ ...formData, specialtyId: value })
                                             }
                                             required
                                         >
@@ -206,9 +206,9 @@ export default function NovaVagaPage() {
                                                 <SelectValue placeholder="Selecione" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {CATEGORIAS.map((cat) => (
-                                                    <SelectItem key={cat} value={cat}>
-                                                        {cat}
+                                                {specialties.map((spec) => (
+                                                    <SelectItem key={spec.id} value={spec.id}>
+                                                        {spec.name}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -277,6 +277,27 @@ export default function NovaVagaPage() {
                                                 onChange={(e) => setFormData({ ...formData, budgetMax: e.target.value })}
                                             />
                                         </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="startDate">Data de Início (Opcional)</Label>
+                                        <Input
+                                            id="startDate"
+                                            type="date"
+                                            value={formData.startDate}
+                                            onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="endDate">Data de Término (Opcional)</Label>
+                                        <Input
+                                            id="endDate"
+                                            type="date"
+                                            value={formData.endDate}
+                                            onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                                        />
                                     </div>
                                 </div>
 

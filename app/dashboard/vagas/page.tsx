@@ -25,7 +25,18 @@ import {
     Pause,
     Play,
     User,
+    Loader2,
 } from "lucide-react";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { fetchUserJobOffers, deleteJobOffer, updateJobOffer, type JobOffer } from "@/lib/data-service";
 import Link from "next/link";
 
@@ -34,6 +45,9 @@ export default function MinhasVagasPage() {
     const { userProfile, loading } = useAuth();
     const [vagas, setVagas] = useState<JobOffer[]>([]);
     const [loadingVagas, setLoadingVagas] = useState(true);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [vagaToDelete, setVagaToDelete] = useState<string | null>(null);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
     const fetchVagas = useCallback(async () => {
         if (!userProfile) return;
@@ -66,15 +80,25 @@ export default function MinhasVagasPage() {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm("Tem certeza que deseja excluir esta vaga?")) return;
+    const handleDeleteClick = (id: string) => {
+        setVagaToDelete(id);
+        setIsDeleteDialogOpen(true);
+    };
 
+    const confirmDelete = async () => {
+        if (!vagaToDelete) return;
+
+        setIsDeleting(true);
         try {
-            await deleteJobOffer(id);
-            setVagas(vagas.filter((v) => v.id !== id));
+            await deleteJobOffer(vagaToDelete);
+            setVagas(vagas.filter((v) => v.id !== vagaToDelete));
+            setIsDeleteDialogOpen(false);
         } catch (error) {
             console.error("Erro ao excluir vaga:", error);
             alert("Erro ao excluir vaga");
+        } finally {
+            setIsDeleting(false);
+            setVagaToDelete(null);
         }
     };
 
@@ -252,7 +276,7 @@ export default function MinhasVagasPage() {
                                                 <Button
                                                     variant="destructive"
                                                     size="sm"
-                                                    onClick={() => handleDelete(vaga.id)}
+                                                    onClick={() => handleDeleteClick(vaga.id)}
                                                 >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
@@ -267,6 +291,38 @@ export default function MinhasVagasPage() {
             </main>
 
             <Footer />
+
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta ação não pode ser desfeita. Isso excluirá permanentemente a vaga
+                            e removerá todos os dados associados de nossos servidores.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault();
+                                confirmDelete();
+                            }}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Excluindo...
+                                </>
+                            ) : (
+                                "Confirmar Exclusão"
+                            )}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

@@ -725,3 +725,22 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
     return [];
   }
 };
+
+export const updateJobApplicationStatus = async (applicationId: string, status: 'accepted' | 'rejected'): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('job_applications')
+      .update({ status })
+      .eq('id', applicationId);
+
+    if (error) {
+      console.error("Error updating application status:", error);
+      throw error;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error updating application status:", error);
+    throw error;
+  }
+};

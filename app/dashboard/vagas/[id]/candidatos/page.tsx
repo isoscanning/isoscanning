@@ -3,25 +3,28 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { fetchJobCandidates, fetchJobOfferById, type JobCandidate, type JobOffer } from "@/lib/data-service";
+import { fetchJobCandidates, fetchJobOfferById, updateJobApplicationStatus, type JobCandidate, type JobOffer } from "@/lib/data-service";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Star, MapPin, Calendar, MessageSquare, ChevronLeft, Loader2 } from "lucide-react";
+import { Star, MapPin, Calendar, MessageSquare, ChevronLeft, Loader2, Check, X, User } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function CandidatosVagaPage() {
     const params = useParams();
     const router = useRouter();
     const { userProfile, loading: authLoading } = useAuth();
+    const { toast } = useToast();
     const [candidates, setCandidates] = useState<JobCandidate[]>([]);
     const [jobOffer, setJobOffer] = useState<JobOffer | null>(null);
     const [loading, setLoading] = useState(true);
+    const [processingId, setProcessingId] = useState<string | null>(null);
 
     useEffect(() => {
         const loadData = async () => {
@@ -57,6 +60,35 @@ export default function CandidatosVagaPage() {
 
         loadData();
     }, [userProfile, authLoading, params.id, router]);
+
+    const handleStatusUpdate = async (applicationId: string, status: 'accepted' | 'rejected') => {
+        setProcessingId(applicationId);
+        try {
+            await updateJobApplicationStatus(applicationId, status);
+
+            // Update local state
+            setCandidates(candidates.map(c =>
+                c.id === applicationId ? { ...c, status } : c
+            ));
+
+            toast({
+                title: status === 'accepted' ? "Candidato aprovado!" : "Candidato rejeitado",
+                description: status === 'accepted'
+                    ? "O candidato foi marcado como aprovado."
+                    : "O candidato foi marcado como rejeitado.",
+                variant: status === 'accepted' ? "default" : "destructive",
+            });
+        } catch (error) {
+            console.error("Erro ao atualizar status:", error);
+            toast({
+                title: "Erro ao atualizar",
+                description: "Não foi possível atualizar o status do candidato.",
+                variant: "destructive",
+            });
+        } finally {
+            setProcessingId(null);
+        }
+    };
 
     const getStatusBadge = (status: string) => {
         switch (status) {
@@ -186,15 +218,51 @@ export default function CandidatosVagaPage() {
                                                 </div>
                                             )}
 
-                                            <div className="flex items-center gap-3 pt-2">
-                                                <Button size="sm" asChild>
-                                                    <Link href={`/perfil/${candidate.profile.id}`}>
-                                                        Ver Perfil Completo
-                                                    </Link>
-                                                </Button>
-                                                <Button variant="outline" size="sm">
-                                                    Entrar em Contato
-                                                </Button>
+                                            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2 justify-between">
+                                                <div className="flex gap-2 w-full sm:w-auto">
+                                                    <Button size="sm" variant="outline" asChild className="flex-1 sm:flex-none">
+                                                        <Link href={`/profissionais/${candidate.profile.id}`} target="_blank">
+                                                            Ver Perfil Completo
+                                                        </Link>
+                                                    </Button>
+                                                    <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
+                                                        Entrar em Contato
+                                                    </Button>
+                                                </div>
+
+                                                {candidate.status === 'pending' && (
+                                                    <div className="flex gap-2 w-full sm:w-auto pt-2 sm:pt-0">
+                                                        <Button
+                                                            size="sm"
+                                                            className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none"
+                                                            onClick={() => handleStatusUpdate(candidate.id, 'accepted')}
+                                                            disabled={processingId === candidate.id}
+                                                        >
+                                                            {processingId === candidate.id ? (
+                                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                            ) : (
+                                                                <>
+                                                                    <Check className="mr-1 h-4 w-4" /> Aprovar
+                                                                </>
+                                                            )}
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="destructive"
+                                                            className="flex-1 sm:flex-none"
+                                                            onClick={() => handleStatusUpdate(candidate.id, 'rejected')}
+                                                            disabled={processingId === candidate.id}
+                                                        >
+                                                            {processingId === candidate.id ? (
+                                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                            ) : (
+                                                                <>
+                                                                    <X className="mr-1 h-4 w-4" /> Rejeitar
+                                                                </>
+                                                            )}
+                                                        </Button>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -211,5 +279,3 @@ export default function CandidatosVagaPage() {
         </div>
     );
 }
-
-import { User } from "lucide-react";

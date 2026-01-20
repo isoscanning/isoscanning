@@ -352,6 +352,52 @@ export default function DashboardPage() {
               )}
               {/* END: Find Professionals */}
 
+              {/* START: Jobs Card */}
+              <ScrollReveal delay={0.9}>
+                <Link href="/vagas" className="block h-full group">
+                  <Card className="h-full border-border hover:border-orange-500/50 transition-all duration-300 hover:shadow-lg bg-card">
+                    <CardHeader>
+                      <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                        <Briefcase className="h-6 w-6" />
+                      </div>
+                      <CardTitle className="group-hover:text-orange-500 transition-colors">Minhas Vagas</CardTitle>
+                      <CardDescription>
+                        Encontre oportunidades de trabalho e gerencie suas candidaturas.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-end">
+                      <div className="w-8 h-8 rounded-full bg-background border flex items-center justify-center group-hover:bg-orange-500 group-hover:text-white group-hover:border-orange-500 transition-colors">
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </ScrollReveal>
+              {/* END: Jobs Card */}
+
+              {/* START: My Applications Card */}
+              <ScrollReveal delay={1.0}>
+                <Link href="/dashboard/candidaturas" className="block h-full group">
+                  <Card className="h-full border-border hover:border-cyan-500/50 transition-all duration-300 hover:shadow-lg bg-card">
+                    <CardHeader>
+                      <div className="w-12 h-12 rounded-2xl bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                        <Briefcase className="h-6 w-6" />
+                      </div>
+                      <CardTitle className="group-hover:text-cyan-500 transition-colors">Minhas Candidaturas</CardTitle>
+                      <CardDescription>
+                        Acompanhe o status das suas candidaturas e gerencie suas aplicações a vagas.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-end">
+                      <div className="w-8 h-8 rounded-full bg-background border flex items-center justify-center group-hover:bg-cyan-500 group-hover:text-white group-hover:border-cyan-500 transition-colors">
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </ScrollReveal>
+              {/* END: My Applications Card */}
+
             </div>
           </div>
         </div>

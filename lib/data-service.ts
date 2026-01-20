@@ -550,7 +550,7 @@ export const checkJobApplication = async (jobId: string, candidateId: string): P
   try {
     const { data, error } = await supabase
       .from('job_applications')
-      .select('id')
+      .select('id, status')
       .eq('job_offer_id', jobId)
       .eq('candidate_id', candidateId)
       .single();
@@ -560,7 +560,12 @@ export const checkJobApplication = async (jobId: string, candidateId: string): P
       return false;
     }
 
-    return !!data;
+    // Allow re-application if no record exists or if the application was withdrawn
+    if (!data || data.status === 'withdrawn') {
+      return false;
+    }
+
+    return true;
   } catch (error) {
     console.error("Error checking application:", error);
     return false;
@@ -569,12 +574,15 @@ export const checkJobApplication = async (jobId: string, candidateId: string): P
 
 export const applyToJob = async (jobId: string, candidateId: string): Promise<boolean> => {
   try {
+    // Use upsert to handle both new applications and reactivating withdrawn ones
     const { error } = await supabase
       .from('job_applications')
-      .insert({
+      .upsert({
         job_offer_id: jobId,
         candidate_id: candidateId,
         status: 'pending'
+      }, {
+        onConflict: 'job_offer_id,candidate_id'
       });
 
     if (error) {

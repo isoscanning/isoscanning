@@ -70,7 +70,7 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
                     className="p-0"
                     modifiers={{
                         available: (date) => availabilitySlots.some(slot =>
-                            format(new Date(slot.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+                            slot.date === format(date, 'yyyy-MM-dd')
                         ),
                     }}
                     modifiersClassNames={{
@@ -101,7 +101,7 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
                     components={{
                         DayButton: ({ day, modifiers, ...props }) => {
                             const isAvailable = availabilitySlots.some(slot =>
-                                format(new Date(slot.date), 'yyyy-MM-dd') === format(day.date, 'yyyy-MM-dd')
+                                slot.date === format(day.date, 'yyyy-MM-dd')
                             );
                             const isOutside = modifiers.outside;
                             const isToday = modifiers.today;
@@ -193,7 +193,7 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
                 {date ? (
                     (() => {
                         const selectedSlot = availabilitySlots.find(slot =>
-                            format(new Date(slot.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+                            slot.date === format(date, 'yyyy-MM-dd')
                         );
 
                         if (!selectedSlot) {

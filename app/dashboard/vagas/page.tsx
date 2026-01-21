@@ -70,6 +70,8 @@ export default function MinhasVagasPage() {
     const [isDeleting, setIsDeleting] = useState(false);
     const [vagaToDelete, setVagaToDelete] = useState<string | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [vagaToConclude, setVagaToConclude] = useState<JobOffer | null>(null);
+    const [isConcludeDialogOpen, setIsConcludeDialogOpen] = useState(false);
     const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
     const [isBulkProcessing, setIsBulkProcessing] = useState(false);
     const { toast } = useToast();
@@ -111,7 +113,7 @@ export default function MinhasVagasPage() {
 
             const newIsActive = newStatus === 'open';
 
-            await updateJobOffer(vaga.id, { isActive: newIsActive, status: newStatus });
+            await updateJobStatus(vaga.id, newStatus);
             setVagas(vagas.map((v) => v.id === vaga.id ? { ...v, isActive: newIsActive, status: newStatus } : v));
 
             toast({
@@ -141,7 +143,11 @@ export default function MinhasVagasPage() {
             setIsDeleteDialogOpen(false);
         } catch (error) {
             console.error("Erro ao excluir vaga:", error);
-            alert("Erro ao excluir vaga");
+            toast({
+                variant: "destructive",
+                title: "Erro",
+                description: "Erro ao excluir vaga",
+            });
         } finally {
             setIsDeleting(false);
             setVagaToDelete(null);
@@ -164,17 +170,22 @@ export default function MinhasVagasPage() {
         }
     };
 
-    const handleConcludeJob = async (vaga: JobOffer) => {
-        try {
-            const confirmed = window.confirm("Tem certeza que deseja concluir esta vaga? Isso irá marcá-la como fechada.");
-            if (!confirmed) return;
+    const handleConcludeJob = (vaga: JobOffer) => {
+        setVagaToConclude(vaga);
+        setIsConcludeDialogOpen(true);
+    };
 
-            await updateJobStatus(vaga.id, 'closed');
-            setVagas(vagas.map((v) => v.id === vaga.id ? { ...v, status: 'closed', isActive: false } : v));
+    const confirmConclude = async () => {
+        if (!vagaToConclude) return;
+
+        try {
+            await updateJobStatus(vagaToConclude.id, 'closed');
+            setVagas(vagas.map((v) => v.id === vagaToConclude.id ? { ...v, status: 'closed', isActive: false } : v));
             toast({
                 title: "Vaga Concluída",
                 description: "A vaga foi marcada como concluída com sucesso.",
             });
+            setIsConcludeDialogOpen(false);
         } catch (error) {
             console.error("Erro ao concluir vaga:", error);
             toast({
@@ -182,6 +193,8 @@ export default function MinhasVagasPage() {
                 title: "Erro",
                 description: "Não foi possível concluir a vaga.",
             });
+        } finally {
+            setVagaToConclude(null);
         }
     };
 
@@ -397,17 +410,23 @@ export default function MinhasVagasPage() {
                                                                     </DropdownMenuItem>
                                                                 )}
 
-                                                                <DropdownMenuItem onClick={() => handleToggleActive(vaga)}>
-                                                                    {vaga.status === 'open' ? (
-                                                                        <>
-                                                                            <Pause className="mr-2 h-4 w-4" /> Pausar Vaga
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <Play className="mr-2 h-4 w-4" /> {vaga.status === 'closed' ? 'Reabrir Vaga' : 'Reativar Vaga'}
-                                                                        </>
-                                                                    )}
-                                                                </DropdownMenuItem>
+                                                                {vaga.status === 'open' && (
+                                                                    <DropdownMenuItem onClick={() => handleToggleActive(vaga)}>
+                                                                        <Pause className="mr-2 h-4 w-4" /> Pausar Vaga
+                                                                    </DropdownMenuItem>
+                                                                )}
+
+                                                                {vaga.status === 'paused' && (
+                                                                    <DropdownMenuItem onClick={() => handleToggleActive(vaga)}>
+                                                                        <Play className="mr-2 h-4 w-4" /> Reativar Vaga
+                                                                    </DropdownMenuItem>
+                                                                )}
+
+                                                                {vaga.status === 'closed' && (
+                                                                    <DropdownMenuItem onClick={() => handleToggleActive(vaga)}>
+                                                                        <Play className="mr-2 h-4 w-4" /> Reabrir Vaga
+                                                                    </DropdownMenuItem>
+                                                                )}
                                                                 <DropdownMenuSeparator />
                                                                 <DropdownMenuItem
                                                                     className="text-destructive focus:text-destructive"
@@ -566,6 +585,29 @@ export default function MinhasVagasPage() {
                             ) : (
                                 "Confirmar Exclusão"
                             )}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={isConcludeDialogOpen} onOpenChange={setIsConcludeDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Concluir Vaga?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Tem certeza que deseja concluir esta vaga? Isso irá marcá-la como fechada e não receberá novas candidaturas.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault();
+                                confirmConclude();
+                            }}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                            Confirmar Conclusão
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

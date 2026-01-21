@@ -23,6 +23,16 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function CandidatosVagaPage() {
@@ -34,6 +44,8 @@ export default function CandidatosVagaPage() {
     const [jobOffer, setJobOffer] = useState<JobOffer | null>(null);
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
+    const [isConcludeDialogOpen, setIsConcludeDialogOpen] = useState(false);
+    const [isReopenDialogOpen, setIsReopenDialogOpen] = useState(false);
 
     useEffect(() => {
         const loadData = async () => {
@@ -103,19 +115,21 @@ export default function CandidatosVagaPage() {
         }
     };
 
-    const handleConcludeJob = async () => {
+    const handleConcludeJob = () => {
+        setIsConcludeDialogOpen(true);
+    };
+
+    const confirmConclude = async () => {
         if (!jobOffer) return;
 
         try {
-            const confirmed = window.confirm("Tem certeza que deseja concluir esta vaga? Isso irá marcá-la como fechada.");
-            if (!confirmed) return;
-
             await updateJobStatus(jobOffer.id, 'closed');
             setJobOffer({ ...jobOffer, status: 'closed', isActive: false });
             toast({
                 title: "Vaga Concluída",
                 description: "A vaga foi marcada como concluída com sucesso.",
             });
+            setIsConcludeDialogOpen(false);
         } catch (error) {
             console.error("Erro ao concluir vaga:", error);
             toast({
@@ -126,19 +140,21 @@ export default function CandidatosVagaPage() {
         }
     };
 
-    const handleReopenJob = async () => {
+    const handleReopenJob = () => {
+        setIsReopenDialogOpen(true);
+    };
+
+    const confirmReopen = async () => {
         if (!jobOffer) return;
 
         try {
-            const confirmed = window.confirm("Tem certeza que deseja reabrir esta vaga? Ela ficará visível para novos candidatos.");
-            if (!confirmed) return;
-
             await updateJobStatus(jobOffer.id, 'open');
             setJobOffer({ ...jobOffer, status: 'open', isActive: true });
             toast({
                 title: "Vaga Reaberta",
                 description: "A vaga foi reaberta com sucesso.",
             });
+            setIsReopenDialogOpen(false);
         } catch (error) {
             console.error("Erro ao reabrir vaga:", error);
             toast({
@@ -421,6 +437,51 @@ export default function CandidatosVagaPage() {
             <div className="hidden lg:block">
                 <Footer />
             </div>
+
+            <AlertDialog open={isConcludeDialogOpen} onOpenChange={setIsConcludeDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Concluir Vaga?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Tem certeza que deseja concluir esta vaga? Isso irá marcá-la como fechada e não receberá novas candidaturas.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault();
+                                confirmConclude();
+                            }}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                            Confirmar Conclusão
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={isReopenDialogOpen} onOpenChange={setIsReopenDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Reabrir Vaga?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Tem certeza que deseja reabrir esta vaga? Ela ficará visível para novos candidatos.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault();
+                                confirmReopen();
+                            }}
+                        >
+                            Confirmar Reabertura
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

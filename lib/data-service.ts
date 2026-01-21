@@ -58,6 +58,7 @@ export interface JobOffer {
   budgetMax?: number | null;
   requirements?: string | null;
   isActive: boolean;
+  status: 'open' | 'paused' | 'closed';
   createdAt: string;
   updatedAt: string;
   employerAvatarUrl?: string;
@@ -121,6 +122,7 @@ export interface CreateJobOfferData {
   endDate?: string;
   specialtyId?: string;
   requiresInvoice?: boolean;
+  status?: 'open' | 'paused' | 'closed';
 }
 
 /**
@@ -531,6 +533,56 @@ export async function createJobOffer(data: CreateJobOfferData): Promise<string> 
   }
 }
 
+export const updateJobStatus = async (jobId: string, status: 'open' | 'paused' | 'closed'): Promise<boolean> => {
+  try {
+    // Also update isActive for backward compatibility
+    const isActive = status === 'open';
+    
+    const { error } = await supabase
+      .from('job_offers')
+      .update({ 
+        status, 
+        is_active: isActive 
+      })
+      .eq('id', jobId);
+
+    if (error) {
+      console.error("Error updating job status:", error);
+      throw error;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error updating job status:", error);
+    throw error;
+  }
+};
+
+export const bulkUpdateJobStatus = async (jobIds: string[], status: 'open' | 'paused' | 'closed'): Promise<boolean> => {
+  try {
+    // Also update isActive for backward compatibility
+    const isActive = status === 'open';
+    
+    const { error } = await supabase
+      .from('job_offers')
+      .update({ 
+        status, 
+        is_active: isActive 
+      })
+      .in('id', jobIds);
+
+    if (error) {
+      console.error("Error bulk updating job status:", error);
+      throw error;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error bulk updating job status:", error);
+    throw error;
+  }
+};
+
 /**
  * Update an existing job offer
  */
@@ -691,6 +743,8 @@ export interface JobCandidate {
     state?: string;
     averageRating?: number;
     totalReviews?: number;
+    email?: string;
+    phone?: string;
   };
 }
 
@@ -738,10 +792,38 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
         state: app.profiles.state,
         averageRating: app.profiles.average_rating,
         totalReviews: app.profiles.total_reviews,
+        // email and phone removed to prevent error
       }
     }));
   } catch (error) {
     console.error("Error fetching candidates:", error);
     return [];
+  }
+};
+
+export const updateJobApplicationStatus = async (applicationId: string, status: 'accepted' | 'rejected'): Promise<boolean> => {
+  try {
+    console.log(`Updating application ${applicationId} to status ${status}`);
+    const { data, error } = await supabase
+      .from('job_applications')
+      .update({ status })
+      .eq('id', applicationId)
+      .select();
+
+    if (error) {
+      console.error("Error updating application status:", error);
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      console.warn("No application updated. Possible RLS issue or ID not found.");
+      return false;
+    }
+
+    console.log("Application updated successfully:", data);
+    return true;
+  } catch (error) {
+    console.error("Error updating application status:", error);
+    throw error;
   }
 };

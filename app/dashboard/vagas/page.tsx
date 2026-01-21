@@ -15,6 +15,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
     Briefcase,
     MapPin,
     Plus,
@@ -25,7 +33,16 @@ import {
     Pause,
     Play,
     User,
+    MoreVertical,
+    Calendar,
+    Search,
     Loader2,
+    CheckSquare,
+    Square,
+    CheckCircle2,
+    XCircle,
+    RotateCcw,
+    PlayCircle,
 } from "lucide-react";
 import {
     AlertDialog,
@@ -37,8 +54,13 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { fetchUserJobOffers, deleteJobOffer, updateJobOffer, type JobOffer } from "@/lib/data-service";
+import { fetchUserJobOffers, deleteJobOffer, updateJobOffer, bulkUpdateJobStatus, updateJobStatus, type JobOffer } from "@/lib/data-service";
 import Link from "next/link";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AnimatePresence, motion } from "framer-motion";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function MinhasVagasPage() {
     const router = useRouter();
@@ -48,6 +70,9 @@ export default function MinhasVagasPage() {
     const [isDeleting, setIsDeleting] = useState(false);
     const [vagaToDelete, setVagaToDelete] = useState<string | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
+    const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+    const { toast } = useToast();
 
     const fetchVagas = useCallback(async () => {
         if (!userProfile) return;
@@ -72,11 +97,32 @@ export default function MinhasVagasPage() {
 
     const handleToggleActive = async (vaga: JobOffer) => {
         try {
-            await updateJobOffer(vaga.id, { isActive: !vaga.isActive });
-            setVagas(vagas.map((v) => v.id === vaga.id ? { ...v, isActive: !v.isActive } : v));
+            // Logic: 
+            // If Open -> Pause
+            // If Paused -> Open
+            // If Closed -> Open
+
+            let newStatus: 'open' | 'paused' | 'closed' = 'open';
+            if (vaga.status === 'open') {
+                newStatus = 'paused';
+            } else {
+                newStatus = 'open'; // Paused or Closed -> Open
+            }
+
+            const newIsActive = newStatus === 'open';
+
+            await updateJobOffer(vaga.id, { isActive: newIsActive, status: newStatus });
+            setVagas(vagas.map((v) => v.id === vaga.id ? { ...v, isActive: newIsActive, status: newStatus } : v));
+
+            toast({
+                title: newStatus === 'open' ? "Vaga Reativada" : "Vaga Pausada",
+                description: newStatus === 'open'
+                    ? "A vaga está visível para candidatos novamente."
+                    : "A vaga foi pausada e não receberá novas candidaturas."
+            });
         } catch (error) {
             console.error("Erro ao alterar status da vaga:", error);
-            alert("Erro ao alterar status da vaga");
+            toast({ variant: "destructive", title: "Erro", description: "Erro ao alterar status da vaga" });
         }
     };
 
@@ -102,6 +148,85 @@ export default function MinhasVagasPage() {
         }
     };
 
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) {
+            setSelectedJobIds(vagas.map(v => v.id));
+        } else {
+            setSelectedJobIds([]);
+        }
+    };
+
+    const handleSelectJob = (jobId: string, checked: boolean) => {
+        if (checked) {
+            setSelectedJobIds(prev => [...prev, jobId]);
+        } else {
+            setSelectedJobIds(prev => prev.filter(id => id !== jobId));
+        }
+    };
+
+    const handleConcludeJob = async (vaga: JobOffer) => {
+        try {
+            const confirmed = window.confirm("Tem certeza que deseja concluir esta vaga? Isso irá marcá-la como fechada.");
+            if (!confirmed) return;
+
+            await updateJobStatus(vaga.id, 'closed');
+            setVagas(vagas.map((v) => v.id === vaga.id ? { ...v, status: 'closed', isActive: false } : v));
+            toast({
+                title: "Vaga Concluída",
+                description: "A vaga foi marcada como concluída com sucesso.",
+            });
+        } catch (error) {
+            console.error("Erro ao concluir vaga:", error);
+            toast({
+                variant: "destructive",
+                title: "Erro",
+                description: "Não foi possível concluir a vaga.",
+            });
+        }
+    };
+
+    const handleBulkAction = async (action: 'conclude' | 'pause' | 'delete' | 'open') => {
+        if (selectedJobIds.length === 0) return;
+        setIsBulkProcessing(true);
+
+        try {
+            if (action === 'delete') {
+                await Promise.all(selectedJobIds.map(id => deleteJobOffer(id)));
+                setVagas(vagas.filter(v => !selectedJobIds.includes(v.id)));
+                toast({ title: "Vagas excluídas", description: `${selectedJobIds.length} vagas foram excluídas.` });
+            } else {
+                const status = action === 'conclude' ? 'closed' : action === 'pause' ? 'paused' : 'open';
+                await bulkUpdateJobStatus(selectedJobIds, status);
+
+                // Update local state
+                setVagas(vagas.map(v => {
+                    if (selectedJobIds.includes(v.id)) {
+                        return {
+                            ...v,
+                            status: status,
+                            isActive: status === 'open'
+                        };
+                    }
+                    return v;
+                }));
+
+                let actionName = '';
+                switch (action) {
+                    case 'conclude': actionName = 'concluídas'; break;
+                    case 'pause': actionName = 'pausadas'; break;
+                    case 'open': actionName = 'reativadas'; break;
+                }
+                toast({ title: "Sucesso", description: `${selectedJobIds.length} vagas foram ${actionName}.` });
+            }
+            setSelectedJobIds([]);
+        } catch (error) {
+            console.error("Erro na ação em massa:", error);
+            toast({ variant: "destructive", title: "Erro", description: "Falha ao processar ação em massa." });
+        } finally {
+            setIsBulkProcessing(false);
+        }
+    };
+
     const getJobTypeLabel = (type: string) => {
         const types: Record<string, string> = {
             freelance: "Freelance",
@@ -112,18 +237,17 @@ export default function MinhasVagasPage() {
         return types[type] || type;
     };
 
-    const getLocationLabel = (type: string) => {
-        const types: Record<string, string> = {
-            on_site: "Presencial",
-            remote: "Remoto",
-            hybrid: "Híbrido",
-        };
-        return types[type] || type;
-    };
+    // Calculate derived state for bulk actions
+    const selectedJobs = vagas.filter(v => selectedJobIds.includes(v.id));
+    const hasOpenJobs = selectedJobs.some(v => v.status === 'open');
+    const hasPausedJobs = selectedJobs.some(v => v.status === 'paused');
+    const hasClosedJobs = selectedJobs.some(v => v.status === 'closed');
+    const hasNonClosedJobs = selectedJobs.some(v => v.status !== 'closed');
+    const hasNonOpenJobs = selectedJobs.some(v => v.status !== 'open');
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
+            <div className="min-h-screen flex items-center justify-center bg-background">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
         );
@@ -132,27 +256,44 @@ export default function MinhasVagasPage() {
     if (!userProfile) return null;
 
     return (
-        <div className="min-h-screen flex flex-col">
+        <div className="min-h-screen flex flex-col bg-background">
             <Header />
 
-            <main className="flex-1 py-12 px-4">
+            <main className="flex-1 py-12 px-4 relative">
                 <div className="container mx-auto max-w-5xl space-y-8">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div>
-                            <h1 className="text-3xl font-bold">Minhas Vagas</h1>
-                            <p className="text-muted-foreground mt-2">
-                                Gerencie as oportunidades que você publicou
+                            <h1 className="text-3xl font-bold tracking-tight">Minhas Vagas</h1>
+                            <p className="text-muted-foreground mt-1">
+                                Gerencie suas oportunidades publicadas e acompanhe candidatos.
                             </p>
                         </div>
-                        <Button asChild>
+                        <Button asChild className="shadow-sm">
                             <Link href="/dashboard/vagas/nova">
                                 <Plus className="mr-2 h-4 w-4" /> Publicar Nova Vaga
                             </Link>
                         </Button>
                     </div>
 
+                    {/* Bulk Selection Header (Only visible when items exist) */}
+                    {vagas.length > 0 && (
+                        <div className="flex items-center gap-2 py-2 px-1">
+                            <Checkbox
+                                id="select-all"
+                                checked={selectedJobIds.length === vagas.length && vagas.length > 0}
+                                onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                            />
+                            <label htmlFor="select-all" className="text-sm font-medium cursor-pointer select-none text-muted-foreground">
+                                {selectedJobIds.length === 0
+                                    ? "Selecionar todas"
+                                    : `${selectedJobIds.length} selecionada${selectedJobIds.length > 1 ? 's' : ''}`
+                                }
+                            </label>
+                        </div>
+                    )}
+
                     {loadingVagas ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 gap-6">
                             {[1, 2].map((i) => (
                                 <Card key={i} className="animate-pulse">
                                     <div className="h-48 bg-muted rounded-t-lg"></div>
@@ -164,122 +305,147 @@ export default function MinhasVagasPage() {
                             ))}
                         </div>
                     ) : vagas.length === 0 ? (
-                        <Card className="text-center py-12">
-                            <CardContent className="space-y-4">
-                                <div className="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto">
-                                    <Briefcase className="h-8 w-8 text-muted-foreground" />
+                        <Card className="text-center py-16 border-dashed">
+                            <CardContent className="space-y-6">
+                                <div className="bg-muted w-20 h-20 rounded-full flex items-center justify-center mx-auto">
+                                    <Briefcase className="h-10 w-10 text-muted-foreground" />
                                 </div>
                                 <div className="space-y-2">
-                                    <CardTitle>Nenhuma vaga publicada</CardTitle>
-                                    <CardDescription>
-                                        Você ainda não publicou nenhuma oferta de emprego.
+                                    <CardTitle className="text-xl">Nenhuma vaga publicada</CardTitle>
+                                    <CardDescription className="text-base max-w-md mx-auto">
+                                        Você ainda não publicou nenhuma oferta de emprego. Comece agora mesmo a encontrar os melhores profissionais.
                                     </CardDescription>
                                 </div>
-                                <Button asChild variant="outline">
-                                    <Link href="/dashboard/vagas/nova">Começar agora</Link>
+                                <Button asChild size="lg">
+                                    <Link href="/dashboard/vagas/nova">Criar Primeira Vaga</Link>
                                 </Button>
                             </CardContent>
                         </Card>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 gap-6 pb-24">
                             {vagas.map((vaga) => (
-                                <Card key={vaga.id} className="overflow-hidden flex flex-col">
-                                    <CardHeader className="pb-4">
-                                        <div className="flex justify-between items-start">
-                                            <Badge variant="secondary" className="mb-2">
-                                                {vaga.category}
-                                            </Badge>
-                                            <Badge variant={vaga.isActive ? "default" : "outline"}>
-                                                {vaga.isActive ? "Ativa" : "Inativa"}
-                                            </Badge>
-                                        </div>
-                                        <CardTitle className="text-xl line-clamp-1">
-                                            {vaga.title}
-                                        </CardTitle>
-                                        <CardDescription className="flex items-center gap-2">
-                                            <Clock className="h-3 w-3" />
-                                            Publicado em {new Date(vaga.createdAt).toLocaleDateString()}
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="flex-1 space-y-4">
-                                        <div className="grid grid-cols-2 gap-y-2 text-sm">
-                                            <div className="flex items-center gap-2 text-muted-foreground">
-                                                <Briefcase className="h-4 w-4" />
-                                                <span>{getJobTypeLabel(vaga.jobType)}</span>
+                                <Card key={vaga.id} className={`overflow-hidden transition-all hover:shadow-md ${!vaga.isActive ? 'opacity-75 bg-muted/30' : ''} ${selectedJobIds.includes(vaga.id) ? 'ring-2 ring-primary border-primary' : ''}`}>
+                                    <CardContent className="p-0">
+                                        <div className="flex flex-col md:flex-row">
+                                            {/* Selection Strip */}
+                                            <div className="flex items-center justify-center w-12 bg-muted/10 border-r">
+                                                <Checkbox
+                                                    checked={selectedJobIds.includes(vaga.id)}
+                                                    onCheckedChange={(checked) => handleSelectJob(vaga.id, checked as boolean)}
+                                                />
                                             </div>
-                                            <div className="flex items-center gap-2 text-muted-foreground">
-                                                <MapPin className="h-4 w-4" />
-                                                <span>
-                                                    {vaga.locationType === "remote"
-                                                        ? "Remoto"
-                                                        : `${vaga.city || "Cidade não informada"}${vaga.state ? `, ${vaga.state}` : ""}`}
-                                                </span>
-                                            </div>
-                                            {(vaga.budgetMin !== null && vaga.budgetMin !== undefined) ||
-                                                (vaga.budgetMax !== null && vaga.budgetMax !== undefined) ? (
-                                                <div className="flex items-center gap-2 text-muted-foreground col-span-2">
-                                                    <DollarSign className="h-4 w-4" />
-                                                    <span>
-                                                        Orçamento:{" "}
-                                                        {vaga.budgetMin !== null && vaga.budgetMin !== undefined && `R$ ${vaga.budgetMin}`}
-                                                        {vaga.budgetMin !== null && vaga.budgetMin !== undefined &&
-                                                            vaga.budgetMax !== null && vaga.budgetMax !== undefined && " - "}
-                                                        {vaga.budgetMax !== null && vaga.budgetMax !== undefined && `R$ ${vaga.budgetMax}`}
-                                                    </span>
-                                                </div>
-                                            ) : null}
-                                            {vaga.startDate && (
-                                                <div className="flex items-center gap-2 text-muted-foreground col-span-2">
-                                                    <Clock className="h-4 w-4" />
-                                                    <span>
-                                                        Início: {new Date(vaga.startDate).toLocaleDateString()}
-                                                        {vaga.endDate && ` - Término: ${new Date(vaga.endDate).toLocaleDateString()}`}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
 
-                                        <p className="text-sm line-clamp-2 text-muted-foreground">
-                                            {vaga.description}
-                                        </p>
+                                            {/* Status Strip */}
+                                            <div className={`w-full md:w-2 h-2 md:h-auto ${vaga.status === 'closed' ? 'bg-gray-500' : vaga.isActive ? 'bg-green-500' : 'bg-yellow-500'}`} />
 
-                                        <div className="flex gap-2 pt-4">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="flex-1"
-                                                onClick={() => handleToggleActive(vaga)}
-                                            >
-                                                {vaga.isActive ? (
-                                                    <>
-                                                        <Pause className="mr-2 h-4 w-4" /> Pausar
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Play className="mr-2 h-4 w-4" /> Reativar
-                                                    </>
-                                                )}
-                                            </Button>
-                                            <div className="flex items-center gap-2">
-                                                <Button variant="outline" size="sm" asChild>
-                                                    <Link href={`/dashboard/vagas/${vaga.id}/candidatos`}>
-                                                        <User className="mr-2 h-4 w-4" />
-                                                        Candidatos
-                                                    </Link>
-                                                </Button>
-                                                <Button variant="outline" size="sm" asChild>
-                                                    <Link href={`/dashboard/vagas/editar/${vaga.id}`}>
-                                                        <Edit className="mr-2 h-4 w-4" />
-                                                        Editar
-                                                    </Link>
-                                                </Button>
-                                                <Button
-                                                    variant="destructive"
-                                                    size="sm"
-                                                    onClick={() => handleDeleteClick(vaga.id)}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
+                                            <div className="flex-1 p-6 space-y-4">
+                                                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <Badge variant={vaga.status === 'closed' ? "secondary" : vaga.isActive ? "default" : "secondary"} className={vaga.status === 'closed' ? "bg-gray-200 text-gray-700" : vaga.isActive ? "bg-green-600 hover:bg-green-700" : ""}>
+                                                                {vaga.status === 'closed' ? "Concluída" : vaga.isActive ? "Ativa" : "Pausada"}
+                                                            </Badge>
+                                                            <Badge variant="outline" className="text-muted-foreground">
+                                                                {vaga.category}
+                                                            </Badge>
+                                                        </div>
+                                                        <h3 className="text-xl font-bold text-foreground line-clamp-1">
+                                                            {vaga.title}
+                                                        </h3>
+                                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                            <Calendar className="h-3.5 w-3.5" />
+                                                            <span>Publicado em {format(new Date(vaga.createdAt), "d 'de' MMM, yyyy", { locale: ptBR })}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2">
+                                                        <Button variant="outline" size="sm" asChild className="hidden md:flex">
+                                                            <Link href={`/dashboard/vagas/${vaga.id}/candidatos`}>
+                                                                <User className="mr-2 h-4 w-4" />
+                                                                Ver Candidatos
+                                                            </Link>
+                                                        </Button>
+
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                                    <MoreVertical className="h-4 w-4" />
+                                                                    <span className="sr-only">Ações</span>
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                                <DropdownMenuLabel>Ações da Vaga</DropdownMenuLabel>
+                                                                <DropdownMenuItem asChild className="md:hidden">
+                                                                    <Link href={`/dashboard/vagas/${vaga.id}/candidatos`}>
+                                                                        <User className="mr-2 h-4 w-4" /> Ver Candidatos
+                                                                    </Link>
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem asChild>
+                                                                    <Link href={`/vagas/${vaga.id}`} target="_blank">
+                                                                        <Search className="mr-2 h-4 w-4" /> Visualizar Vaga
+                                                                    </Link>
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem asChild>
+                                                                    <Link href={`/dashboard/vagas/editar/${vaga.id}`}>
+                                                                        <Edit className="mr-2 h-4 w-4" /> Editar
+                                                                    </Link>
+                                                                </DropdownMenuItem>
+
+                                                                {vaga.status !== 'closed' && (
+                                                                    <DropdownMenuItem onClick={() => handleConcludeJob(vaga)}>
+                                                                        <CheckCircle2 className="mr-2 h-4 w-4" /> Concluir Vaga
+                                                                    </DropdownMenuItem>
+                                                                )}
+
+                                                                <DropdownMenuItem onClick={() => handleToggleActive(vaga)}>
+                                                                    {vaga.status === 'open' ? (
+                                                                        <>
+                                                                            <Pause className="mr-2 h-4 w-4" /> Pausar Vaga
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Play className="mr-2 h-4 w-4" /> {vaga.status === 'closed' ? 'Reabrir Vaga' : 'Reativar Vaga'}
+                                                                        </>
+                                                                    )}
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuItem
+                                                                    className="text-destructive focus:text-destructive"
+                                                                    onClick={() => handleDeleteClick(vaga.id)}
+                                                                >
+                                                                    <Trash2 className="mr-2 h-4 w-4" /> Excluir Vaga
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                        <Briefcase className="h-4 w-4 text-primary/70" />
+                                                        <span>{getJobTypeLabel(vaga.jobType)}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                        <MapPin className="h-4 w-4 text-primary/70" />
+                                                        <span>
+                                                            {vaga.locationType === "remote"
+                                                                ? "Remoto"
+                                                                : `${vaga.city || "Cidade não informada"}/${vaga.state || "UF"}`}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 text-sm text-muted-foreground sm:col-span-2">
+                                                        <DollarSign className="h-4 w-4 text-primary/70" />
+                                                        <span>
+                                                            {(vaga.budgetMin || vaga.budgetMax) ? (
+                                                                <>
+                                                                    {vaga.budgetMin && `R$ ${vaga.budgetMin}`}
+                                                                    {vaga.budgetMin && vaga.budgetMax && " - "}
+                                                                    {vaga.budgetMax && `R$ ${vaga.budgetMax}`}
+                                                                </>
+                                                            ) : "A combinar"}
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </CardContent>
@@ -288,6 +454,87 @@ export default function MinhasVagasPage() {
                         </div>
                     )}
                 </div>
+
+                {/* Floating Action Bar */}
+                <AnimatePresence>
+                    {selectedJobIds.length > 0 && (
+                        <motion.div
+                            initial={{ y: 100, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: 100, opacity: 0 }}
+                            className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 w-[90%] max-w-2xl"
+                        >
+                            <Card className="bg-foreground text-background shadow-2xl border-none">
+                                <CardContent className="p-4 flex items-center justify-between gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <span className="font-medium text-sm md:text-base whitespace-nowrap">
+                                            {selectedJobIds.length} item{selectedJobIds.length > 1 ? 's' : ''} selecionado{selectedJobIds.length > 1 ? 's' : ''}
+                                        </span>
+                                        <div className="h-4 w-px bg-background/20" />
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setSelectedJobIds([])}
+                                            className="text-background/70 hover:text-background hover:bg-background/10 h-8"
+                                        >
+                                            Cancelar
+                                        </Button>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        {hasNonOpenJobs && (
+                                            <Button
+                                                size="sm"
+                                                variant="secondary"
+                                                onClick={() => handleBulkAction('open')}
+                                                disabled={isBulkProcessing}
+                                                className="h-9"
+                                            >
+                                                {isBulkProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4 mr-2" />}
+                                                <span className="hidden sm:inline">Reativar</span>
+                                            </Button>
+                                        )}
+
+                                        {hasOpenJobs && (
+                                            <Button
+                                                size="sm"
+                                                variant="secondary"
+                                                onClick={() => handleBulkAction('pause')}
+                                                disabled={isBulkProcessing}
+                                                className="h-9"
+                                            >
+                                                {isBulkProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pause className="h-4 w-4 mr-2" />}
+                                                <span className="hidden sm:inline">Pausar</span>
+                                            </Button>
+                                        )}
+
+                                        {hasNonClosedJobs && (
+                                            <Button
+                                                size="sm"
+                                                className="bg-green-600 hover:bg-green-700 text-white h-9 border-none"
+                                                onClick={() => handleBulkAction('conclude')}
+                                                disabled={isBulkProcessing}
+                                            >
+                                                {isBulkProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                                                <span className="hidden sm:inline">Concluir</span>
+                                            </Button>
+                                        )}
+
+                                        <Button
+                                            size="icon"
+                                            variant="destructive"
+                                            onClick={() => handleBulkAction('delete')}
+                                            disabled={isBulkProcessing}
+                                            className="h-9 w-9"
+                                        >
+                                            {isBulkProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </main>
 
             <Footer />

@@ -410,7 +410,7 @@ export default function EditarVagaPage() {
                                                             <Input
                                                                 id="budgetMin"
                                                                 type="number"
-                                                                className="pl-10"
+                                                                className="pl-12"
                                                                 value={formData.budgetMin}
                                                                 onChange={(e) => setFormData({ ...formData, budgetMin: e.target.value })}
                                                             />
@@ -420,7 +420,7 @@ export default function EditarVagaPage() {
                                                             <Input
                                                                 id="budgetMax"
                                                                 type="number"
-                                                                className="pl-10"
+                                                                className="pl-12"
                                                                 value={formData.budgetMax}
                                                                 onChange={(e) => setFormData({ ...formData, budgetMax: e.target.value })}
                                                             />

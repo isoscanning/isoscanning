@@ -152,18 +152,6 @@ export function UserNav() {
               <span>Configurações</span>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem
-            asChild
-            className="cursor-pointer hover:bg-accent/10 dark:hover:bg-primary/25"
-          >
-            <Link
-              href="/dashboard/vagas"
-              className="flex items-center w-full text-foreground"
-            >
-              <Briefcase className="mr-2 h-4 w-4 text-accent" />
-              <span>Minhas Vagas</span>
-            </Link>
-          </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem

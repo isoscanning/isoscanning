@@ -25,9 +25,20 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import {
+    AlertCircle,
+    CheckCircle2,
+    Briefcase,
+    MapPin,
+    Calendar,
+    DollarSign,
+    FileText,
+    ArrowLeft,
+    Save
+} from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { createJobOffer, fetchSpecialties, Specialty } from "@/lib/data-service";
+import { ScrollReveal } from "@/components/scroll-reveal";
 
 const TIPOS_TRABALHO = [
     { value: "freelance", label: "Freelance" },
@@ -66,6 +77,7 @@ export default function NovaVagaPage() {
         requirements: "",
         startDate: "",
         endDate: "",
+        requiresInvoice: false,
     });
 
     const [saving, setSaving] = useState(false);
@@ -99,6 +111,8 @@ export default function NovaVagaPage() {
                 locationType: formData.locationType as any,
                 budgetMin: formData.budgetMin ? Number.parseFloat(formData.budgetMin) : undefined,
                 budgetMax: formData.budgetMax ? Number.parseFloat(formData.budgetMax) : undefined,
+                startDate: formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
+                endDate: formData.endDate ? new Date(formData.endDate).toISOString() : undefined,
                 isActive: true,
             });
 
@@ -141,249 +155,338 @@ export default function NovaVagaPage() {
     }
 
     return (
-        <div className="min-h-screen flex flex-col">
+        <div className="min-h-screen flex flex-col bg-background/50">
             <Header />
 
             <main className="flex-1 py-12 px-4">
-                <div className="container mx-auto max-w-3xl space-y-8">
-                    <div>
-                        <h1 className="text-3xl font-bold">Publicar Nova Vaga</h1>
-                        <p className="text-muted-foreground mt-2">
-                            Encontre o profissional ideal para o seu projeto audiovisual
-                        </p>
-                    </div>
+                <div className="container mx-auto max-w-4xl space-y-8">
+
+                    {/* Header Section */}
+                    <ScrollReveal>
+                        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b">
+                            <div>
+                                <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600">
+                                    Publicar Nova Vaga
+                                </h1>
+                                <p className="text-muted-foreground mt-2">
+                                    Encontre o profissional ideal para o seu projeto audiovisual
+                                </p>
+                            </div>
+                            <Button
+                                variant="outline"
+                                className="rounded-full"
+                                onClick={() => router.back()}
+                            >
+                                <ArrowLeft className="h-4 w-4 mr-2" />
+                                Voltar
+                            </Button>
+                        </div>
+                    </ScrollReveal>
 
                     {success && (
-                        <Alert>
-                            <CheckCircle2 className="h-4 w-4" />
-                            <AlertDescription>
-                                Vaga publicada com sucesso! Redirecionando...
-                            </AlertDescription>
-                        </Alert>
+                        <ScrollReveal>
+                            <Alert className="bg-green-500/10 border-green-500/20 text-green-600">
+                                <CheckCircle2 className="h-4 w-4" />
+                                <AlertDescription>
+                                    Vaga publicada com sucesso! Redirecionando...
+                                </AlertDescription>
+                            </Alert>
+                        </ScrollReveal>
                     )}
 
                     {error && (
-                        <Alert variant="destructive">
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>{error}</AlertDescription>
-                        </Alert>
+                        <ScrollReveal>
+                            <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>{error}</AlertDescription>
+                            </Alert>
+                        </ScrollReveal>
                     )}
 
-                    <form onSubmit={handleSubmit}>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Informações da Vaga</CardTitle>
-                                <CardDescription>
-                                    Preencha os detalhes da oportunidade
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="title">Título da Vaga *</Label>
-                                    <Input
-                                        id="title"
-                                        value={formData.title}
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, title: e.target.value })
-                                        }
-                                        placeholder="Ex: Fotógrafo para Casamento em São Paulo"
-                                        required
-                                        minLength={5}
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="specialtyId">Especialidade *</Label>
-                                        <Select
-                                            value={formData.specialtyId}
-                                            onValueChange={(value) =>
-                                                setFormData({ ...formData, specialtyId: value })
-                                            }
-                                            required
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Selecione" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {specialties.map((spec) => (
-                                                    <SelectItem key={spec.id} value={spec.id}>
-                                                        {spec.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                    <ScrollReveal delay={0.2}>
+                        <form onSubmit={handleSubmit}>
+                            <Card className="border-t-4 border-t-primary shadow-lg">
+                                <CardHeader>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                                            <Briefcase className="h-5 w-5" />
+                                        </div>
+                                        <CardTitle>Detalhes da Oportunidade</CardTitle>
                                     </div>
+                                    <CardDescription>
+                                        Preencha as informações abaixo para atrair os melhores candidatos.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
 
-                                    <div className="space-y-2">
-                                        <Label htmlFor="jobType">Tipo de Trabalho *</Label>
-                                        <Select
-                                            value={formData.jobType}
-                                            onValueChange={(value) =>
-                                                setFormData({ ...formData, jobType: value })
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {TIPOS_TRABALHO.map((tipo) => (
-                                                    <SelectItem key={tipo.value} value={tipo.value}>
-                                                        {tipo.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="locationType">Modalidade *</Label>
-                                        <Select
-                                            value={formData.locationType}
-                                            onValueChange={(value) =>
-                                                setFormData({ ...formData, locationType: value })
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {MODALIDADES.map((mod) => (
-                                                    <SelectItem key={mod.value} value={mod.value}>
-                                                        {mod.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="budget">Orçamento (Opcional)</Label>
-                                        <div className="flex gap-2">
+                                    {/* Section 1: Basic Info */}
+                                    <div className="grid gap-6 p-4 rounded-xl bg-muted/30">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="title" className="text-base font-medium">Título da Vaga *</Label>
                                             <Input
-                                                id="budgetMin"
-                                                type="number"
-                                                placeholder="Mín"
-                                                value={formData.budgetMin}
-                                                onChange={(e) => setFormData({ ...formData, budgetMin: e.target.value })}
+                                                id="title"
+                                                value={formData.title}
+                                                onChange={(e) =>
+                                                    setFormData({ ...formData, title: e.target.value })
+                                                }
+                                                placeholder="Ex: Fotógrafo para Casamento em São Paulo"
+                                                required
+                                                minLength={5}
+                                                className="text-lg py-6"
                                             />
-                                            <Input
-                                                id="budgetMax"
-                                                type="number"
-                                                placeholder="Máx"
-                                                value={formData.budgetMax}
-                                                onChange={(e) => setFormData({ ...formData, budgetMax: e.target.value })}
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="specialtyId">Especialidade *</Label>
+                                                <Select
+                                                    value={formData.specialtyId}
+                                                    onValueChange={(value) =>
+                                                        setFormData({ ...formData, specialtyId: value })
+                                                    }
+                                                    required
+                                                >
+                                                    <SelectTrigger className="h-12">
+                                                        <SelectValue placeholder="Selecione a área" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {specialties.map((spec) => (
+                                                            <SelectItem key={spec.id} value={spec.id}>
+                                                                {spec.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label htmlFor="jobType">Tipo de Trabalho *</Label>
+                                                <Select
+                                                    value={formData.jobType}
+                                                    onValueChange={(value) =>
+                                                        setFormData({ ...formData, jobType: value })
+                                                    }
+                                                >
+                                                    <SelectTrigger className="h-12">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {TIPOS_TRABALHO.map((tipo) => (
+                                                            <SelectItem key={tipo.value} value={tipo.value}>
+                                                                {tipo.label}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Section 2: Logistics */}
+                                    <div className="grid gap-6">
+                                        <div className="flex items-center gap-2 pb-2 border-b">
+                                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                                            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Localização e Modalidade</h3>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="locationType">Modalidade *</Label>
+                                                <Select
+                                                    value={formData.locationType}
+                                                    onValueChange={(value) =>
+                                                        setFormData({ ...formData, locationType: value })
+                                                    }
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {MODALIDADES.map((mod) => (
+                                                            <SelectItem key={mod.value} value={mod.value}>
+                                                                {mod.label}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label htmlFor="city">Cidade</Label>
+                                                <Input
+                                                    id="city"
+                                                    value={formData.city}
+                                                    onChange={(e) =>
+                                                        setFormData({ ...formData, city: e.target.value })
+                                                    }
+                                                    disabled={formData.locationType === "remote"}
+                                                    placeholder="Digite a cidade"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label htmlFor="state">Estado</Label>
+                                                <Select
+                                                    value={formData.state}
+                                                    onValueChange={(value) =>
+                                                        setFormData({ ...formData, state: value })
+                                                    }
+                                                    disabled={formData.locationType === "remote"}
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="UF" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {ESTADOS.map((estado) => (
+                                                            <SelectItem key={estado} value={estado}>
+                                                                {estado}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Section 3: Budget & Dates */}
+                                    <div className="grid gap-6">
+                                        <div className="flex items-center gap-2 pb-2 border-b">
+                                            <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Orçamento e Prazos</h3>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="budget">Orçamento Estimado (R$)</Label>
+                                                <div className="flex gap-2">
+                                                    <div className="relative flex-1">
+                                                        <span className="absolute left-3 top-2.5 text-muted-foreground">Min</span>
+                                                        <Input
+                                                            id="budgetMin"
+                                                            type="number"
+                                                            className="pl-12"
+                                                            value={formData.budgetMin}
+                                                            onChange={(e) => setFormData({ ...formData, budgetMin: e.target.value })}
+                                                        />
+                                                    </div>
+                                                    <div className="relative flex-1">
+                                                        <span className="absolute left-3 top-2.5 text-muted-foreground">Máx</span>
+                                                        <Input
+                                                            id="budgetMax"
+                                                            type="number"
+                                                            className="pl-12"
+                                                            value={formData.budgetMax}
+                                                            onChange={(e) => setFormData({ ...formData, budgetMax: e.target.value })}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="startDate">Início</Label>
+                                                    <Input
+                                                        id="startDate"
+                                                        type="date"
+                                                        value={formData.startDate}
+                                                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="endDate">Término</Label>
+                                                    <Input
+                                                        id="endDate"
+                                                        type="date"
+                                                        value={formData.endDate}
+                                                        onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/30">
+                                            <input
+                                                type="checkbox"
+                                                id="requiresInvoice"
+                                                checked={formData.requiresInvoice}
+                                                onChange={(e) => setFormData({ ...formData, requiresInvoice: e.target.checked })}
+                                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                            />
+                                            <div className="flex flex-col">
+                                                <Label htmlFor="requiresInvoice" className="cursor-pointer font-medium">Exige Nota Fiscal</Label>
+                                                <span className="text-xs text-muted-foreground">O profissional deverá emitir NF para receber o pagamento.</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Section 4: Description */}
+                                    <div className="grid gap-6">
+                                        <div className="flex items-center gap-2 pb-2 border-b">
+                                            <FileText className="h-4 w-4 text-muted-foreground" />
+                                            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Descrição e Requisitos</h3>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="description">Descrição da Vaga *</Label>
+                                            <Textarea
+                                                id="description"
+                                                value={formData.description}
+                                                onChange={(e) =>
+                                                    setFormData({ ...formData, description: e.target.value })
+                                                }
+                                                placeholder="Descreva as responsabilidades, o projeto e o que você procura (mínimo 20 caracteres)..."
+                                                rows={6}
+                                                required
+                                                minLength={20}
+                                                className="resize-y min-h-[120px]"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="requirements">Requisitos / Equipamentos Necessários</Label>
+                                            <Textarea
+                                                id="requirements"
+                                                value={formData.requirements}
+                                                onChange={(e) =>
+                                                    setFormData({ ...formData, requirements: e.target.value })
+                                                }
+                                                placeholder="Ex: Câmera Full Frame, Lente 50mm, Experiência com eventos..."
+                                                rows={4}
+                                                className="resize-y min-h-[100px]"
                                             />
                                         </div>
                                     </div>
-                                </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="startDate">Data de Início (Opcional)</Label>
-                                        <Input
-                                            id="startDate"
-                                            type="date"
-                                            value={formData.startDate}
-                                            onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="endDate">Data de Término (Opcional)</Label>
-                                        <Input
-                                            id="endDate"
-                                            type="date"
-                                            value={formData.endDate}
-                                            onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="description">Descrição da Vaga *</Label>
-                                    <Textarea
-                                        id="description"
-                                        value={formData.description}
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, description: e.target.value })
-                                        }
-                                        placeholder="Descreva as responsabilidades, o projeto e o que você procura (mínimo 20 caracteres)..."
-                                        rows={5}
-                                        required
-                                        minLength={20}
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="requirements">Requisitos / Equipamentos Necessários</Label>
-                                    <Textarea
-                                        id="requirements"
-                                        value={formData.requirements}
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, requirements: e.target.value })
-                                        }
-                                        placeholder="Ex: Câmera Full Frame, Lente 50mm, Experiência com eventos..."
-                                        rows={3}
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="city">Cidade</Label>
-                                        <Input
-                                            id="city"
-                                            value={formData.city}
-                                            onChange={(e) =>
-                                                setFormData({ ...formData, city: e.target.value })
-                                            }
-                                            disabled={formData.locationType === "remote"}
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="state">Estado</Label>
-                                        <Select
-                                            value={formData.state}
-                                            onValueChange={(value) =>
-                                                setFormData({ ...formData, state: value })
-                                            }
-                                            disabled={formData.locationType === "remote"}
+                                    <div className="flex justify-end gap-3 pt-6 border-t">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => router.back()}
+                                            className="px-6 rounded-full"
                                         >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="UF" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {ESTADOS.map((estado) => (
-                                                    <SelectItem key={estado} value={estado}>
-                                                        {estado}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                            Cancelar
+                                        </Button>
+                                        <Button
+                                            type="submit"
+                                            disabled={saving || success}
+                                            className="px-6 rounded-full shadow-md hover:shadow-lg transition-all"
+                                        >
+                                            {saving ? "Publicando..." : (
+                                                <>
+                                                    <Save className="h-4 w-4 mr-2" />
+                                                    Publicar Vaga
+                                                </>
+                                            )}
+                                        </Button>
                                     </div>
-                                </div>
-
-                                <div className="flex justify-end gap-3 pt-4">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => router.back()}
-                                    >
-                                        Cancelar
-                                    </Button>
-                                    <Button type="submit" disabled={saving || success}>
-                                        {saving ? "Publicando..." : "Publicar Vaga"}
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </form>
+                                </CardContent>
+                            </Card>
+                        </form>
+                    </ScrollReveal>
                 </div>
-            </main>
+            </main >
 
             <Footer />
-        </div>
+        </div >
     );
 }

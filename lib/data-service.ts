@@ -58,6 +58,7 @@ export interface JobOffer {
   budgetMax?: number | null;
   requirements?: string | null;
   isActive: boolean;
+  status: 'open' | 'paused' | 'closed';
   createdAt: string;
   updatedAt: string;
   employerAvatarUrl?: string;
@@ -65,6 +66,7 @@ export interface JobOffer {
   startDate?: string;
   endDate?: string;
   specialtyId?: string | null;
+  requiresInvoice?: boolean;
 }
 
 export interface Specialty {
@@ -119,6 +121,8 @@ export interface CreateJobOfferData {
   startDate?: string;
   endDate?: string;
   specialtyId?: string;
+  requiresInvoice?: boolean;
+  status?: 'open' | 'paused' | 'closed';
 }
 
 /**
@@ -519,6 +523,56 @@ export async function createJobOffer(data: CreateJobOfferData): Promise<string> 
   }
 }
 
+export const updateJobStatus = async (jobId: string, status: 'open' | 'paused' | 'closed'): Promise<boolean> => {
+  try {
+    // Also update isActive for backward compatibility
+    const isActive = status === 'open';
+    
+    const { error } = await supabase
+      .from('job_offers')
+      .update({ 
+        status, 
+        is_active: isActive 
+      })
+      .eq('id', jobId);
+
+    if (error) {
+      console.error("Error updating job status:", error);
+      throw error;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error updating job status:", error);
+    throw error;
+  }
+};
+
+export const bulkUpdateJobStatus = async (jobIds: string[], status: 'open' | 'paused' | 'closed'): Promise<boolean> => {
+  try {
+    // Also update isActive for backward compatibility
+    const isActive = status === 'open';
+    
+    const { error } = await supabase
+      .from('job_offers')
+      .update({ 
+        status, 
+        is_active: isActive 
+      })
+      .in('id', jobIds);
+
+    if (error) {
+      console.error("Error bulk updating job status:", error);
+      throw error;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error bulk updating job status:", error);
+    throw error;
+  }
+};
+
 /**
  * Update an existing job offer
  */
@@ -550,7 +604,7 @@ export const checkJobApplication = async (jobId: string, candidateId: string): P
   try {
     const { data, error } = await supabase
       .from('job_applications')
-      .select('id')
+      .select('id, status')
       .eq('job_offer_id', jobId)
       .eq('candidate_id', candidateId)
       .single();
@@ -560,7 +614,12 @@ export const checkJobApplication = async (jobId: string, candidateId: string): P
       return false;
     }
 
-    return !!data;
+    // Allow re-application if no record exists or if the application was withdrawn
+    if (!data || data.status === 'withdrawn') {
+      return false;
+    }
+
+    return true;
   } catch (error) {
     console.error("Error checking application:", error);
     return false;
@@ -569,12 +628,15 @@ export const checkJobApplication = async (jobId: string, candidateId: string): P
 
 export const applyToJob = async (jobId: string, candidateId: string): Promise<boolean> => {
   try {
+    // Use upsert to handle both new applications and reactivating withdrawn ones
     const { error } = await supabase
       .from('job_applications')
-      .insert({
+      .upsert({
         job_offer_id: jobId,
         candidate_id: candidateId,
         status: 'pending'
+      }, {
+        onConflict: 'job_offer_id,candidate_id'
       });
 
     if (error) {
@@ -671,6 +733,8 @@ export interface JobCandidate {
     state?: string;
     averageRating?: number;
     totalReviews?: number;
+    email?: string;
+    phone?: string;
   };
 }
 
@@ -718,6 +782,7 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
         state: app.profiles.state,
         averageRating: app.profiles.average_rating,
         totalReviews: app.profiles.total_reviews,
+        // email and phone removed to prevent error
       }
     }));
   } catch (error) {
@@ -728,16 +793,24 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
 
 export const updateJobApplicationStatus = async (applicationId: string, status: 'accepted' | 'rejected'): Promise<boolean> => {
   try {
-    const { error } = await supabase
+    console.log(`Updating application ${applicationId} to status ${status}`);
+    const { data, error } = await supabase
       .from('job_applications')
       .update({ status })
-      .eq('id', applicationId);
+      .eq('id', applicationId)
+      .select();
 
     if (error) {
       console.error("Error updating application status:", error);
       throw error;
     }
 
+    if (!data || data.length === 0) {
+      console.warn("No application updated. Possible RLS issue or ID not found.");
+      return false;
+    }
+
+    console.log("Application updated successfully:", data);
     return true;
   } catch (error) {
     console.error("Error updating application status:", error);

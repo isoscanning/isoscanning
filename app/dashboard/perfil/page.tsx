@@ -28,7 +28,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { format } from "date-fns"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import apiClient from "@/lib/api-service"
@@ -100,6 +111,8 @@ export default function PerfilPage() {
     startTime: "09:00",
     endTime: "18:00"
   })
+
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
 
   // Loading States and Modals
   const [loadingPortfolio, setLoadingPortfolio] = useState(false)
@@ -345,11 +358,13 @@ export default function PerfilPage() {
     const slots = await fetchAvailability(userProfile.id)
     setAvailabilitySlots(slots)
 
-    // Only pre-select dates on initial load, not after adding new availabilities
+    // We no longer pre-select dates automatically as the calendar now has a separate "available" state
+    /*
     if (preselectDates) {
       const existingDates = slots.map(slot => new Date(slot.date))
       setSelectedDates(existingDates)
     }
+    */
 
     setLoadingAvailability(false)
   }
@@ -661,9 +676,9 @@ export default function PerfilPage() {
         professionalId: userProfile.id
       })
 
-      // Reload availability without pre-selecting dates to avoid duplication
-      await loadAvailability(false)
-      setSelectedDates([])
+      // Reload availability and synchronize selected dates to update calendar colors
+      await loadAvailability(true)
+      setSelectedDates([]) // Clear selection after successful add
       setLastClickedDate(null)
       setSuccessMsg(`${dates.length} disponibilidade(s) adicionada(s)!`)
     } catch (err: any) {
@@ -734,7 +749,7 @@ export default function PerfilPage() {
     try {
       setLoadingAvailability(true)
       await deleteAvailability(id)
-      await loadAvailability(false) // Don't pre-select after delete
+      await loadAvailability(true) // Synchronize selected dates to update calendar colors
       setSelectedSlotsToDelete(prev => prev.filter(slotId => slotId !== id)) // Remove from selection if deleted
     } catch (err) {
       setErrorMsg("Erro ao excluir disponibilidade.")
@@ -765,10 +780,6 @@ export default function PerfilPage() {
   const handleBulkDelete = async () => {
     if (selectedSlotsToDelete.length === 0) return
 
-    if (!confirm(`Tem certeza que deseja excluir ${selectedSlotsToDelete.length} disponibilidade(s)?`)) {
-      return
-    }
-
     try {
       setDeletingBulk(true) // Show loader on button
       setLoadingAvailability(true) // Also set general loading
@@ -776,7 +787,7 @@ export default function PerfilPage() {
       // Delete all selected slots using bulk endpoint
       await deleteAvailabilities(selectedSlotsToDelete)
 
-      await loadAvailability(false) // Don't pre-select after delete
+      await loadAvailability(true) // Synchronize selected dates to update calendar colors
       setSelectedSlotsToDelete([])
       setSuccessMsg(`${selectedSlotsToDelete.length} disponibilidade(s) excluída(s)!`)
     } catch (err) {
@@ -1313,6 +1324,11 @@ export default function PerfilPage() {
                           selected={selectedDates}
                           onSelect={handleDateSelect}
                           onDayClick={handleDayClick}
+                          modifiers={{
+                            available: (date) => availabilitySlots.some(slot =>
+                              slot.date === format(date, 'yyyy-MM-dd')
+                            )
+                          }}
                           locale={ptBR}
                           className="rounded-md"
                         />
@@ -1384,25 +1400,46 @@ export default function PerfilPage() {
                               {selectedSlotsToDelete.length === availabilitySlots.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
                             </Button>
                             {selectedSlotsToDelete.length > 0 && (
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={handleBulkDelete}
-                                disabled={deletingBulk}
-                                className="text-xs"
-                              >
-                                {deletingBulk ? (
-                                  <>
-                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                    Excluindo...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Trash2 className="h-3 w-3 mr-1" />
-                                    Excluir ({selectedSlotsToDelete.length})
-                                  </>
-                                )}
-                              </Button>
+                              <AlertDialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    disabled={deletingBulk}
+                                    className="text-xs"
+                                  >
+                                    {deletingBulk ? (
+                                      <>
+                                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                        Excluindo...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Trash2 className="h-3 w-3 mr-1" />
+                                        Excluir ({selectedSlotsToDelete.length})
+                                      </>
+                                    )}
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Confirmar Exclusão em Lote</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Você tem certeza que deseja excluir as {selectedSlotsToDelete.length} disponibilidades selecionadas?
+                                      Esta ação não poderá ser desfeita.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={handleBulkDelete}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      Excluir Todas
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             )}
                           </div>
                         )}
@@ -1423,7 +1460,7 @@ export default function PerfilPage() {
                                   <CalendarIcon className="h-5 w-5 text-primary" />
                                   <div>
                                     <p className="font-medium">
-                                      {format(new Date(slot.date), "dd 'de' MMMM, yyyy", { locale: ptBR })}
+                                      {format(parseISO(slot.date + 'T12:00:00'), "dd 'de' MMMM, yyyy", { locale: ptBR })}
                                     </p>
                                     {slot.startTime === "00:00" && slot.endTime === "23:59" ? (
                                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">

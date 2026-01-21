@@ -210,17 +210,20 @@ function CalendarDayButton({
         'group-data-[focused=true]/day:border-ring group-data-[focused=true]/day:ring-ring/50 group-data-[focused=true]/day:ring-[3px]',
         '[&>span]:text-xs [&>span]:opacity-70',
 
-        // Selected date styles (green)
-        isSelected && 'bg-green-500 text-white hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700',
+        // 1. Selection styles (Blue - Highest Priority)
+        isSelected && 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800',
 
-        // Range styles (green for range dates)
-        modifiers.range_start && 'bg-green-500 text-white hover:bg-green-600 rounded-md rounded-l-md dark:bg-green-600',
-        modifiers.range_end && 'bg-green-500 text-white hover:bg-green-600 rounded-md rounded-r-md dark:bg-green-600',
-        modifiers.range_middle && 'bg-green-100 text-green-900 hover:bg-green-200 rounded-none dark:bg-green-950 dark:text-green-100',
+        // 2. Availability styles (Green) - Only if not selected
+        modifiers.available && !isSelected && 'bg-green-500 text-white hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700',
 
-        // Unselected date styles (red) - only if not disabled, outside, or today
-        !modifiers.selected && !modifiers.disabled && !modifiers.outside && !modifiers.today &&
-        'bg-red-100 text-red-900 hover:bg-red-200 dark:bg-red-950/50 dark:text-red-100 dark:hover:bg-red-950',
+        // 3. Range styles (Optional - kept for compatibility)
+        modifiers.range_start && 'bg-blue-600 text-white hover:bg-blue-700 rounded-md dark:bg-blue-700',
+        modifiers.range_end && 'bg-blue-600 text-white hover:bg-blue-700 rounded-md dark:bg-blue-700',
+        modifiers.range_middle && 'bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-100',
+
+        // 4. Unavailable styles (Red) - Only if not available AND not selected
+        !modifiers.available && !isSelected && !modifiers.disabled && !modifiers.outside && !modifiers.today &&
+        'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400 dark:hover:bg-red-950/40 border border-red-100 dark:border-red-950/50',
 
         // Today marker (if not selected)
         modifiers.today && !modifiers.selected &&

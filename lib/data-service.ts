@@ -469,6 +469,16 @@ export async function deleteAvailability(id: string): Promise<void> {
   }
 }
 
+export async function deleteAvailabilities(ids: string[]): Promise<void> {
+  try {
+    await apiClient.post("/availability/bulk-delete", { ids });
+  } catch (error) {
+    console.error("[data-service] Error deleting multiple availabilities:", error);
+    throw new Error("Erro ao excluir disponibilidades");
+  }
+}
+
+
 // --- JOB OFFERS ---
 
 /**

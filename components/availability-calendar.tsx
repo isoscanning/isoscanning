@@ -70,17 +70,11 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
                     className="p-0"
                     modifiers={{
                         available: (date) => availabilitySlots.some(slot =>
-                            slot.type === 'available' &&
-                            format(new Date(slot.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
-                        ),
-                        blocked: (date) => availabilitySlots.some(slot =>
-                            slot.type === 'blocked' &&
                             format(new Date(slot.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
                         ),
                     }}
                     modifiersClassNames={{
                         available: "bg-green-100 text-green-700 hover:bg-green-200 font-bold",
-                        blocked: "bg-red-100 text-red-700 hover:bg-red-200 font-bold opacity-100",
                     }}
                     classNames={{
                         month: "space-y-4",
@@ -91,7 +85,8 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
                         row: "flex w-full mt-2 justify-between",
                         cell: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
                         day: cn(
-                            "h-9 w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-gray-100 rounded-full"
+                            "h-9 w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-gray-100 rounded-full",
+                            // Apply red color to days that are NOT available and NOT outside current month
                         ),
                         day_selected:
                             "bg-blue-600 text-primary-foreground hover:bg-blue-600 hover:text-primary-foreground focus:bg-blue-600 focus:text-primary-foreground",
@@ -102,6 +97,29 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
                         day_range_middle:
                             "aria-selected:bg-accent aria-selected:text-accent-foreground",
                         day_hidden: "invisible",
+                    }}
+                    components={{
+                        DayButton: ({ day, modifiers, ...props }) => {
+                            const isAvailable = availabilitySlots.some(slot =>
+                                format(new Date(slot.date), 'yyyy-MM-dd') === format(day.date, 'yyyy-MM-dd')
+                            );
+                            const isOutside = modifiers.outside;
+                            const isToday = modifiers.today;
+
+                            return (
+                                <button
+                                    {...props}
+                                    className={cn(
+                                        "h-9 w-9 p-0 font-normal rounded-full transition-colors",
+                                        isAvailable && "bg-green-100 text-green-700 hover:bg-green-200 font-bold",
+                                        !isAvailable && !isOutside && !isToday && "bg-red-100 text-red-700 hover:bg-red-200",
+                                        isToday && !isAvailable && "border-2 border-blue-600",
+                                        modifiers.selected && "bg-blue-600 text-white hover:bg-blue-700",
+                                        isOutside && "text-muted-foreground opacity-50"
+                                    )}
+                                />
+                            );
+                        }
                     }}
                 />
 
@@ -117,17 +135,11 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
                         className="p-0"
                         modifiers={{
                             available: (date) => availabilitySlots.some(slot =>
-                                slot.type === 'available' &&
-                                format(new Date(slot.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
-                            ),
-                            blocked: (date) => availabilitySlots.some(slot =>
-                                slot.type === 'blocked' &&
                                 format(new Date(slot.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
                             ),
                         }}
                         modifiersClassNames={{
                             available: "bg-green-100 text-green-700 hover:bg-green-200 font-bold",
-                            blocked: "bg-red-100 text-red-700 hover:bg-red-200 font-bold opacity-100",
                         }}
                         classNames={{
                             month: "space-y-4",
@@ -150,6 +162,29 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
                                 "aria-selected:bg-accent aria-selected:text-accent-foreground",
                             day_hidden: "invisible",
                         }}
+                        components={{
+                            DayButton: ({ day, modifiers, ...props }) => {
+                                const isAvailable = availabilitySlots.some(slot =>
+                                    format(new Date(slot.date), 'yyyy-MM-dd') === format(day.date, 'yyyy-MM-dd')
+                                );
+                                const isOutside = modifiers.outside;
+                                const isToday = modifiers.today;
+
+                                return (
+                                    <button
+                                        {...props}
+                                        className={cn(
+                                            "h-9 w-9 p-0 font-normal rounded-full transition-colors",
+                                            isAvailable && "bg-green-100 text-green-700 hover:bg-green-200 font-bold",
+                                            !isAvailable && !isOutside && !isToday && "bg-red-100 text-red-700 hover:bg-red-200",
+                                            isToday && !isAvailable && "border-2 border-blue-600",
+                                            modifiers.selected && "bg-blue-600 text-white hover:bg-blue-700",
+                                            isOutside && "text-muted-foreground opacity-50"
+                                        )}
+                                    />
+                                );
+                            }
+                        }}
                     />
                 </div>
             </div>
@@ -163,24 +198,16 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
 
                         if (!selectedSlot) {
                             return (
-                                <div className="text-center text-gray-500">
-                                    <p className="font-medium">Nenhuma informação de disponibilidade para este dia.</p>
-                                </div>
-                            );
-                        }
-
-                        if (selectedSlot.type === 'blocked') {
-                            return (
                                 <div className="text-center">
                                     <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-full font-medium">
                                         <div className="w-2 h-2 rounded-full bg-red-600" />
-                                        Indisponível
+                                        Indisponível neste dia
                                     </div>
                                 </div>
                             );
                         }
 
-                        // Available slot
+                        // Available slot - show details
                         const isAllDay = selectedSlot.startTime === '00:00' && selectedSlot.endTime === '23:59';
 
                         return (

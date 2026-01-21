@@ -13,12 +13,13 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AlertCircle, CheckCircle2, Trash2, Plus, Calendar as CalendarIcon, Upload, ImageIcon, Eye, EyeOff, X, Globe, Camera } from "lucide-react"
+import { AlertCircle, CheckCircle2, Trash2, Plus, Calendar as CalendarIcon, Upload, ImageIcon, Eye, EyeOff, X, Globe, Camera, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -39,6 +40,7 @@ import {
   fetchAvailability,
   createAvailability,
   deleteAvailability,
+  deleteAvailabilities,
   fetchSpecialties,
   type PortfolioItem,
   type AvailabilitySlot,
@@ -91,6 +93,8 @@ export default function PerfilPage() {
   // Availability State
   const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([])
   const [selectedDates, setSelectedDates] = useState<Date[]>([])
+  const [lastClickedDate, setLastClickedDate] = useState<Date | null>(null)
+  const [selectedSlotsToDelete, setSelectedSlotsToDelete] = useState<string[]>([]) // For bulk deletion
   const [isAllDay, setIsAllDay] = useState(false)
   const [newSlot, setNewSlot] = useState({
     startTime: "09:00",
@@ -100,6 +104,7 @@ export default function PerfilPage() {
   // Loading States and Modals
   const [loadingPortfolio, setLoadingPortfolio] = useState(false)
   const [loadingAvailability, setLoadingAvailability] = useState(false)
+  const [deletingBulk, setDeletingBulk] = useState(false) // Specific loader for bulk delete
   const [savingProfile, setSavingProfile] = useState(false)
   const [showSaveSuccessModal, setShowSaveSuccessModal] = useState(false)
   const [showPublishModal, setShowPublishModal] = useState(false)
@@ -334,11 +339,18 @@ export default function PerfilPage() {
     setLoadingPortfolio(false)
   }
 
-  const loadAvailability = async () => {
+  const loadAvailability = async (preselectDates: boolean = true) => {
     if (!userProfile?.id) return
     setLoadingAvailability(true)
     const slots = await fetchAvailability(userProfile.id)
     setAvailabilitySlots(slots)
+
+    // Only pre-select dates on initial load, not after adding new availabilities
+    if (preselectDates) {
+      const existingDates = slots.map(slot => new Date(slot.date))
+      setSelectedDates(existingDates)
+    }
+
     setLoadingAvailability(false)
   }
 
@@ -649,8 +661,10 @@ export default function PerfilPage() {
         professionalId: userProfile.id
       })
 
-      await loadAvailability()
+      // Reload availability without pre-selecting dates to avoid duplication
+      await loadAvailability(false)
       setSelectedDates([])
+      setLastClickedDate(null)
       setSuccessMsg(`${dates.length} disponibilidade(s) adicionada(s)!`)
     } catch (err: any) {
       setErrorMsg("Erro ao adicionar disponibilidade.")
@@ -659,14 +673,116 @@ export default function PerfilPage() {
     }
   }
 
+  // Custom handler for date selection with Shift-click support
+  const handleDateSelect = (dates: Date[] | undefined) => {
+    if (!dates) {
+      setSelectedDates([])
+      setLastClickedDate(null)
+      return
+    }
+    setSelectedDates(dates)
+  }
+
+  // Handler for individual day clicks with Shift support
+  const handleDayClick = (day: Date, modifiers: any, e: React.MouseEvent) => {
+    if (modifiers.disabled) return
+
+    // If Shift is pressed and we have a last clicked date
+    if (e.shiftKey && lastClickedDate) {
+      const start = lastClickedDate < day ? lastClickedDate : day
+      const end = lastClickedDate < day ? day : start === day ? lastClickedDate : day
+
+      // Generate all dates in range
+      const dateRange: Date[] = []
+      const current = new Date(start)
+      while (current <= end) {
+        dateRange.push(new Date(current))
+        current.setDate(current.getDate() + 1)
+      }
+
+      // Merge with existing selected dates
+      const newSelectedDates = [...selectedDates]
+      dateRange.forEach(date => {
+        const exists = newSelectedDates.some(
+          selected => selected.toDateString() === date.toDateString()
+        )
+        if (!exists) {
+          newSelectedDates.push(date)
+        }
+      })
+
+      setSelectedDates(newSelectedDates)
+    } else {
+      // Normal click behavior - toggle selection
+      const isAlreadySelected = selectedDates.some(
+        selected => selected.toDateString() === day.toDateString()
+      )
+
+      if (isAlreadySelected) {
+        setSelectedDates(selectedDates.filter(
+          selected => selected.toDateString() !== day.toDateString()
+        ))
+      } else {
+        setSelectedDates([...selectedDates, day])
+      }
+    }
+
+    setLastClickedDate(day)
+  }
+
   const handleDeleteAvailability = async (id: string) => {
     try {
       setLoadingAvailability(true)
       await deleteAvailability(id)
-      await loadAvailability()
+      await loadAvailability(false) // Don't pre-select after delete
+      setSelectedSlotsToDelete(prev => prev.filter(slotId => slotId !== id)) // Remove from selection if deleted
     } catch (err) {
       setErrorMsg("Erro ao excluir disponibilidade.")
     } finally {
+      setLoadingAvailability(false)
+    }
+  }
+
+  // Toggle slot selection for bulk deletion
+  const toggleSlotSelection = (slotId: string) => {
+    setSelectedSlotsToDelete(prev =>
+      prev.includes(slotId)
+        ? prev.filter(id => id !== slotId)
+        : [...prev, slotId]
+    )
+  }
+
+  // Select all slots
+  const handleSelectAll = () => {
+    if (selectedSlotsToDelete.length === availabilitySlots.length) {
+      setSelectedSlotsToDelete([])
+    } else {
+      setSelectedSlotsToDelete(availabilitySlots.map(slot => slot.id))
+    }
+  }
+
+  // Bulk delete selected slots
+  const handleBulkDelete = async () => {
+    if (selectedSlotsToDelete.length === 0) return
+
+    if (!confirm(`Tem certeza que deseja excluir ${selectedSlotsToDelete.length} disponibilidade(s)?`)) {
+      return
+    }
+
+    try {
+      setDeletingBulk(true) // Show loader on button
+      setLoadingAvailability(true) // Also set general loading
+
+      // Delete all selected slots using bulk endpoint
+      await deleteAvailabilities(selectedSlotsToDelete)
+
+      await loadAvailability(false) // Don't pre-select after delete
+      setSelectedSlotsToDelete([])
+      setSuccessMsg(`${selectedSlotsToDelete.length} disponibilidade(s) excluída(s)!`)
+    } catch (err) {
+      setErrorMsg("Erro ao excluir disponibilidades.")
+    } finally {
+      setDeletingBulk(false)
       setLoadingAvailability(false)
     }
   }
@@ -1195,7 +1311,8 @@ export default function PerfilPage() {
                         <Calendar
                           mode="multiple"
                           selected={selectedDates}
-                          onSelect={(dates) => setSelectedDates(dates || [])}
+                          onSelect={handleDateSelect}
+                          onDayClick={handleDayClick}
                           locale={ptBR}
                           className="rounded-md"
                         />
@@ -1254,7 +1371,42 @@ export default function PerfilPage() {
 
                     {/* Slots List */}
                     <div className="space-y-4">
-                      <h4 className="font-medium">Datas Disponíveis</h4>
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium">Datas Disponíveis</h4>
+                        {availabilitySlots.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleSelectAll}
+                              className="text-xs"
+                            >
+                              {selectedSlotsToDelete.length === availabilitySlots.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                            </Button>
+                            {selectedSlotsToDelete.length > 0 && (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={handleBulkDelete}
+                                disabled={deletingBulk}
+                                className="text-xs"
+                              >
+                                {deletingBulk ? (
+                                  <>
+                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                    Excluindo...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Trash2 className="h-3 w-3 mr-1" />
+                                    Excluir ({selectedSlotsToDelete.length})
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                       <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
                         {availabilitySlots.length === 0 ? (
                           <p className="text-muted-foreground">Nenhuma disponibilidade cadastrada.</p>
@@ -1262,8 +1414,12 @@ export default function PerfilPage() {
                           availabilitySlots
                             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
                             .map((slot) => (
-                              <div key={slot.id} className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors">
-                                <div className="flex items-center gap-3">
+                              <div key={slot.id} className="flex items-center gap-3 p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors">
+                                <Checkbox
+                                  checked={selectedSlotsToDelete.includes(slot.id)}
+                                  onCheckedChange={() => toggleSlotSelection(slot.id)}
+                                />
+                                <div className="flex items-center gap-3 flex-1">
                                   <CalendarIcon className="h-5 w-5 text-primary" />
                                   <div>
                                     <p className="font-medium">

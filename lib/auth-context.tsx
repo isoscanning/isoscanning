@@ -23,6 +23,8 @@ export interface UserProfile {
   email: string;
   displayName: string;
   userType: "client" | "professional";
+  username?: string;
+  cpf?: string;
   phone?: string;
   phoneCountryCode?: string;
   city?: string;
@@ -53,6 +55,7 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<void>;
   getRedirectUrl: () => string | null;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
+  updateUserAuth: (attributes: { password?: string; email?: string; data?: any }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -284,6 +287,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  const updateUserAuth = async (attributes: { password?: string; email?: string; data?: any }) => {
+    try {
+      const { error } = await supabase.auth.updateUser(attributes);
+      if (error) throw error;
+      console.log("[auth-context] User auth updated successfully");
+    } catch (error) {
+      console.error("[auth-context] Update user auth error:", error);
+      throw error;
+    }
+  };
+
   const isAnonymous = !userProfile;
 
   const value: AuthContextType = {
@@ -297,6 +311,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     resetPassword,
     getRedirectUrl,
     updateProfile,
+    updateUserAuth,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

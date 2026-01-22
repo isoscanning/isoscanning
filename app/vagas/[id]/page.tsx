@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { fetchJobOfferById, type JobOffer, checkJobApplication, applyToJob } from "@/lib/data-service";
+import apiClient from "@/lib/api-service";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion } from "framer-motion";
@@ -50,6 +51,7 @@ export default function DetalhesVagaPage() {
     const [loading, setLoading] = useState(true);
     const [hasApplied, setHasApplied] = useState(false);
     const [applying, setApplying] = useState(false);
+    const [employerStats, setEmployerStats] = useState<{ averageRating: number; totalReviews: number }>({ averageRating: 0, totalReviews: 0 });
 
     useEffect(() => {
         const loadData = async () => {
@@ -57,6 +59,19 @@ export default function DetalhesVagaPage() {
             try {
                 const vagaData = await fetchJobOfferById(params.id as string);
                 setVaga(vagaData);
+
+                // Fetch employer review stats
+                if (vagaData?.employerId) {
+                    try {
+                        const statsRes = await apiClient.get(`/reviews/stats/${vagaData.employerId}`);
+                        setEmployerStats({
+                            averageRating: statsRes.data.averageRating || 0,
+                            totalReviews: statsRes.data.totalReviews || 0,
+                        });
+                    } catch (e) {
+                        console.error("Error fetching employer stats:", e);
+                    }
+                }
 
                 if (userProfile) {
                     const applied = await checkJobApplication(params.id as string, userProfile.id);
@@ -165,6 +180,16 @@ export default function DetalhesVagaPage() {
             hybrid: "Híbrido",
         };
         return types[type] || type;
+    };
+
+    const formatMemberSince = (dateString?: string) => {
+        if (!dateString) return "";
+        const date = new Date(dateString);
+        const months = [
+            "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+            "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
+        ];
+        return `${months[date.getMonth()]} de ${date.getFullYear()}`;
     };
 
     if (loading) {
@@ -317,9 +342,15 @@ export default function DetalhesVagaPage() {
                                                 <h3 className="text-lg font-bold text-foreground">{vaga.employerName}</h3>
                                                 <div className="flex items-center text-sm text-yellow-500 mt-0.5">
                                                     <Star className="h-4 w-4 fill-current" />
-                                                    <span className="ml-1 font-medium text-foreground">4.9</span>
-                                                    <span className="mx-1 text-muted-foreground">•</span>
-                                                    <span className="text-muted-foreground">12 avaliações</span>
+                                                    <span className="ml-1 font-medium text-foreground">
+                                                        {employerStats.averageRating > 0 ? employerStats.averageRating.toFixed(1) : "—"}
+                                                    </span>
+                                                    {employerStats.totalReviews > 0 && (
+                                                        <>
+                                                            <span className="mx-1 text-muted-foreground">•</span>
+                                                            <span className="text-muted-foreground">{employerStats.totalReviews} avaliações</span>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                             <Button variant="outline" size="sm" asChild>
@@ -328,9 +359,10 @@ export default function DetalhesVagaPage() {
                                                 </Link>
                                             </Button>
                                         </div>
-                                        <p className="text-sm text-muted-foreground line-clamp-2">
-                                            Membro ativo da plataforma desde {vaga.employerCreatedAt ? new Date(vaga.employerCreatedAt).getFullYear() : "2024"}.
-                                            Comprometido com a qualidade e pontualidade nos projetos.
+                                        <p className="text-sm text-muted-foreground">
+                                            {vaga.employerCreatedAt
+                                                ? `Membro ativo da plataforma desde ${formatMemberSince(vaga.employerCreatedAt)}.`
+                                                : "Membro ativo da plataforma."}
                                         </p>
                                     </div>
                                 </div>
@@ -409,20 +441,7 @@ export default function DetalhesVagaPage() {
                                 </CardContent>
                             </Card>
 
-                            {/* Safety/Info Card - NEUTRALIZED COLORS */}
-                            <Card className="bg-muted/50 border-none shadow-none">
-                                <CardContent className="p-4 flex gap-3">
-                                    <div className="mt-1">
-                                        <CheckCircle2 className="h-5 w-5 text-muted-foreground" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-medium text-foreground">Pagamento Garantido</p>
-                                        <p className="text-xs text-muted-foreground">
-                                            O pagamento é liberado apenas após a conclusão satisfatória do trabalho.
-                                        </p>
-                                    </div>
-                                </CardContent>
-                            </Card>
+
                         </div>
                     </div>
                 </div>

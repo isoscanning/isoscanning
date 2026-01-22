@@ -73,9 +73,19 @@ export default function DashboardPage() {
       if (!userProfile) return;
 
       try {
-        // Set profile stats
-        const rating = userProfile.averageRating || 0; // The average rating is stored in profile but often dependent on separate sync in some systems. Using profile data for now.
-        const reviews = userProfile.totalReviews || 0;
+        // Fetch review stats from API
+        let rating = 0;
+        let reviews = 0;
+        try {
+          const statsRes = await apiClient.get(`/reviews/stats/${userProfile.id}`);
+          rating = statsRes.data.averageRating || 0;
+          reviews = statsRes.data.totalReviews || 0;
+        } catch (e) {
+          console.error("Error fetching review stats", e);
+          // Fallback to profile data if endpoint fails
+          rating = userProfile.averageRating || 0;
+          reviews = userProfile.totalReviews || 0;
+        }
 
         // Fetch requests count
         let requestsCount = 0;

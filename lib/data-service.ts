@@ -537,12 +537,12 @@ export const updateJobStatus = async (jobId: string, status: 'open' | 'paused' |
   try {
     // Also update isActive for backward compatibility
     const isActive = status === 'open';
-    
+
     const { error } = await supabase
       .from('job_offers')
-      .update({ 
-        status, 
-        is_active: isActive 
+      .update({
+        status,
+        is_active: isActive
       })
       .eq('id', jobId);
 
@@ -562,12 +562,12 @@ export const bulkUpdateJobStatus = async (jobIds: string[], status: 'open' | 'pa
   try {
     // Also update isActive for backward compatibility
     const isActive = status === 'open';
-    
+
     const { error } = await supabase
       .from('job_offers')
-      .update({ 
-        status, 
-        is_active: isActive 
+      .update({
+        status,
+        is_active: isActive
       })
       .in('id', jobIds);
 
@@ -670,6 +670,7 @@ export interface JobApplication {
   jobOffer: {
     id: string;
     title: string;
+    employerId: string;
     employerName: string;
     city?: string;
     state?: string;
@@ -691,6 +692,7 @@ export const fetchUserApplications = async (userId: string): Promise<JobApplicat
         job_offers (
           id,
           title,
+          employer_id,
           employer_name,
           city,
           state,
@@ -715,6 +717,7 @@ export const fetchUserApplications = async (userId: string): Promise<JobApplicat
       jobOffer: {
         id: app.job_offers.id,
         title: app.job_offers.title,
+        employerId: app.job_offers.employer_id,
         employerName: app.job_offers.employer_name,
         city: app.job_offers.city,
         state: app.job_offers.state,

@@ -8,7 +8,7 @@ import { Footer } from "@/components/footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Briefcase, MapPin, Clock, Building2, ChevronRight, Loader2 } from "lucide-react";
+import { Briefcase, MapPin, Clock, Building2, ChevronRight, Loader2, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -139,8 +139,8 @@ export default function MinhasCandidaturasPage() {
                                             </div>
                                         </div>
 
-                                        <div className="flex flex-col items-end gap-4 min-w-[140px]">
-                                            <div className="hidden md:flex flex-col items-end gap-1">
+                                        <div className="flex flex-col items-end gap-3 min-w-[140px]">
+                                            <div className="hidden md:flex flex-col items-end gap-1 mb-1">
                                                 {getStatusBadge(app.status)}
                                                 <span className="text-xs text-muted-foreground mt-1">
                                                     Candidatado em {format(new Date(app.createdAt), "d 'de' MMM", { locale: ptBR })}
@@ -151,6 +151,14 @@ export default function MinhasCandidaturasPage() {
                                                     Ver Detalhes <ChevronRight className="ml-2 h-4 w-4" />
                                                 </Link>
                                             </Button>
+
+                                            {app.status === 'accepted' && (
+                                                <Button size="sm" className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white shadow-sm" asChild>
+                                                    <Link href={`/profissionais/${app.jobOffer.employerId}`}>
+                                                        Entrar em Contato <MessageSquare className="ml-2 h-4 w-4" />
+                                                    </Link>
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
                                 </CardContent>

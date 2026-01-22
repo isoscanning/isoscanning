@@ -34,6 +34,8 @@ export interface UserProfile {
   description?: string;
   portfolioLink?: string;
   avatarUrl?: string;
+  averageRating?: number;
+  totalReviews?: number;
   isActive: boolean;
   isPublished: boolean;
   createdAt: Date;
@@ -83,21 +85,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (typeof window === "undefined") return;
 
         const token = localStorage.getItem("auth_token");
-        const savedProfile = localStorage.getItem("user_profile");
+
+        if (!token) {
+          setLoading(false);
+          return;
+        }
 
         let profile: UserProfile | null = null;
 
-        if (savedProfile && token) {
-          // Load profile from localStorage first
-          console.log("[auth-context] Loading profile from localStorage...");
-          profile = JSON.parse(savedProfile);
-        } else if (token) {
-          // If no saved profile, fetch from API
-          console.log("[auth-context] Token found, fetching profile...");
+        // Always fetch fresh data from API when we have a token
+        // This ensures we have the most up-to-date profile data
+        try {
+          console.log("[auth-context] Token found, fetching profile from API...");
           const response = await apiClient.get("/auth/me");
           profile = response.data;
           localStorage.setItem("user_profile", JSON.stringify(response.data));
-          console.log("[auth-context] Profile loaded successfully");
+          console.log("[auth-context] Profile loaded from API successfully");
+        } catch (apiError) {
+          console.error("[auth-context] Error fetching from API, falling back to localStorage:", apiError);
+          // Fallback to localStorage only if API fails
+          const savedProfile = localStorage.getItem("user_profile");
+          if (savedProfile) {
+            profile = JSON.parse(savedProfile);
+            console.log("[auth-context] Using cached profile from localStorage");
+          }
         }
 
         // Enrich with Google Data if missing info

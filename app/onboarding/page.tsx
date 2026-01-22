@@ -49,9 +49,7 @@ const step2Schema = z.object({
 
 // Schema for Step 3: Verification Method
 const step3Schema = z.object({
-    method: z.enum(["totp", "email"], {
-        required_error: "Selecione um método de verificação",
-    }),
+    method: z.enum(["totp", "email"]),
 });
 
 // Schema for Step 4: Verification Code
@@ -215,6 +213,45 @@ export default function OnboardingPage() {
         }
     };
 
+    const handleFinalizeRegistration = async () => {
+        const step1Values = form1.getValues();
+        const step2Values = form2.getValues();
+
+        await updateUserAuth({
+            password: step1Values.password,
+        });
+
+        await updateProfile({
+            username: step1Values.username,
+            cpf: step1Values.cpf.replace(/\D/g, ""),
+            phone: step2Values.phone.replace(/\D/g, ""),
+            phoneCountryCode: "55",
+        });
+
+        toast({
+            title: "Cadastro concluído!",
+            description: "Bem-vindo ao IsoScanning.",
+        });
+
+        router.push("/dashboard");
+    };
+
+    const onSkip2FA = async () => {
+        setIsSubmitting(true);
+        try {
+            await handleFinalizeRegistration();
+        } catch (error) {
+            console.error("Error skipping 2FA:", error);
+            toast({
+                variant: "destructive",
+                title: "Erro ao finalizar cadastro",
+                description: "Tente novamente.",
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const onStep4Submit = async (values: z.infer<typeof step4Schema>) => {
         setIsSubmitting(true);
         try {
@@ -241,27 +278,7 @@ export default function OnboardingPage() {
                 if (verify.error) throw verify.error;
             }
 
-            // Save Profile Data
-            const step1Values = form1.getValues();
-            const step2Values = form2.getValues();
-
-            await updateUserAuth({
-                password: step1Values.password,
-            });
-
-            await updateProfile({
-                username: step1Values.username,
-                cpf: step1Values.cpf.replace(/\D/g, ""),
-                phone: step2Values.phone.replace(/\D/g, ""),
-                phoneCountryCode: "55",
-            });
-
-            toast({
-                title: "Cadastro concluído!",
-                description: "Bem-vindo ao IsoScanning.",
-            });
-
-            router.push("/dashboard");
+            await handleFinalizeRegistration();
         } catch (error) {
             console.error("Verification error:", error);
             toast({
@@ -283,38 +300,38 @@ export default function OnboardingPage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-            <Card className="w-full max-w-lg">
-                <CardHeader>
-                    <CardTitle className="text-2xl text-center">Complete seu Cadastro</CardTitle>
-                    <CardDescription className="text-center">
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-2 sm:p-4">
+            <Card className="w-full max-w-lg shadow-sm">
+                <CardHeader className="px-4 sm:px-6 py-4 sm:py-6">
+                    <CardTitle className="text-xl sm:text-2xl text-center">Complete seu Cadastro</CardTitle>
+                    <CardDescription className="text-center text-sm sm:text-base">
                         {step >= 3
                             ? "Escolha como deseja proteger sua conta."
                             : "Precisamos de algumas informações adicionais para garantir a segurança da sua conta."}
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-4 sm:px-6 py-4 sm:py-6">
                     {/* Stepper */}
-                    <div className="flex items-center justify-center mb-8">
+                    <div className="flex items-center justify-center mb-6 sm:mb-8">
                         <div className={`flex items-center ${step >= 1 ? "text-primary" : "text-gray-400"}`}>
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step >= 1 ? "border-primary bg-primary text-white" : "border-gray-300"}`}>
+                            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 text-xs sm:text-sm ${step >= 1 ? "border-primary bg-primary text-white" : "border-gray-300"}`}>
                                 1
                             </div>
-                            <span className="ml-2 font-medium hidden sm:inline">Conta</span>
+                            <span className="ml-1 sm:ml-2 text-xs sm:text-sm font-medium hidden sm:inline">Conta</span>
                         </div>
-                        <div className={`w-8 sm:w-16 h-1 mx-2 ${step >= 2 ? "bg-primary" : "bg-gray-200"}`} />
+                        <div className={`w-6 sm:w-16 h-1 mx-1 sm:mx-2 ${step >= 2 ? "bg-primary" : "bg-gray-200"}`} />
                         <div className={`flex items-center ${step >= 2 ? "text-primary" : "text-gray-400"}`}>
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step >= 2 ? "border-primary bg-primary text-white" : "border-gray-300"}`}>
+                            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 text-xs sm:text-sm ${step >= 2 ? "border-primary bg-primary text-white" : "border-gray-300"}`}>
                                 2
                             </div>
-                            <span className="ml-2 font-medium hidden sm:inline">Contato</span>
+                            <span className="ml-1 sm:ml-2 text-xs sm:text-sm font-medium hidden sm:inline">Contato</span>
                         </div>
-                        <div className={`w-8 sm:w-16 h-1 mx-2 ${step >= 3 ? "bg-primary" : "bg-gray-200"}`} />
+                        <div className={`w-6 sm:w-16 h-1 mx-1 sm:mx-2 ${step >= 3 ? "bg-primary" : "bg-gray-200"}`} />
                         <div className={`flex items-center ${step >= 3 ? "text-primary" : "text-gray-400"}`}>
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step >= 3 ? "border-primary bg-primary text-white" : "border-gray-300"}`}>
+                            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 text-xs sm:text-sm ${step >= 3 ? "border-primary bg-primary text-white" : "border-gray-300"}`}>
                                 3
                             </div>
-                            <span className="ml-2 font-medium hidden sm:inline">Segurança</span>
+                            <span className="ml-1 sm:ml-2 text-xs sm:text-sm font-medium hidden sm:inline">Segurança</span>
                         </div>
                     </div>
 
@@ -412,7 +429,7 @@ export default function OnboardingPage() {
                                     )}
                                 />
 
-                                <Button type="submit" className="w-full">
+                                <Button type="submit" className="w-full h-11 sm:h-10 text-sm sm:text-base">
                                     Próximo
                                 </Button>
                             </form>
@@ -447,11 +464,11 @@ export default function OnboardingPage() {
                                     )}
                                 />
 
-                                <div className="flex gap-2">
-                                    <Button type="button" variant="outline" onClick={() => setStep(1)} className="flex-1">
+                                <div className="flex flex-col sm:flex-row gap-2 sm:gap-2">
+                                    <Button type="button" variant="outline" onClick={() => setStep(1)} className="w-full sm:flex-1 h-11 sm:h-10 text-sm sm:text-base">
                                         Voltar
                                     </Button>
-                                    <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                                    <Button type="submit" className="w-full sm:flex-1 h-11 sm:h-10 text-sm sm:text-base" disabled={isSubmitting}>
                                         {isSubmitting ? (
                                             <>
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparando...
@@ -514,13 +531,25 @@ export default function OnboardingPage() {
                                     )}
                                 />
 
-                                <div className="flex gap-2">
-                                    <Button type="button" variant="outline" onClick={() => setStep(2)} className="flex-1">
-                                        Voltar
-                                    </Button>
-                                    <Button type="submit" className="flex-1">
-                                        Continuar
-                                    </Button>
+                                <div className="space-y-4 sm:space-y-6">
+                                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-2">
+                                        <Button type="button" variant="outline" onClick={() => setStep(2)} className="w-full sm:flex-1 h-11 sm:h-10 text-sm sm:text-base">
+                                            Voltar
+                                        </Button>
+                                        <Button type="submit" className="w-full sm:flex-1 h-11 sm:h-10 text-sm sm:text-base">
+                                            Continuar
+                                        </Button>
+                                    </div>
+                                    <div className="flex justify-center">
+                                        <button
+                                            type="button"
+                                            className="text-sm sm:text-base text-gray-400 hover:text-primary transition-colors py-2"
+                                            onClick={onSkip2FA}
+                                            disabled={isSubmitting}
+                                        >
+                                            Configurar mais tarde
+                                        </button>
+                                    </div>
                                 </div>
                             </form>
                         </Form>
@@ -599,11 +628,11 @@ export default function OnboardingPage() {
                                     )}
                                 />
 
-                                <div className="flex gap-2">
-                                    <Button type="button" variant="outline" onClick={() => setStep(3)} className="flex-1">
+                                <div className="flex flex-col sm:flex-row gap-2 sm:gap-2">
+                                    <Button type="button" variant="outline" onClick={() => setStep(3)} className="w-full sm:flex-1 h-11 sm:h-10 text-sm sm:text-base">
                                         Voltar
                                     </Button>
-                                    <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                                    <Button type="submit" className="w-full sm:flex-1 h-11 sm:h-10 text-sm sm:text-base" disabled={isSubmitting}>
                                         {isSubmitting ? (
                                             <>
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verificando...

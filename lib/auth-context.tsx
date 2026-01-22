@@ -289,8 +289,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const updateUserAuth = async (attributes: { password?: string; email?: string; data?: any }) => {
     try {
-      const { error } = await supabase.auth.updateUser(attributes);
+      const { data, error } = await supabase.auth.updateUser(attributes);
       if (error) throw error;
+
+      // If we got a new session/token (e.g. after password change), update localStorage
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        localStorage.setItem("auth_token", session.access_token);
+        console.log("[auth-context] auth_token refreshed after user update");
+      }
+
       console.log("[auth-context] User auth updated successfully");
     } catch (error) {
       console.error("[auth-context] Update user auth error:", error);

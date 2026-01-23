@@ -408,6 +408,8 @@ export default function DashboardPage() {
               </ScrollReveal>
               {/* END: My Applications Card */}
 
+
+
             </div>
           </div>
         </div>

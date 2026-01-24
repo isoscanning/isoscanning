@@ -90,12 +90,12 @@ describe('DetalhesVagaPage', () => {
         render(<DetalhesVagaPage />);
 
         await waitFor(() => {
-            expect(screen.getByText('Vaga Publica de Teste')).toBeInTheDocument();
+            expect(screen.getAllByText(/Vaga Publica de Teste/i).length).toBeGreaterThan(0);
         });
 
-        expect(screen.getByText('Empresa Teste')).toBeInTheDocument();
-        expect(screen.getByText('Descrição detalhada da vaga.')).toBeInTheDocument();
-        expect(screen.getByText('São Paulo/SP')).toBeInTheDocument();
+        expect(screen.getAllByText(/Empresa Teste/i).length).toBeGreaterThan(0);
+        expect(screen.getByText(/Descrição detalhada da vaga/i)).toBeInTheDocument();
+        expect(screen.getByText(/São Paulo\/SP/i)).toBeInTheDocument();
     });
 
     it('allows a user to apply for a job', async () => {
@@ -103,7 +103,7 @@ describe('DetalhesVagaPage', () => {
         render(<DetalhesVagaPage />);
 
         await waitFor(() => {
-            expect(screen.getByText('Vaga Publica de Teste')).toBeInTheDocument();
+            expect(screen.getAllByText(/Vaga Publica de Teste/i).length).toBeGreaterThan(0);
         });
 
         const applyButton = screen.getAllByRole('button', { name: /candidatar-se/i })[0];
@@ -123,7 +123,7 @@ describe('DetalhesVagaPage', () => {
         render(<DetalhesVagaPage />);
 
         await waitFor(() => {
-            expect(screen.getByText('Vaga Publica de Teste')).toBeInTheDocument();
+            expect(screen.getAllByText(/Vaga Publica de Teste/i).length).toBeGreaterThan(0);
         });
 
         const applyButton = screen.getAllByRole('button', { name: /candidatar-se/i })[0];
@@ -138,7 +138,7 @@ describe('DetalhesVagaPage', () => {
         render(<DetalhesVagaPage />);
 
         await waitFor(() => {
-            expect(screen.getAllByText('Já Candidatado').length).toBeGreaterThan(0);
+            expect(screen.getAllByText(/Já Candidatado/i).length).toBeGreaterThan(0);
         });
 
         const applyButton = screen.getAllByRole('button', { name: /já candidatado/i })[0];

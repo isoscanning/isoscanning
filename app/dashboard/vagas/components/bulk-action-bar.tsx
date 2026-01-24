@@ -109,7 +109,7 @@ export function BulkActionBar({
                         <div className="hidden md:flex items-center justify-between gap-4">
                             <div className="flex items-center gap-4">
                                 <span className="font-medium text-base whitespace-nowrap">
-                                    {selectedIds.length} item{selectedIds.length > 1 ? 's' : ''} selecionado{selectedIds.length > 1 ? 's' : ''}
+                                    {selectedIds.length} {selectedIds.length > 1 ? 'itens selecionados' : 'item selecionado'}
                                 </span>
                                 <div className="h-4 w-px bg-background/20" />
                                 <Button

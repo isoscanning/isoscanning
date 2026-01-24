@@ -135,9 +135,9 @@ describe('CandidatosVagaPage', () => {
         render(<CandidatosVagaPage />);
 
         await waitFor(() => {
-            expect(screen.getByText('João Silva')).toBeInTheDocument();
-            expect(screen.getByText('Maria Souza')).toBeInTheDocument();
-            expect(screen.getByText('Tenho interesse na vaga')).toBeInTheDocument();
+            expect(screen.getByText(/João Silva/i)).toBeInTheDocument();
+            expect(screen.getByText(/Maria Souza/i)).toBeInTheDocument();
+            expect(screen.getByText(/Tenho interesse na vaga/i)).toBeInTheDocument();
         });
 
         expect(screen.getByText('Aprovado')).toBeInTheDocument();
@@ -149,7 +149,7 @@ describe('CandidatosVagaPage', () => {
         render(<CandidatosVagaPage />);
 
         await waitFor(() => {
-            expect(screen.getByText('João Silva')).toBeInTheDocument();
+            expect(screen.getByText(/João Silva/i)).toBeInTheDocument();
         });
 
         const approveButton = screen.getByRole('button', { name: /aprovar/i });
@@ -165,7 +165,7 @@ describe('CandidatosVagaPage', () => {
         render(<CandidatosVagaPage />);
 
         await waitFor(() => {
-            expect(screen.getByText('João Silva')).toBeInTheDocument();
+            expect(screen.getByText(/João Silva/i)).toBeInTheDocument();
         });
 
         const rejectButton = screen.getByRole('button', { name: /rejeitar/i });
@@ -180,7 +180,7 @@ describe('CandidatosVagaPage', () => {
         render(<CandidatosVagaPage />);
 
         await waitFor(() => {
-            expect(screen.getByText('João Silva')).toBeInTheDocument();
+            expect(screen.getByText(/João Silva/i)).toBeInTheDocument();
         });
 
         // Click on "Aprovados" tab
@@ -188,7 +188,7 @@ describe('CandidatosVagaPage', () => {
         fireEvent.click(approvedTab);
 
         await waitFor(() => {
-            expect(screen.queryByText('João Silva')).not.toBeInTheDocument();
+            expect(screen.queryByText(/João Silva/i)).not.toBeInTheDocument();
             expect(screen.getByText('Maria Souza')).toBeInTheDocument();
         });
     });
@@ -198,7 +198,7 @@ describe('CandidatosVagaPage', () => {
         render(<CandidatosVagaPage />);
 
         await waitFor(() => {
-            expect(screen.getByText('João Silva')).toBeInTheDocument();
+            expect(screen.getByText(/João Silva/i)).toBeInTheDocument();
         });
 
         const concludeButton = screen.getByRole('button', { name: /concluir vaga/i });

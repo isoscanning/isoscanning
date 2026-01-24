@@ -164,8 +164,10 @@ describe('MinhasVagasPage', () => {
         fireEvent.click(dropdownTriggers[0]);
 
         // Now click delete
-        const deleteButton = screen.getByText('Excluir Vaga');
-        fireEvent.click(deleteButton);
+        // Since our mocks render all dropdown contents, we need to pick the specific one for this job.
+        // Or simply pick the first one found.
+        const deleteButtons = screen.getAllByText('Excluir Vaga');
+        fireEvent.click(deleteButtons[0]);
 
         // Verify modal is open
         expect(screen.getByText(/Você tem certeza\?/i)).toBeInTheDocument();
@@ -217,8 +219,10 @@ describe('MinhasVagasPage', () => {
         expect(screen.getByText('2 itens selecionados')).toBeInTheDocument();
 
         // Try a bulk action like 'Pausar'
-        const pauseBulkButton = screen.getByRole('button', { name: /pausar/i });
-        fireEvent.click(pauseBulkButton);
+        // Try a bulk action like 'Pausar'
+        // Note: The bulk action bar renders both mobile and desktop versions (hidden via CSS), so we get multiple buttons.
+        const pauseBulkButtons = screen.getAllByRole('button', { name: /pausar/i });
+        fireEvent.click(pauseBulkButtons[0]);
 
         await waitFor(() => {
             // bulkUpdateJobStatus specifically

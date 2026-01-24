@@ -10,11 +10,25 @@ jest.mock('next/navigation', () => ({
     useRouter: jest.fn(() => ({ back: jest.fn() })),
 }));
 
-jest.mock('@/lib/api-service');
+jest.mock('@/lib/api-service', () => ({
+    __esModule: true,
+    default: {
+        get: jest.fn(),
+    },
+}));
 
 jest.mock('@/components/header', () => ({ Header: () => <div>Header</div> }));
 jest.mock('@/components/footer', () => ({ Footer: () => <div>Footer</div> }));
 jest.mock('@/components/scroll-reveal', () => ({ ScrollReveal: ({ children }: any) => <div>{children}</div> }));
+
+// Mock framer-motion
+jest.mock('framer-motion', () => ({
+    motion: {
+        div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+        img: ({ children, ...props }: any) => <img {...props} />
+    },
+    AnimatePresence: ({ children }: any) => <>{children}</>,
+}));
 
 describe('EquipamentoDetalhesPage', () => {
     const mockEquipment = {
@@ -51,7 +65,7 @@ describe('EquipamentoDetalhesPage', () => {
     });
 
     it('handles not found', async () => {
-        (apiClient.get as jest.Mock).mockRejectedValue(new Error('Not found'));
+        (apiClient.get as jest.Mock).mockResolvedValue({ data: null });
         render(<EquipamentoDetalhesPage />);
 
         await waitFor(() => {

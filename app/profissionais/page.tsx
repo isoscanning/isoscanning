@@ -1,79 +1,36 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MapPin, Star, Search, Users, Filter, ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
-import { fetchProfessionals, fetchSpecialties, type Professional, type Specialty } from "@/lib/data-service";
 import { SearchBar } from "@/components/search-bar";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { CountUp } from "@/components/typing-text";
-import { motion } from "framer-motion";
+import { useProfessionals } from "./hooks/use-professionals";
+import { ProfessionalCard } from "./components/professional-card";
 
 export default function ProfissionaisPage() {
-  const [professionals, setProfessionals] = useState<Professional[]>([]);
-  const [availableSpecialties, setAvailableSpecialties] = useState<string[]>(["Todos"]);
-  const [loading, setLoading] = useState(true);
-
-  // Filters
-  const [selectedSpecialty, setSelectedSpecialty] = useState("Todos");
-  const [selectedCity, setSelectedCity] = useState("");
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
-
-  useEffect(() => {
-    loadSpecialties();
-    loadProfessionals();
-  }, []);
-
-  const loadSpecialties = async () => {
-    const data = await fetchSpecialties();
-    const names = data.map(s => s.name);
-    setAvailableSpecialties(["Todos", ...names]);
-  };
-
-  const loadProfessionals = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchProfessionals();
-      setProfessionals(data as any);
-    } catch (error) {
-      console.error("[v0] Error loading professionals:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSearch = (filters: {
-    city: string;
-    date: Date | undefined;
-    specialty: string;
-  }) => {
-    setSelectedCity(filters.city);
-    setSelectedDate(filters.date);
-    setSelectedSpecialty(filters.specialty);
-  };
-
-  const filteredProfessionals = professionals.filter((prof) => {
-    const matchesSpecialty =
-      selectedSpecialty === "Todos" || prof.specialty === selectedSpecialty;
-
-    const matchesCity =
-      selectedCity === "" ||
-      prof.city?.toLowerCase().includes(selectedCity.toLowerCase());
-
-    return matchesSpecialty && matchesCity;
-  });
+  const {
+    availableSpecialties,
+    loading,
+    selectedSpecialty,
+    selectedCity,
+    filteredProfessionals,
+    handleSearch,
+    setSelectedCity,
+    setSelectedSpecialty,
+    setSelectedDate
+  } = useProfessionals();
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
 
       <main className="flex-1">
-        {/* Hero Section */}
+        {/* --- Hero Section --- */}
         <section className="relative py-20 md:py-28 overflow-hidden">
           {/* Gradient Background */}
           <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50/50 to-pink-50 dark:from-blue-950/30 dark:via-purple-950/20 dark:to-pink-950/30" />
@@ -139,7 +96,7 @@ export default function ProfissionaisPage() {
           </div>
         </section>
 
-        {/* Results Section */}
+        {/* --- Results Section --- */}
         <section className="py-16 px-4 bg-muted/30 dark:bg-muted/10">
           <div className="container mx-auto max-w-7xl">
             {/* Results Header */}
@@ -231,93 +188,14 @@ export default function ProfissionaisPage() {
               /* Professional Cards Grid */
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredProfessionals.map((prof, index) => (
-                  <motion.div
-                    key={prof.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: index * 0.1 }}
-                  >
-                    <Card className="group hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 border-2 hover:border-primary/30 overflow-hidden bg-card h-full">
-                      <CardContent className="p-0">
-                        <Link href={`/profissionais/${prof.id}`}>
-                          {/* Image Area */}
-                          <div className="relative h-72 bg-gradient-to-br from-muted to-muted/50 overflow-hidden">
-                            <Avatar className="h-full w-full rounded-none">
-                              <AvatarImage
-                                src={prof.avatarUrl || undefined}
-                                alt={prof.displayName}
-                                className="object-cover group-hover:scale-110 transition-transform duration-700"
-                              />
-                              <AvatarFallback className="text-4xl bg-gradient-to-br from-primary/20 to-purple-500/20 text-primary rounded-none h-full w-full flex items-center justify-center">
-                                {prof.displayName?.charAt(0).toUpperCase() || "P"}
-                              </AvatarFallback>
-                            </Avatar>
-
-                            {/* Gradient Overlay */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-                            {/* Availability Badge */}
-                            <div className="absolute top-4 right-4">
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-500/90 backdrop-blur-sm text-white text-xs font-bold rounded-full uppercase tracking-wide shadow-lg">
-                                <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                                Disponível
-                              </span>
-                            </div>
-
-                            {/* View Profile Overlay */}
-                            <div className="absolute inset-x-0 bottom-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-                              <span className="inline-flex items-center gap-2 text-white font-medium">
-                                Ver Perfil Completo
-                                <ArrowRight className="h-4 w-4" />
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Content */}
-                          <div className="p-6">
-                            <div className="mb-3">
-                              <h3 className="font-bold text-xl text-foreground mb-1 group-hover:text-primary transition-colors">
-                                {prof.artisticName || prof.displayName}
-                              </h3>
-                              <p className="text-sm font-medium text-primary">
-                                {prof.specialty || "Profissional"}
-                              </p>
-                            </div>
-
-                            {prof.description && (
-                              <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                                {prof.description}
-                              </p>
-                            )}
-
-                            {/* Footer */}
-                            <div className="flex items-center justify-between pt-4 border-t">
-                              <div className="flex items-center gap-2">
-                                {prof.city && (
-                                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                    <MapPin className="h-3 w-3" />
-                                    {prof.city}
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="flex items-center gap-1 text-yellow-500">
-                                <Star className="h-4 w-4 fill-current" />
-                                <span className="text-sm font-medium text-foreground">5.0</span>
-                              </div>
-                            </div>
-                          </div>
-                        </Link>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
+                  <ProfessionalCard key={prof.id} professional={prof} index={index} />
                 ))}
               </div>
             )}
           </div>
         </section>
 
-        {/* CTA Section */}
+        {/* --- CTA Section --- */}
         <section className="py-20 bg-gradient-to-r from-primary via-purple-600 to-pink-600 dark:from-primary/90 dark:via-purple-700 dark:to-pink-700">
           <div className="container mx-auto px-4">
             <ScrollReveal>

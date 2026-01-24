@@ -202,7 +202,7 @@ export default function EditarEquipamentoPage() {
         rentPeriod: equipment.rentPeriod || "day",
         city: equipment.city,
         state: equipment.state,
-        additionalConditions: "",
+        additionalConditions: equipment.additionalConditions || "",
       });
 
       // Initialize items from existing URLS
@@ -279,6 +279,7 @@ export default function EditarEquipamentoPage() {
             formData.negotiationType === "rent" ? (formData.rentPeriod as "day" | "week" | "month") : undefined,
           city: formData.city,
           state: formData.state,
+          additionalConditions: formData.additionalConditions,
           imageUrls: finalImageUrls.length > 0 ? finalImageUrls : undefined,
         });
         console.log("Equipamento atualizado com sucesso!");
@@ -390,7 +391,7 @@ export default function EditarEquipamentoPage() {
                             }
                             required
                           >
-                            <SelectTrigger>
+                            <SelectTrigger id="category">
                               <SelectValue placeholder="Selecione" />
                             </SelectTrigger>
                             <SelectContent>
@@ -411,7 +412,7 @@ export default function EditarEquipamentoPage() {
                               setFormData({ ...formData, condition: value })
                             }
                           >
-                            <SelectTrigger>
+                            <SelectTrigger id="condition">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -569,7 +570,7 @@ export default function EditarEquipamentoPage() {
                             setFormData({ ...formData, negotiationType: value })
                           }
                         >
-                          <SelectTrigger>
+                          <SelectTrigger id="negotiationType">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -586,6 +587,7 @@ export default function EditarEquipamentoPage() {
                             {formData.negotiationType === "sale" ? "Preço de Venda (R$)" : "Valor do Aluguel (R$)"} *
                           </Label>
                           <Input
+                            id="price"
                             type="number"
                             step="0.01"
                             value={formData.price}
@@ -608,7 +610,7 @@ export default function EditarEquipamentoPage() {
                               setFormData({ ...formData, rentPeriod: value })
                             }
                           >
-                            <SelectTrigger>
+                            <SelectTrigger id="rentPeriod">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -625,6 +627,7 @@ export default function EditarEquipamentoPage() {
                           <div className="col-span-2 space-y-2">
                             <Label>Cidade *</Label>
                             <Input
+                              id="city"
                               value={formData.city}
                               onChange={(e) =>
                                 setFormData({ ...formData, city: e.target.value })
@@ -642,7 +645,7 @@ export default function EditarEquipamentoPage() {
                               }
                               required
                             >
-                              <SelectTrigger>
+                              <SelectTrigger id="state">
                                 <SelectValue placeholder="UF" />
                               </SelectTrigger>
                               <SelectContent>

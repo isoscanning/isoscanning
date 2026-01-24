@@ -293,7 +293,7 @@ export default function NovoEquipamentoPage() {
                             }
                             required
                           >
-                            <SelectTrigger>
+                            <SelectTrigger id="category">
                               <SelectValue placeholder="Selecione" />
                             </SelectTrigger>
                             <SelectContent>
@@ -314,7 +314,7 @@ export default function NovoEquipamentoPage() {
                               setFormData({ ...formData, condition: value })
                             }
                           >
-                            <SelectTrigger>
+                            <SelectTrigger id="condition">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -484,7 +484,7 @@ export default function NovoEquipamentoPage() {
                             setFormData({ ...formData, negotiationType: value })
                           }
                         >
-                          <SelectTrigger>
+                          <SelectTrigger id="negotiationType">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -501,6 +501,7 @@ export default function NovoEquipamentoPage() {
                             {formData.negotiationType === "sale" ? "Preço de Venda (R$)" : "Valor do Aluguel (R$)"} *
                           </Label>
                           <Input
+                            id="price"
                             type="number"
                             step="0.01"
                             value={formData.price}
@@ -523,7 +524,7 @@ export default function NovoEquipamentoPage() {
                               setFormData({ ...formData, rentPeriod: value })
                             }
                           >
-                            <SelectTrigger>
+                            <SelectTrigger id="rentPeriod">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -540,6 +541,7 @@ export default function NovoEquipamentoPage() {
                           <div className="col-span-2 space-y-2">
                             <Label>Cidade *</Label>
                             <Input
+                              id="city"
                               value={formData.city}
                               onChange={(e) =>
                                 setFormData({ ...formData, city: e.target.value })
@@ -557,7 +559,7 @@ export default function NovoEquipamentoPage() {
                               }
                               required
                             >
-                              <SelectTrigger>
+                              <SelectTrigger id="state">
                                 <SelectValue placeholder="UF" />
                               </SelectTrigger>
                               <SelectContent>

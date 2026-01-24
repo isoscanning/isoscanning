@@ -6,20 +6,11 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AlertCircle, CheckCircle2, Trash2, Plus, Calendar as CalendarIcon, Upload, ImageIcon, Eye, EyeOff, X, Globe, Camera, Loader2 } from "lucide-react"
+import { AlertCircle, CheckCircle2, EyeOff, Globe, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -57,6 +48,9 @@ import {
   type AvailabilitySlot,
   type Specialty
 } from "@/lib/data-service"
+import { PersonalDataForm } from "./components/personal-data-form"
+import { PortfolioGallery } from "./components/portfolio-gallery"
+import { AvailabilityManager } from "./components/availability-manager"
 
 
 const ESTADOS = [
@@ -877,618 +871,67 @@ export default function PerfilPage() {
             {/* TAB: INFO */}
             <TabsContent value="info" className="mt-6">
               <form onSubmit={handleProfileSubmit}>
-                <Card className="border-2 shadow-sm">
-                  <CardHeader className="space-y-1 pb-6">
-                    <CardTitle className="text-2xl">Informações Básicas</CardTitle>
-                    <CardDescription className="text-base">Seus dados de contato e apresentação</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Avatar Upload */}
-                    <div className="flex flex-col items-center gap-4 pb-6 border-b">
-                      <div className="relative group">
-                        <div className="w-32 h-32 rounded-full bg-gradient-to-br from-muted to-muted/50 border-4 border-background shadow-lg overflow-hidden flex items-center justify-center ring-2 ring-border/50">
-                          {avatarPreview ? (
-                            <img
-                              src={avatarPreview}
-                              alt="Avatar"
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <Camera className="w-12 h-12 text-muted-foreground" />
-                          )}
-                        </div>
-                        <label
-                          htmlFor="avatar-upload"
-                          className="absolute inset-0 rounded-full flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                        >
-                          {uploadingAvatar ? (
-                            <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                          ) : (
-                            <div className="flex flex-col items-center gap-1">
-                              <Camera className="w-6 h-6 text-white" />
-                              <span className="text-xs text-white font-medium">Editar</span>
-                            </div>
-                          )}
-                        </label>
-                        <input
-                          type="file"
-                          id="avatar-upload"
-                          accept="image/*"
-                          onChange={handleAvatarChange}
-                          className="hidden"
-                        />
-                      </div>
-                      <div className="text-center">
-                        <p className="font-medium">Foto de Perfil</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">Clique para alterar (máx 5MB)</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="displayName">Nome Completo *</Label>
-                        <Input
-                          id="displayName"
-                          value={formData.displayName}
-                          onChange={(e) => {
-                            setFormData({ ...formData, displayName: e.target.value })
-                            if (validationErrors.includes("displayName")) {
-                              setValidationErrors(prev => prev.filter(f => f !== "displayName"))
-                            }
-                          }}
-                          className={cn(validationErrors.includes("displayName") && "border-destructive focus-visible:ring-destructive")}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="artisticName">Nome Artístico / Estúdio</Label>
-                        <Input
-                          id="artisticName"
-                          value={formData.artisticName}
-                          onChange={(e) => setFormData({ ...formData, artisticName: e.target.value })}
-                          placeholder="Como quer ser conhecido"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <Label className={cn(
-                        "text-base font-semibold",
-                        validationErrors.includes("specialties") && "text-destructive"
-                      )}>Especialidades *</Label>
-                      <p className="text-sm text-muted-foreground -mt-1">Selecione suas áreas de atuação</p>
-
-                      {/* Selected Specialties */}
-                      <div className={cn(
-                        "flex flex-wrap gap-2 p-3 min-h-[56px] border-2 rounded-lg bg-background transition-colors",
-                        validationErrors.includes("specialties")
-                          ? "border-destructive ring-2 ring-destructive/20"
-                          : "border-border hover:border-muted-foreground/30"
-                      )}>
-                        {formData.specialties.length === 0 && <span className="text-muted-foreground text-sm self-center px-1">Nenhuma especialidade selecionada</span>}
-                        {formData.specialties.map(spec => (
-                          <Badge key={spec} variant="secondary" className="flex items-center gap-1.5 px-3 py-1.5 text-sm">
-                            {spec}
-                            <button type="button" onClick={() => removeSpecialty(spec)} className="hover:text-destructive transition-colors">
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-
-                      {/* Available Specialties */}
-                      <div className="border-2 rounded-lg max-h-[240px] overflow-y-auto p-2 bg-muted/20">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-                          {availableSpecialties.map(spec => {
-                            const isSelected = formData.specialties.includes(spec.name)
-                            return (
-                              <div
-                                key={spec.id}
-                                onClick={() => toggleSpecialty(spec.name)}
-                                className={cn(
-                                  "flex items-center gap-3 p-3 rounded-md cursor-pointer transition-all",
-                                  "hover:bg-accent hover:shadow-sm",
-                                  isSelected && "bg-primary/10 dark:bg-primary/20 border border-primary/30"
-                                )}
-                              >
-                                <div className={cn(
-                                  "w-5 h-5 border-2 rounded-md flex items-center justify-center transition-all",
-                                  isSelected
-                                    ? "bg-primary border-primary text-primary-foreground scale-110"
-                                    : "border-input hover:border-primary/50"
-                                )}>
-                                  {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
-                                </div>
-                                <span className="text-sm font-medium">{spec.name}</span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="description">Descrição / Bio *</Label>
-                      <Textarea
-                        id="description"
-                        value={formData.description}
-                        onChange={(e) => {
-                          setFormData({ ...formData, description: e.target.value })
-                          if (validationErrors.includes("description")) {
-                            setValidationErrors(prev => prev.filter(f => f !== "description"))
-                          }
-                        }}
-                        placeholder="Fale sobre seus serviços, equipamentos e experiência..."
-                        rows={5}
-                        className={cn(validationErrors.includes("description") && "border-destructive focus-visible:ring-destructive")}
-                        required
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="city">Cidade *</Label>
-                        <Input
-                          id="city"
-                          value={formData.city}
-                          onChange={(e) => {
-                            setFormData({ ...formData, city: e.target.value })
-                            if (validationErrors.includes("city")) {
-                              setValidationErrors(prev => prev.filter(f => f !== "city"))
-                            }
-                          }}
-                          className={cn(validationErrors.includes("city") && "border-destructive focus-visible:ring-destructive")}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="state">Estado *</Label>
-                        <Select
-                          value={formData.state}
-                          onValueChange={(value) => {
-                            setFormData({ ...formData, state: value })
-                            if (validationErrors.includes("state")) {
-                              setValidationErrors(prev => prev.filter(f => f !== "state"))
-                            }
-                          }}
-                        >
-                          <SelectTrigger className={cn(validationErrors.includes("state") && "border-destructive focus:ring-destructive")}>
-                            <SelectValue placeholder="UF" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ESTADOS.map((uf) => (
-                              <SelectItem key={uf} value={uf}>{uf}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Telefone / WhatsApp</Label>
-                      <div className="flex gap-2">
-                        <Select
-                          value={selectedCountryCode}
-                          onValueChange={(value) => {
-                            setSelectedCountryCode(value)
-                            // Do NOT update formData.phone here. Keep them separate.
-                          }}
-                        >
-                          <SelectTrigger className="w-[140px]">
-                            <SelectValue placeholder="País" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {countries.map((country) => {
-                              const code = `${country.idd.root}${country.idd.suffixes?.[0] || ''}`;
-                              return (
-                                <SelectItem key={code} value={code}>
-                                  <span className="flex items-center gap-2">
-                                    <span>{country.flag}</span>
-                                    <span>{code}</span>
-                                  </span>
-                                </SelectItem>
-                              );
-                            })}
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          id="phone"
-                          value={formData.phone}
-                          onChange={(e) => {
-                            // Just update the phone field directly
-                            setFormData({ ...formData, phone: e.target.value })
-                          }}
-                          placeholder="00 00000-0000"
-                          className="flex-1"
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Selecione o país e digite o número com DDD (ex: 32 99999-9999)
-                      </p>
-                    </div>
-
-                    {/* Social Media Section - UI Only for now */}
-                    <div className="border-t-2 pt-6 mt-2 space-y-4">
-                      <div>
-                        <h3 className="text-lg font-semibold">Redes Sociais e Portfólio Externo</h3>
-                        <p className="text-sm text-muted-foreground mt-1">Links adicionais para seus trabalhos</p>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="portfolioLink" className="flex items-center gap-2">
-                            <Globe className="h-4 w-4" />
-                            Site / Portfólio (URL)
-                          </Label>
-                          <Input
-                            id="portfolioLink"
-                            value={formData.portfolioLink}
-                            onChange={(e) => setFormData({ ...formData, portfolioLink: e.target.value })}
-                            placeholder="https://seu-site.com"
-                            className="h-11"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="instagram" className="flex items-center gap-2">
-                            <ImageIcon className="h-4 w-4" />
-                            Instagram (URL)
-                          </Label>
-                          <Input
-                            id="instagram"
-                            value={formData.instagram}
-                            onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
-                            placeholder="https://instagram.com/..."
-                            className="h-11"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end pt-4 border-t">
-                      <Button type="submit" disabled={savingProfile} size="lg" className="min-w-[200px]">
-                        {savingProfile ? "Salvando..." : "Salvar Alterações"}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                <PersonalDataForm
+                  formData={formData}
+                  setFormData={setFormData}
+                  avatarPreview={avatarPreview}
+                  uploadingAvatar={uploadingAvatar}
+                  handleAvatarChange={handleAvatarChange}
+                  availableSpecialties={availableSpecialties}
+                  validationErrors={validationErrors}
+                  setValidationErrors={setValidationErrors}
+                  removeSpecialty={removeSpecialty}
+                  toggleSpecialty={toggleSpecialty}
+                  countries={countries}
+                  selectedCountryCode={selectedCountryCode}
+                  setSelectedCountryCode={setSelectedCountryCode}
+                  ESTADOS={ESTADOS}
+                />
+                <div className="flex justify-end pt-4">
+                  <Button type="submit" disabled={savingProfile} size="lg" className="min-w-[200px]">
+                    {savingProfile ? "Salvando..." : "Salvar Alterações"}
+                  </Button>
+                </div>
               </form>
             </TabsContent>
 
             {/* TAB: PORTFOLIO */}
             <TabsContent value="portfolio" className="mt-6">
-              <Card className="border-2 shadow-sm">
-                <CardHeader className="space-y-1 pb-6">
-                  <CardTitle className="text-2xl">Meu Portfólio</CardTitle>
-                  <CardDescription className="text-base">Adicione fotos e vídeos dos seus trabalhos anteriores (máx 9 itens)</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Add New Item */}
-                  <div className="bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/30 dark:to-muted/10 p-6 rounded-xl space-y-4 border-2 border-dashed border-border hover:border-primary/50 transition-colors">
-                    <h4 className="font-semibold text-lg flex items-center gap-2">
-                      <Plus className="h-5 w-5 text-primary" /> Adicionar Novo Item
-                    </h4>
-
-                    {portfolioItems.length >= 9 && (
-                      <Alert className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
-                        <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                        <AlertDescription className="text-amber-800 dark:text-amber-200">
-                          Você atingiu o limite de 9 itens no portfólio. Exclua um item para adicionar outro.
-                        </AlertDescription>
-                      </Alert>
-                    )}
-
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Título</Label>
-                        <Input
-                          value={newPortfolioItem.title}
-                          onChange={(e) => setNewPortfolioItem({ ...newPortfolioItem, title: e.target.value })}
-                          placeholder="Ex: Casamento na Praia"
-                          disabled={portfolioItems.length >= 9}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Arquivo (Imagem ou Vídeo)</Label>
-                        <div className="flex flex-col gap-2">
-                          <Input
-                            type="file"
-                            accept="image/*,video/*"
-                            onChange={handlePortfolioFileChange}
-                            disabled={portfolioItems.length >= 9 || loadingPortfolio}
-                            className="cursor-pointer"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Imagens: máx 5MB • Vídeos: máx 50MB e 1min30s
-                          </p>
-                        </div>
-                        {fileError && (
-                          <p className="text-xs text-destructive">{fileError}</p>
-                        )}
-
-                        {portfolioPreview && (
-                          <div className="relative rounded-lg overflow-hidden border bg-muted">
-                            {newPortfolioItem.mediaType === 'video' ? (
-                              <video
-                                src={portfolioPreview}
-                                controls
-                                className="w-full max-h-48 object-contain bg-black"
-                              />
-                            ) : (
-                              <img
-                                src={portfolioPreview}
-                                alt="Preview"
-                                className="w-full max-h-48 object-contain"
-                                onError={(e) => {
-                                  console.error('[Portfolio] Image preview failed to load')
-                                }}
-                              />
-                            )}
-                            <button
-                              onClick={() => {
-                                setPortfolioFile(null)
-                                setPortfolioPreview(null)
-                                setFileError(null)
-                              }}
-                              className="absolute top-2 right-2 p-1 bg-destructive text-white rounded-full hover:bg-destructive/90"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      <Button
-                        onClick={handleAddPortfolioItem}
-                        disabled={loadingPortfolio || !newPortfolioItem.title || !portfolioFile || portfolioItems.length >= 9}
-                        className="w-full"
-                      >
-                        {loadingPortfolio ? "Enviando..." : "Adicionar Item"}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* List Items */}
-                  <div>
-                    <h4 className="font-semibold text-lg mb-4">Seus Trabalhos</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {portfolioItems.map((item) => (
-                        <div key={item.id} className="group relative rounded-xl border-2 overflow-hidden transition-all hover:shadow-lg hover:border-primary/50">
-                          <div className="aspect-video bg-gradient-to-br from-muted to-muted/50 relative">
-                            {item.mediaType === 'video' ? (
-                              <video
-                                src={item.mediaUrl}
-                                className="w-full h-full object-cover"
-                                controls
-                              />
-                            ) : (
-                              <img
-                                src={item.mediaUrl}
-                                alt={item.title}
-                                className="w-full h-full object-cover"
-                                onError={(e) => { e.currentTarget.src = "/placeholder.svg" }}
-                              />
-                            )}
-                            <button
-                              onClick={() => handleDeletePortfolioItem(item.id)}
-                              className="absolute top-2 right-2 p-2 bg-destructive/90 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-destructive hover:scale-110 shadow-lg"
-                              title="Excluir"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                          <div className="p-4 bg-card">
-                            <p className="font-semibold truncate">{item.title}</p>
-                            <p className="text-xs text-muted-foreground capitalize flex items-center gap-1.5 mt-1">
-                              {item.mediaType === 'video' ? (
-                                <>
-                                  <span className="inline-block w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                                  Vídeo
-                                </>
-                              ) : (
-                                <>
-                                  <span className="inline-block w-2 h-2 bg-blue-500 rounded-full"></span>
-                                  Imagem
-                                </>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                      {portfolioItems.length === 0 && !loadingPortfolio && (
-                        <div className="col-span-full text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">
-                          <ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                          <p className="font-medium">Nenhum item no portfólio.</p>
-                          <p className="text-sm">Adicione fotos ou vídeos dos seus trabalhos acima.</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <PortfolioGallery
+                portfolioItems={portfolioItems}
+                loadingPortfolio={loadingPortfolio}
+                handleDeletePortfolioItem={handleDeletePortfolioItem}
+                newPortfolioItem={newPortfolioItem}
+                setNewPortfolioItem={setNewPortfolioItem}
+                handlePortfolioFileChange={handlePortfolioFileChange}
+                handleAddPortfolioItem={handleAddPortfolioItem}
+                portfolioPreview={portfolioPreview}
+                fileError={fileError}
+              />
             </TabsContent>
 
             {/* TAB: AGENDA */}
             <TabsContent value="agenda" className="mt-6">
-              <Card className="border-2 shadow-sm">
-                <CardHeader className="space-y-1 pb-6">
-                  <CardTitle className="text-2xl">Minha Disponibilidade</CardTitle>
-                  <CardDescription className="text-base">Gerencie os dias e horários que você está disponível para serviços</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-8">
-                    {/* Calendar Input */}
-                    <div className="space-y-4">
-                      <div className="border rounded-md p-4">
-                        <Calendar
-                          mode="multiple"
-                          selected={selectedDates}
-                          onSelect={handleDateSelect}
-                          onDayClick={handleDayClick}
-                          modifiers={{
-                            available: (date) => availabilitySlots.some(slot =>
-                              slot.date === format(date, 'yyyy-MM-dd')
-                            )
-                          }}
-                          locale={ptBR}
-                          className="rounded-md"
-                        />
-                      </div>
-
-                      {selectedDates.length > 0 && (
-                        <p className="text-sm text-muted-foreground">
-                          {selectedDates.length} data(s) selecionada(s)
-                        </p>
-                      )}
-
-                      <div className="space-y-3">
-                        {/* All Day Toggle */}
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id="isAllDay"
-                            checked={isAllDay}
-                            onChange={(e) => setIsAllDay(e.target.checked)}
-                            className="w-4 h-4 rounded border-gray-300"
-                          />
-                          <Label htmlFor="isAllDay" className="cursor-pointer">
-                            Dia Inteiro
-                          </Label>
-                        </div>
-
-                        {/* Time Inputs - hidden when all day */}
-                        {!isAllDay && (
-                          <div className="space-y-2">
-                            <Label>Horário</Label>
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="time"
-                                value={newSlot.startTime}
-                                onChange={(e) => setNewSlot({ ...newSlot, startTime: e.target.value })}
-                              />
-                              <span>até</span>
-                              <Input
-                                type="time"
-                                value={newSlot.endTime}
-                                onChange={(e) => setNewSlot({ ...newSlot, endTime: e.target.value })}
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        <Button
-                          className="w-full"
-                          onClick={handleAddAvailability}
-                          disabled={loadingAvailability || selectedDates.length === 0}
-                        >
-                          Adicionar Disponibilidade
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Slots List */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium">Datas Disponíveis</h4>
-                        {availabilitySlots.length > 0 && (
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={handleSelectAll}
-                              className="text-xs"
-                            >
-                              {selectedSlotsToDelete.length === availabilitySlots.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
-                            </Button>
-                            {selectedSlotsToDelete.length > 0 && (
-                              <AlertDialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    disabled={deletingBulk}
-                                    className="text-xs"
-                                  >
-                                    {deletingBulk ? (
-                                      <>
-                                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                        Excluindo...
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Trash2 className="h-3 w-3 mr-1" />
-                                        Excluir ({selectedSlotsToDelete.length})
-                                      </>
-                                    )}
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Confirmar Exclusão em Lote</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Você tem certeza que deseja excluir as {selectedSlotsToDelete.length} disponibilidades selecionadas?
-                                      Esta ação não poderá ser desfeita.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={handleBulkDelete}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    >
-                                      Excluir Todas
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
-                        {availabilitySlots.length === 0 ? (
-                          <p className="text-muted-foreground">Nenhuma disponibilidade cadastrada.</p>
-                        ) : (
-                          availabilitySlots
-                            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                            .map((slot) => (
-                              <div key={slot.id} className="flex items-center gap-3 p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors">
-                                <Checkbox
-                                  checked={selectedSlotsToDelete.includes(slot.id)}
-                                  onCheckedChange={() => toggleSlotSelection(slot.id)}
-                                />
-                                <div className="flex items-center gap-3 flex-1">
-                                  <CalendarIcon className="h-5 w-5 text-primary" />
-                                  <div>
-                                    <p className="font-medium">
-                                      {format(parseISO(slot.date + 'T12:00:00'), "dd 'de' MMMM, yyyy", { locale: ptBR })}
-                                    </p>
-                                    {slot.startTime === "00:00" && slot.endTime === "23:59" ? (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                                        ⭐ Dia Inteiro
-                                      </span>
-                                    ) : (
-                                      <p className="text-sm text-muted-foreground">
-                                        {slot.startTime} - {slot.endTime}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  onClick={() => handleDeleteAvailability(slot.id)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <AvailabilityManager
+                selectedDates={selectedDates}
+                handleDateSelect={handleDateSelect}
+                handleDayClick={handleDayClick}
+                availabilitySlots={availabilitySlots}
+                isAllDay={isAllDay}
+                setIsAllDay={setIsAllDay}
+                newSlot={newSlot}
+                setNewSlot={setNewSlot}
+                handleAddAvailability={handleAddAvailability}
+                loadingAvailability={loadingAvailability}
+                handleSelectAll={handleSelectAll}
+                selectedSlotsToDelete={selectedSlotsToDelete}
+                toggleSlotSelection={toggleSlotSelection}
+                showBulkDeleteConfirm={showBulkDeleteConfirm}
+                setShowBulkDeleteConfirm={setShowBulkDeleteConfirm}
+                deletingBulk={deletingBulk}
+                handleBulkDelete={handleBulkDelete}
+                handleDeleteAvailability={handleDeleteAvailability}
+              />
             </TabsContent>
           </Tabs>
 

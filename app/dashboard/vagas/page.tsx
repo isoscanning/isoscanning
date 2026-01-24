@@ -13,36 +13,10 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-    Briefcase,
-    MapPin,
     Plus,
-    Trash2,
-    Edit,
-    Clock,
-    DollarSign,
-    Pause,
-    Play,
-    User,
-    MoreVertical,
-    Calendar,
-    Search,
+    Briefcase,
     Loader2,
-    CheckSquare,
-    Square,
-    CheckCircle2,
-    XCircle,
-    RotateCcw,
-    PlayCircle,
 } from "lucide-react";
 import {
     AlertDialog,
@@ -54,13 +28,12 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { fetchUserJobOffers, deleteJobOffer, updateJobOffer, bulkUpdateJobStatus, updateJobStatus, type JobOffer } from "@/lib/data-service";
+import { fetchUserJobOffers, deleteJobOffer, bulkUpdateJobStatus, updateJobStatus, type JobOffer } from "@/lib/data-service";
 import Link from "next/link";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AnimatePresence, motion } from "framer-motion";
 import { useToast } from "@/components/ui/use-toast";
+import { JobCard } from "./components/job-card";
+import { BulkActionBar } from "./components/bulk-action-bar";
 
 export default function MinhasVagasPage() {
     const router = useRouter();
@@ -99,18 +72,7 @@ export default function MinhasVagasPage() {
 
     const handleToggleActive = async (vaga: JobOffer) => {
         try {
-            // Logic: 
-            // If Open -> Pause
-            // If Paused -> Open
-            // If Closed -> Open
-
-            let newStatus: 'open' | 'paused' | 'closed' = 'open';
-            if (vaga.status === 'open') {
-                newStatus = 'paused';
-            } else {
-                newStatus = 'open'; // Paused or Closed -> Open
-            }
-
+            let newStatus: 'open' | 'paused' | 'closed' = vaga.status === 'open' ? 'paused' : 'open';
             const newIsActive = newStatus === 'open';
 
             await updateJobStatus(vaga.id, newStatus);
@@ -143,11 +105,7 @@ export default function MinhasVagasPage() {
             setIsDeleteDialogOpen(false);
         } catch (error) {
             console.error("Erro ao excluir vaga:", error);
-            toast({
-                variant: "destructive",
-                title: "Erro",
-                description: "Erro ao excluir vaga",
-            });
+            toast({ variant: "destructive", title: "Erro", description: "Erro ao excluir vaga" });
         } finally {
             setIsDeleting(false);
             setVagaToDelete(null);
@@ -155,19 +113,11 @@ export default function MinhasVagasPage() {
     };
 
     const handleSelectAll = (checked: boolean) => {
-        if (checked) {
-            setSelectedJobIds(vagas.map(v => v.id));
-        } else {
-            setSelectedJobIds([]);
-        }
+        setSelectedJobIds(checked ? vagas.map(v => v.id) : []);
     };
 
     const handleSelectJob = (jobId: string, checked: boolean) => {
-        if (checked) {
-            setSelectedJobIds(prev => [...prev, jobId]);
-        } else {
-            setSelectedJobIds(prev => prev.filter(id => id !== jobId));
-        }
+        setSelectedJobIds(prev => checked ? [...prev, jobId] : prev.filter(id => id !== jobId));
     };
 
     const handleConcludeJob = (vaga: JobOffer) => {
@@ -181,18 +131,11 @@ export default function MinhasVagasPage() {
         try {
             await updateJobStatus(vagaToConclude.id, 'closed');
             setVagas(vagas.map((v) => v.id === vagaToConclude.id ? { ...v, status: 'closed', isActive: false } : v));
-            toast({
-                title: "Vaga Concluída",
-                description: "A vaga foi marcada como concluída com sucesso.",
-            });
+            toast({ title: "Vaga Concluída", description: "A vaga foi marcada como concluída com sucesso." });
             setIsConcludeDialogOpen(false);
         } catch (error) {
             console.error("Erro ao concluir vaga:", error);
-            toast({
-                variant: "destructive",
-                title: "Erro",
-                description: "Não foi possível concluir a vaga.",
-            });
+            toast({ variant: "destructive", title: "Erro", description: "Não foi possível concluir a vaga." });
         } finally {
             setVagaToConclude(null);
         }
@@ -211,24 +154,9 @@ export default function MinhasVagasPage() {
                 const status = action === 'conclude' ? 'closed' : action === 'pause' ? 'paused' : 'open';
                 await bulkUpdateJobStatus(selectedJobIds, status);
 
-                // Update local state
-                setVagas(vagas.map(v => {
-                    if (selectedJobIds.includes(v.id)) {
-                        return {
-                            ...v,
-                            status: status,
-                            isActive: status === 'open'
-                        };
-                    }
-                    return v;
-                }));
+                setVagas(vagas.map(v => selectedJobIds.includes(v.id) ? { ...v, status, isActive: status === 'open' } : v));
 
-                let actionName = '';
-                switch (action) {
-                    case 'conclude': actionName = 'concluídas'; break;
-                    case 'pause': actionName = 'pausadas'; break;
-                    case 'open': actionName = 'reativadas'; break;
-                }
+                let actionName = action === 'conclude' ? 'concluídas' : action === 'pause' ? 'pausadas' : 'reativadas';
                 toast({ title: "Sucesso", description: `${selectedJobIds.length} vagas foram ${actionName}.` });
             }
             setSelectedJobIds([]);
@@ -240,17 +168,7 @@ export default function MinhasVagasPage() {
         }
     };
 
-    const getJobTypeLabel = (type: string) => {
-        const types: Record<string, string> = {
-            freelance: "Freelance",
-            full_time: "Tempo Integral",
-            part_time: "Meio Período",
-            project: "Por Projeto",
-        };
-        return types[type] || type;
-    };
-
-    // Calculate derived state for bulk actions
+    // Derived flags for BulkActionBar
     const selectedJobs = vagas.filter(v => selectedJobIds.includes(v.id));
     const hasOpenJobs = selectedJobs.some(v => v.status === 'open');
     const hasPausedJobs = selectedJobs.some(v => v.status === 'paused');
@@ -288,7 +206,6 @@ export default function MinhasVagasPage() {
                         </Button>
                     </div>
 
-                    {/* Bulk Selection Header (Only visible when items exist) */}
                     {vagas.length > 0 && (
                         <div className="flex items-center gap-2 py-2 px-1">
                             <Checkbox
@@ -297,10 +214,7 @@ export default function MinhasVagasPage() {
                                 onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
                             />
                             <label htmlFor="select-all" className="text-sm font-medium cursor-pointer select-none text-muted-foreground">
-                                {selectedJobIds.length === 0
-                                    ? "Selecionar todas"
-                                    : `${selectedJobIds.length} selecionada${selectedJobIds.length > 1 ? 's' : ''}`
-                                }
+                                {selectedJobIds.length === 0 ? "Selecionar todas" : `${selectedJobIds.length} selecionada${selectedJobIds.length > 1 ? 's' : ''}`}
                             </label>
                         </div>
                     )}
@@ -337,340 +251,29 @@ export default function MinhasVagasPage() {
                     ) : (
                         <div className="grid grid-cols-1 gap-6 pb-24">
                             {vagas.map((vaga) => (
-                                <Card key={vaga.id} className={`overflow-hidden transition-all hover:shadow-md ${!vaga.isActive ? 'opacity-75 bg-muted/30' : ''} ${selectedJobIds.includes(vaga.id) ? 'ring-2 ring-primary border-primary' : ''}`}>
-                                    <CardContent className="p-0">
-                                        {/* Mobile: Status strip at top */}
-                                        <div className={`md:hidden h-1.5 ${vaga.status === 'closed' ? 'bg-gray-500' : vaga.isActive ? 'bg-green-500' : 'bg-yellow-500'}`} />
-
-                                        <div className="flex">
-                                            {/* Selection Strip - hidden on mobile, shown in content area */}
-                                            <div className="hidden md:flex items-center justify-center w-12 bg-muted/10 border-r">
-                                                <Checkbox
-                                                    checked={selectedJobIds.includes(vaga.id)}
-                                                    onCheckedChange={(checked) => handleSelectJob(vaga.id, checked as boolean)}
-                                                />
-                                            </div>
-
-                                            {/* Desktop: Status Strip */}
-                                            <div className={`hidden md:block w-2 ${vaga.status === 'closed' ? 'bg-gray-500' : vaga.isActive ? 'bg-green-500' : 'bg-yellow-500'}`} />
-
-                                            <div className="flex-1 p-4 md:p-6 space-y-3 md:space-y-4">
-                                                {/* Mobile: Checkbox row */}
-                                                <div className="flex md:hidden items-center justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <Checkbox
-                                                            checked={selectedJobIds.includes(vaga.id)}
-                                                            onCheckedChange={(checked) => handleSelectJob(vaga.id, checked as boolean)}
-                                                        />
-                                                        <Badge variant={vaga.status === 'closed' ? "secondary" : vaga.isActive ? "default" : "secondary"} className={`text-xs ${vaga.status === 'closed' ? "bg-gray-200 text-gray-700" : vaga.isActive ? "bg-green-600 hover:bg-green-700" : ""}`}>
-                                                            {vaga.status === 'closed' ? "Concluída" : vaga.isActive ? "Ativa" : "Pausada"}
-                                                        </Badge>
-                                                        <Badge variant="outline" className="text-muted-foreground text-xs">
-                                                            {vaga.category}
-                                                        </Badge>
-                                                    </div>
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden">
-                                                                <MoreVertical className="h-4 w-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                                            <DropdownMenuItem asChild>
-                                                                <Link href={`/dashboard/vagas/${vaga.id}/candidatos`}>
-                                                                    <User className="mr-2 h-4 w-4" /> Ver Candidatos
-                                                                </Link>
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem asChild>
-                                                                <Link href={`/vagas/${vaga.id}`} target="_blank">
-                                                                    <Search className="mr-2 h-4 w-4" /> Visualizar
-                                                                </Link>
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem asChild>
-                                                                <Link href={`/dashboard/vagas/editar/${vaga.id}`}>
-                                                                    <Edit className="mr-2 h-4 w-4" /> Editar
-                                                                </Link>
-                                                            </DropdownMenuItem>
-                                                            {vaga.status !== 'closed' && (
-                                                                <DropdownMenuItem onClick={() => handleConcludeJob(vaga)}>
-                                                                    <CheckCircle2 className="mr-2 h-4 w-4" /> Concluir
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                            {vaga.status === 'open' && (
-                                                                <DropdownMenuItem onClick={() => handleToggleActive(vaga)}>
-                                                                    <Pause className="mr-2 h-4 w-4" /> Pausar
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                            {(vaga.status === 'paused' || vaga.status === 'closed') && (
-                                                                <DropdownMenuItem onClick={() => handleToggleActive(vaga)}>
-                                                                    <Play className="mr-2 h-4 w-4" /> Reativar
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                            <DropdownMenuSeparator />
-                                                            <DropdownMenuItem
-                                                                className="text-destructive focus:text-destructive"
-                                                                onClick={() => handleDeleteClick(vaga.id)}
-                                                            >
-                                                                <Trash2 className="mr-2 h-4 w-4" /> Excluir
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-
-                                                <div className="flex flex-col md:flex-row md:items-start justify-between gap-3 md:gap-4">
-                                                    <div className="space-y-1 min-w-0 flex-1">
-                                                        {/* Desktop badges */}
-                                                        <div className="hidden md:flex items-center gap-2 mb-2">
-                                                            <Badge variant={vaga.status === 'closed' ? "secondary" : vaga.isActive ? "default" : "secondary"} className={vaga.status === 'closed' ? "bg-gray-200 text-gray-700" : vaga.isActive ? "bg-green-600 hover:bg-green-700" : ""}>
-                                                                {vaga.status === 'closed' ? "Concluída" : vaga.isActive ? "Ativa" : "Pausada"}
-                                                            </Badge>
-                                                            <Badge variant="outline" className="text-muted-foreground">
-                                                                {vaga.category}
-                                                            </Badge>
-                                                        </div>
-                                                        <h3 className="text-base md:text-xl font-bold text-foreground line-clamp-2 md:line-clamp-1">
-                                                            {vaga.title}
-                                                        </h3>
-                                                        <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground">
-                                                            <Calendar className="h-3 w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
-                                                            <span>Publicado em {format(new Date(vaga.createdAt), "d 'de' MMM, yyyy", { locale: ptBR })}</span>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Desktop actions */}
-                                                    <div className="hidden md:flex items-center gap-2 flex-shrink-0">
-                                                        <Button variant="outline" size="sm" asChild>
-                                                            <Link href={`/dashboard/vagas/${vaga.id}/candidatos`}>
-                                                                <User className="mr-2 h-4 w-4" />
-                                                                Ver Candidatos
-                                                            </Link>
-                                                        </Button>
-
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                                    <MoreVertical className="h-4 w-4" />
-                                                                    <span className="sr-only">Ações</span>
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end">
-                                                                <DropdownMenuLabel>Ações da Vaga</DropdownMenuLabel>
-                                                                <DropdownMenuItem asChild>
-                                                                    <Link href={`/vagas/${vaga.id}`} target="_blank">
-                                                                        <Search className="mr-2 h-4 w-4" /> Visualizar Vaga
-                                                                    </Link>
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuItem asChild>
-                                                                    <Link href={`/dashboard/vagas/editar/${vaga.id}`}>
-                                                                        <Edit className="mr-2 h-4 w-4" /> Editar
-                                                                    </Link>
-                                                                </DropdownMenuItem>
-                                                                {vaga.status !== 'closed' && (
-                                                                    <DropdownMenuItem onClick={() => handleConcludeJob(vaga)}>
-                                                                        <CheckCircle2 className="mr-2 h-4 w-4" /> Concluir Vaga
-                                                                    </DropdownMenuItem>
-                                                                )}
-                                                                {vaga.status === 'open' && (
-                                                                    <DropdownMenuItem onClick={() => handleToggleActive(vaga)}>
-                                                                        <Pause className="mr-2 h-4 w-4" /> Pausar Vaga
-                                                                    </DropdownMenuItem>
-                                                                )}
-                                                                {(vaga.status === 'paused' || vaga.status === 'closed') && (
-                                                                    <DropdownMenuItem onClick={() => handleToggleActive(vaga)}>
-                                                                        <Play className="mr-2 h-4 w-4" /> {vaga.status === 'closed' ? 'Reabrir Vaga' : 'Reativar Vaga'}
-                                                                    </DropdownMenuItem>
-                                                                )}
-                                                                <DropdownMenuSeparator />
-                                                                <DropdownMenuItem
-                                                                    className="text-destructive focus:text-destructive"
-                                                                    onClick={() => handleDeleteClick(vaga.id)}
-                                                                >
-                                                                    <Trash2 className="mr-2 h-4 w-4" /> Excluir Vaga
-                                                                </DropdownMenuItem>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </div>
-                                                </div>
-
-                                                {/* Info grid - responsive */}
-                                                <div className="flex flex-wrap gap-x-4 gap-y-2 pt-2 text-xs md:text-sm text-muted-foreground">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <Briefcase className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary/70 flex-shrink-0" />
-                                                        <span>{getJobTypeLabel(vaga.jobType)}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <MapPin className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary/70 flex-shrink-0" />
-                                                        <span className="truncate max-w-[150px] md:max-w-none">
-                                                            {vaga.locationType === "remote"
-                                                                ? "Remoto"
-                                                                : `${vaga.city || "Cidade"}/${vaga.state || "UF"}`}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <DollarSign className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary/70 flex-shrink-0" />
-                                                        <span>
-                                                            {(vaga.budgetMin || vaga.budgetMax) ? (
-                                                                <>
-                                                                    {vaga.budgetMin && `R$ ${vaga.budgetMin}`}
-                                                                    {vaga.budgetMin && vaga.budgetMax && " - "}
-                                                                    {vaga.budgetMax && `R$ ${vaga.budgetMax}`}
-                                                                </>
-                                                            ) : "A combinar"}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
+                                <JobCard
+                                    key={vaga.id}
+                                    vaga={vaga}
+                                    isSelected={selectedJobIds.includes(vaga.id)}
+                                    onToggleSelection={(checked) => handleSelectJob(vaga.id, checked)}
+                                    onToggleActive={() => handleToggleActive(vaga)}
+                                    onDelete={() => handleDeleteClick(vaga.id)}
+                                    onConclude={() => handleConcludeJob(vaga)}
+                                />
                             ))}
                         </div>
                     )}
                 </div>
 
-                {/* Floating Action Bar - Mobile Optimized */}
-                <AnimatePresence>
-                    {selectedJobIds.length > 0 && (
-                        <motion.div
-                            initial={{ y: 100, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            exit={{ y: 100, opacity: 0 }}
-                            className="fixed bottom-4 left-2 right-2 md:left-1/2 md:right-auto md:transform md:-translate-x-1/2 z-50 md:w-auto md:min-w-[500px] md:max-w-2xl"
-                        >
-                            <Card className="bg-foreground text-background shadow-2xl border-none">
-                                <CardContent className="p-3 md:p-4">
-                                    {/* Mobile: Stack layout */}
-                                    <div className="flex flex-col gap-3 md:hidden">
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-medium text-sm">
-                                                {selectedJobIds.length} selecionado{selectedJobIds.length > 1 ? 's' : ''}
-                                            </span>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => setSelectedJobIds([])}
-                                                className="text-background/70 hover:text-background hover:bg-background/10 h-7 text-xs"
-                                            >
-                                                Cancelar
-                                            </Button>
-                                        </div>
-                                        <div className="flex items-center justify-end gap-2">
-                                            {hasNonOpenJobs && (
-                                                <Button
-                                                    size="sm"
-                                                    variant="secondary"
-                                                    onClick={() => handleBulkAction('open')}
-                                                    disabled={isBulkProcessing}
-                                                    className="h-8 text-xs px-2"
-                                                >
-                                                    {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <PlayCircle className="h-3 w-3 mr-1" />}
-                                                    Reativar
-                                                </Button>
-                                            )}
-                                            {hasOpenJobs && (
-                                                <Button
-                                                    size="sm"
-                                                    variant="secondary"
-                                                    onClick={() => handleBulkAction('pause')}
-                                                    disabled={isBulkProcessing}
-                                                    className="h-8 text-xs px-2"
-                                                >
-                                                    {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Pause className="h-3 w-3 mr-1" />}
-                                                    Pausar
-                                                </Button>
-                                            )}
-                                            {hasNonClosedJobs && (
-                                                <Button
-                                                    size="sm"
-                                                    className="bg-green-600 hover:bg-green-700 text-white h-8 text-xs px-2 border-none"
-                                                    onClick={() => handleBulkAction('conclude')}
-                                                    disabled={isBulkProcessing}
-                                                >
-                                                    {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
-                                                    Concluir
-                                                </Button>
-                                            )}
-                                            <Button
-                                                size="icon"
-                                                variant="destructive"
-                                                onClick={() => handleBulkAction('delete')}
-                                                disabled={isBulkProcessing}
-                                                className="h-8 w-8"
-                                            >
-                                                {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                    {/* Desktop: Row layout */}
-                                    <div className="hidden md:flex items-center justify-between gap-4">
-                                        <div className="flex items-center gap-4">
-                                            <span className="font-medium text-base whitespace-nowrap">
-                                                {selectedJobIds.length} item{selectedJobIds.length > 1 ? 's' : ''} selecionado{selectedJobIds.length > 1 ? 's' : ''}
-                                            </span>
-                                            <div className="h-4 w-px bg-background/20" />
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => setSelectedJobIds([])}
-                                                className="text-background/70 hover:text-background hover:bg-background/10 h-8"
-                                            >
-                                                Cancelar
-                                            </Button>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {hasNonOpenJobs && (
-                                                <Button
-                                                    size="sm"
-                                                    variant="secondary"
-                                                    onClick={() => handleBulkAction('open')}
-                                                    disabled={isBulkProcessing}
-                                                    className="h-9"
-                                                >
-                                                    {isBulkProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4 mr-2" />}
-                                                    Reativar
-                                                </Button>
-                                            )}
-                                            {hasOpenJobs && (
-                                                <Button
-                                                    size="sm"
-                                                    variant="secondary"
-                                                    onClick={() => handleBulkAction('pause')}
-                                                    disabled={isBulkProcessing}
-                                                    className="h-9"
-                                                >
-                                                    {isBulkProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pause className="h-4 w-4 mr-2" />}
-                                                    Pausar
-                                                </Button>
-                                            )}
-                                            {hasNonClosedJobs && (
-                                                <Button
-                                                    size="sm"
-                                                    className="bg-green-600 hover:bg-green-700 text-white h-9 border-none"
-                                                    onClick={() => handleBulkAction('conclude')}
-                                                    disabled={isBulkProcessing}
-                                                >
-                                                    {isBulkProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                                                    Concluir
-                                                </Button>
-                                            )}
-                                            <Button
-                                                size="icon"
-                                                variant="destructive"
-                                                onClick={() => handleBulkAction('delete')}
-                                                disabled={isBulkProcessing}
-                                                className="h-9 w-9"
-                                            >
-                                                {isBulkProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                <BulkActionBar
+                    selectedIds={selectedJobIds}
+                    isProcessing={isBulkProcessing}
+                    hasOpenJobs={hasOpenJobs}
+                    hasNonOpenJobs={hasNonOpenJobs}
+                    hasNonClosedJobs={hasNonClosedJobs}
+                    onAction={handleBulkAction}
+                    onCancel={() => setSelectedJobIds([])}
+                />
             </main>
 
             <Footer />
@@ -680,28 +283,17 @@ export default function MinhasVagasPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Esta ação não pode ser desfeita. Isso excluirá permanentemente a vaga
-                            e removerá todos os dados associados de nossos servidores.
+                            Esta ação não pode ser desfeita. Isso excluirá permanentemente a vaga e removerá todos os dados associados.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={(e) => {
-                                e.preventDefault();
-                                confirmDelete();
-                            }}
+                            onClick={(e) => { e.preventDefault(); confirmDelete(); }}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             disabled={isDeleting}
                         >
-                            {isDeleting ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Excluindo...
-                                </>
-                            ) : (
-                                "Confirmar Exclusão"
-                            )}
+                            {isDeleting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Excluindo...</> : "Confirmar Exclusão"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -718,10 +310,7 @@ export default function MinhasVagasPage() {
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={(e) => {
-                                e.preventDefault();
-                                confirmConclude();
-                            }}
+                            onClick={(e) => { e.preventDefault(); confirmConclude(); }}
                             className="bg-green-600 hover:bg-green-700 text-white"
                         >
                             Confirmar Conclusão

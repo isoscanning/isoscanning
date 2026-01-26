@@ -17,6 +17,7 @@ import {
   LogIn,
   Settings,
   Briefcase,
+  Zap,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -97,6 +98,12 @@ export function Header() {
             >
               Jobs
             </Link>
+            <Link
+              href="/precos"
+              className="text-sm font-medium transition-colors hover:text-primary focus-visible:text-primary"
+            >
+              Preços
+            </Link>
             {isAuthenticated && (
               // Link removed - accessible via Dashboard
               null
@@ -154,6 +161,14 @@ export function Header() {
             >
               <Briefcase className="h-4 w-4 text-primary" />
               Jobs
+            </Link>
+            <Link
+              href="/precos"
+              className="flex items-center gap-3 text-sm font-medium hover:text-purple-500 transition-colors hover:bg-purple-500/10 p-3 rounded-lg"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <Zap className="h-4 w-4 text-purple-500" />
+              Preços
             </Link>
             {isAuthenticated && (
               // Link removed as per redesign - accessible via Dashboard

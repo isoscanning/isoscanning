@@ -733,6 +733,7 @@ export interface JobApplication {
   status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
   message?: string;
   counterProposal?: number;
+  agreedValue?: number;
   createdAt: string;
   jobOffer: {
     id: string;
@@ -760,6 +761,7 @@ export const fetchUserApplications = async (userId: string): Promise<JobApplicat
         created_at,
         message,
         counter_proposal,
+        agreed_value,
         job_offers (
           id,
           title,
@@ -789,6 +791,7 @@ export const fetchUserApplications = async (userId: string): Promise<JobApplicat
       createdAt: app.created_at,
       message: app.message,
       counterProposal: app.counter_proposal,
+      agreedValue: app.agreed_value,
       jobOffer: {
         id: app.job_offers.id,
         title: app.job_offers.title,
@@ -815,6 +818,7 @@ export interface JobCandidate {
   createdAt: string;
   message?: string;
   counterProposal?: number;
+  agreedValue?: number;
   profile: {
     id: string;
     displayName: string;
@@ -840,6 +844,7 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
         created_at,
         message,
         counter_proposal,
+        agreed_value,
         profiles (
           id,
           display_name,
@@ -866,6 +871,7 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
       createdAt: app.created_at,
       message: app.message,
       counterProposal: app.counter_proposal,
+      agreedValue: app.agreed_value,
       profile: {
         id: app.profiles.id,
         displayName: app.profiles.display_name,
@@ -884,12 +890,17 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
   }
 };
 
-export const updateJobApplicationStatus = async (applicationId: string, status: 'accepted' | 'rejected'): Promise<boolean> => {
+export const updateJobApplicationStatus = async (applicationId: string, status: 'accepted' | 'rejected', agreedValue?: number): Promise<boolean> => {
   try {
-    console.log(`Updating application ${applicationId} to status ${status}`);
+    console.log(`Updating application ${applicationId} to status ${status} with agreed value ${agreedValue}`);
+    const updateData: any = { status };
+    if (agreedValue !== undefined) {
+      updateData.agreed_value = agreedValue;
+    }
+
     const { data, error } = await supabase
       .from('job_applications')
-      .update({ status })
+      .update(updateData)
       .eq('id', applicationId)
       .select();
 

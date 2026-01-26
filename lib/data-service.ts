@@ -636,7 +636,70 @@ export const checkJobApplication = async (jobId: string, candidateId: string): P
   }
 };
 
-export const applyToJob = async (jobId: string, candidateId: string): Promise<boolean> => {
+export const fetchJobApplication = async (jobId: string, candidateId: string): Promise<JobApplication | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('job_applications')
+      .select(`
+        id,
+        job_offer_id,
+        candidate_id,
+        status,
+        created_at,
+        message,
+        counter_proposal,
+        job_offers (
+          id,
+          title,
+          employer_id,
+          employer_name,
+          city,
+          state,
+          job_type,
+          location_type,
+          budget_min,
+          budget_max
+        )
+      `)
+      .eq('job_offer_id', jobId)
+      .eq('candidate_id', candidateId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      console.error("Error fetching application details:", error);
+      return null;
+    }
+
+    const app = data as any;
+    return {
+      id: app.id,
+      jobOfferId: app.job_offer_id,
+      candidateId: app.candidate_id,
+      status: app.status,
+      createdAt: app.created_at,
+      message: app.message,
+      counterProposal: app.counter_proposal,
+      jobOffer: {
+        id: app.job_offers.id,
+        title: app.job_offers.title,
+        employerId: app.job_offers.employer_id,
+        employerName: app.job_offers.employer_name,
+        city: app.job_offers.city,
+        state: app.job_offers.state,
+        jobType: app.job_offers.job_type,
+        locationType: app.job_offers.location_type,
+        budgetMin: app.job_offers.budget_min,
+        budgetMax: app.job_offers.budget_max,
+      }
+    };
+  } catch (error) {
+    console.error("Error fetching application details:", error);
+    return null;
+  }
+};
+
+export const applyToJob = async (jobId: string, candidateId: string, message?: string, counterProposal?: number): Promise<boolean> => {
   try {
     // Use upsert to handle both new applications and reactivating withdrawn ones
     const { error } = await supabase
@@ -644,7 +707,9 @@ export const applyToJob = async (jobId: string, candidateId: string): Promise<bo
       .upsert({
         job_offer_id: jobId,
         candidate_id: candidateId,
-        status: 'pending'
+        status: 'pending',
+        message: message || null,
+        counter_proposal: counterProposal || null
       }, {
         onConflict: 'job_offer_id,candidate_id'
       });
@@ -666,6 +731,8 @@ export interface JobApplication {
   jobOfferId: string;
   candidateId: string;
   status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
+  message?: string;
+  counterProposal?: number;
   createdAt: string;
   jobOffer: {
     id: string;
@@ -676,6 +743,8 @@ export interface JobApplication {
     state?: string;
     jobType: string;
     locationType: string;
+    budgetMin?: number;
+    budgetMax?: number;
   };
 }
 
@@ -689,6 +758,8 @@ export const fetchUserApplications = async (userId: string): Promise<JobApplicat
         candidate_id,
         status,
         created_at,
+        message,
+        counter_proposal,
         job_offers (
           id,
           title,
@@ -697,7 +768,9 @@ export const fetchUserApplications = async (userId: string): Promise<JobApplicat
           city,
           state,
           job_type,
-          location_type
+          location_type,
+          budget_min,
+          budget_max
         )
       `)
       .eq('candidate_id', userId)
@@ -714,6 +787,8 @@ export const fetchUserApplications = async (userId: string): Promise<JobApplicat
       candidateId: app.candidate_id,
       status: app.status,
       createdAt: app.created_at,
+      message: app.message,
+      counterProposal: app.counter_proposal,
       jobOffer: {
         id: app.job_offers.id,
         title: app.job_offers.title,
@@ -723,6 +798,8 @@ export const fetchUserApplications = async (userId: string): Promise<JobApplicat
         state: app.job_offers.state,
         jobType: app.job_offers.job_type,
         locationType: app.job_offers.location_type,
+        budgetMin: app.job_offers.budget_min,
+        budgetMax: app.job_offers.budget_max,
       }
     }));
   } catch (error) {
@@ -737,6 +814,7 @@ export interface JobCandidate {
   status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
   createdAt: string;
   message?: string;
+  counterProposal?: number;
   profile: {
     id: string;
     displayName: string;
@@ -761,6 +839,7 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
         status,
         created_at,
         message,
+        counter_proposal,
         profiles (
           id,
           display_name,
@@ -786,6 +865,7 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
       status: app.status,
       createdAt: app.created_at,
       message: app.message,
+      counterProposal: app.counter_proposal,
       profile: {
         id: app.profiles.id,
         displayName: app.profiles.display_name,

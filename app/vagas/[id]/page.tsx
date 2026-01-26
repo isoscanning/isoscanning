@@ -16,6 +16,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
     Briefcase,
     MapPin,
     Clock,
@@ -34,7 +46,7 @@ import {
     MoreHorizontal,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { fetchJobOfferById, type JobOffer, checkJobApplication, applyToJob } from "@/lib/data-service";
+import { fetchJobOfferById, type JobOffer, checkJobApplication, applyToJob, fetchJobApplication, type JobApplication } from "@/lib/data-service";
 import apiClient from "@/lib/api-service";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -50,7 +62,11 @@ export default function DetalhesVagaPage() {
     const [vaga, setVaga] = useState<JobOffer | null>(null);
     const [loading, setLoading] = useState(true);
     const [hasApplied, setHasApplied] = useState(false);
+    const [appliedDetails, setAppliedDetails] = useState<JobApplication | null>(null);
     const [applying, setApplying] = useState(false);
+    const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
+    const [proposalAmount, setProposalAmount] = useState<string>("");
+    const [proposalMessage, setProposalMessage] = useState<string>("");
     const [employerStats, setEmployerStats] = useState<{ averageRating: number; totalReviews: number }>({ averageRating: 0, totalReviews: 0 });
 
     useEffect(() => {
@@ -74,8 +90,9 @@ export default function DetalhesVagaPage() {
                 }
 
                 if (userProfile) {
-                    const applied = await checkJobApplication(params.id as string, userProfile.id);
-                    setHasApplied(applied);
+                    const application = await fetchJobApplication(params.id as string, userProfile.id);
+                    setHasApplied(!!application);
+                    setAppliedDetails(application);
                 }
             } catch (error) {
                 console.error("Erro ao buscar dados:", error);
@@ -120,7 +137,7 @@ export default function DetalhesVagaPage() {
                 description: "Você precisa estar logado para se candidatar.",
                 variant: "destructive",
             });
-            router.push("/login"); // Or open login modal
+            router.push("/login");
             return;
         }
 
@@ -141,11 +158,53 @@ export default function DetalhesVagaPage() {
                 description: "Boa sorte! Você pode acompanhar suas candidaturas no painel.",
                 duration: 5000,
             });
-            router.push("/dashboard/candidaturas"); // Redirect to applications page
+            router.push("/dashboard/candidaturas");
         } catch (error) {
             toast({
                 title: "Erro ao candidatar",
                 description: "Ocorreu um erro ao processar sua candidatura. Tente novamente.",
+                variant: "destructive",
+            });
+        } finally {
+            setApplying(false);
+        }
+    };
+
+    const handleCounterProposal = async () => {
+        if (!userProfile) {
+            toast({
+                title: "Login necessário",
+                description: "Você precisa estar logado para fazer uma contraproposta.",
+                variant: "destructive",
+            });
+            router.push("/login");
+            return;
+        }
+
+        if (!proposalAmount) {
+            toast({
+                title: "Campo obrigatório",
+                description: "Por favor, insira o valor da sua proposta.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        setApplying(true);
+        try {
+            await applyToJob(vaga!.id, userProfile.id, proposalMessage, parseFloat(proposalAmount));
+            setHasApplied(true);
+            setIsProposalModalOpen(false);
+            toast({
+                title: "Contraproposta enviada!",
+                description: "Sua proposta foi enviada com sucesso ao contratante.",
+                duration: 5000,
+            });
+            router.push("/dashboard/candidaturas");
+        } catch (error) {
+            toast({
+                title: "Erro ao enviar",
+                description: "Ocorreu um erro ao enviar sua contraproposta. Tente novamente.",
                 variant: "destructive",
             });
         } finally {
@@ -394,6 +453,12 @@ export default function DetalhesVagaPage() {
                                                 "A combinar"
                                             )}
                                         </div>
+                                        {appliedDetails?.counterProposal && (
+                                            <div className="mt-2 flex items-center gap-1.5 text-emerald-700 font-bold bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 w-fit">
+                                                <DollarSign className="h-4 w-4" />
+                                                <span>Minha Proposta: R$ {appliedDetails.counterProposal}</span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="space-y-4 pt-4 border-t">
@@ -437,6 +502,50 @@ export default function DetalhesVagaPage() {
                                         >
                                             <Share2 className="mr-2 h-4 w-4" /> Compartilhar Vaga
                                         </Button>
+
+                                        {userProfile?.id !== vaga.employerId && !hasApplied && (
+                                            <Dialog open={isProposalModalOpen} onOpenChange={setIsProposalModalOpen}>
+                                                <DialogTrigger asChild>
+                                                    <Button variant="outline" className="w-full border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 mt-2">
+                                                        Fazer contraproposta
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogContent className="sm:max-w-[425px]">
+                                                    <DialogHeader>
+                                                        <DialogTitle>Fazer Contraproposta</DialogTitle>
+                                                        <DialogDescription>
+                                                            Sugira um valor diferente para este trabalho. O contratante será notificado.
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <div className="grid gap-4 py-4">
+                                                        <div className="grid gap-2">
+                                                            <Label htmlFor="amount">Valor Sugerido (R$)</Label>
+                                                            <Input
+                                                                id="amount"
+                                                                type="number"
+                                                                placeholder="Ex: 600"
+                                                                value={proposalAmount}
+                                                                onChange={(e) => setProposalAmount(e.target.value)}
+                                                            />
+                                                        </div>
+                                                        <div className="grid gap-2">
+                                                            <Label htmlFor="message">Mensagem (Opcional)</Label>
+                                                            <Textarea
+                                                                id="message"
+                                                                placeholder="Explique o motivo da sua proposta..."
+                                                                value={proposalMessage}
+                                                                onChange={(e) => setProposalMessage(e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <DialogFooter>
+                                                        <Button onClick={handleCounterProposal} disabled={applying}>
+                                                            {applying ? "Enviando..." : "Enviar Proposta"}
+                                                        </Button>
+                                                    </DialogFooter>
+                                                </DialogContent>
+                                            </Dialog>
+                                        )}
                                     </div>
                                 </CardContent>
                             </Card>
@@ -461,6 +570,11 @@ export default function DetalhesVagaPage() {
                                     "A combinar"
                                 )}
                             </p>
+                            {appliedDetails?.counterProposal && (
+                                <p className="text-emerald-700 font-bold text-sm mt-0.5">
+                                    Minha Proposta: R$ {appliedDetails.counterProposal}
+                                </p>
+                            )}
                         </div>
                         <Button
                             size="lg"
@@ -470,6 +584,37 @@ export default function DetalhesVagaPage() {
                         >
                             {applying ? "Enviando..." : hasApplied ? "Já Candidatado" : "Candidatar-se"}
                         </Button>
+                        {userProfile?.id !== vaga.employerId && !hasApplied && (
+                            <Dialog open={isProposalModalOpen} onOpenChange={setIsProposalModalOpen}>
+                                <DialogTrigger asChild>
+                                    <Button variant="outline" size="icon" className="h-12 w-12 shrink-0 border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800">
+                                        <DollarSign className="h-6 w-6" />
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-[425px]">
+                                    <DialogHeader>
+                                        <DialogTitle>Fazer Contraproposta</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="grid gap-4 py-4">
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="amount-mobile">Valor Sugerido (R$)</Label>
+                                            <Input
+                                                id="amount-mobile"
+                                                type="number"
+                                                placeholder="Ex: 600"
+                                                value={proposalAmount}
+                                                onChange={(e) => setProposalAmount(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                    <DialogFooter>
+                                        <Button className="w-full" onClick={handleCounterProposal} disabled={applying}>
+                                            {applying ? "Enviando..." : "Enviar"}
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        )}
                     </div>
                 </div>
             </main>

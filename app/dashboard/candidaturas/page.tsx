@@ -8,7 +8,7 @@ import { Footer } from "@/components/footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Briefcase, MapPin, Clock, Building2, ChevronRight, Loader2, MessageSquare } from "lucide-react";
+import { Briefcase, MapPin, Clock, Building2, ChevronRight, Loader2, MessageSquare, DollarSign } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -120,20 +120,29 @@ export default function MinhasCandidaturasPage() {
                                                 </div>
                                             </div>
 
-                                            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
-                                                <div className="flex items-center gap-1.5">
-                                                    <MapPin className="h-4 w-4" />
-                                                    <span>
-                                                        {app.jobOffer.locationType === "remote"
-                                                            ? "Remoto"
-                                                            : `${app.jobOffer.city || ""}/${app.jobOffer.state || ""}`}
+                                            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-muted-foreground mt-2">
+                                                <div className="flex items-center gap-1.5 py-1 px-3 bg-muted/50 rounded-full border">
+                                                    <DollarSign className="h-4 w-4 text-foreground/70" />
+                                                    <span className="font-semibold text-foreground">
+                                                        Vaga:{" "}
+                                                        {(app.jobOffer.budgetMin !== null && app.jobOffer.budgetMin !== undefined) ||
+                                                            (app.jobOffer.budgetMax !== null && app.jobOffer.budgetMax !== undefined) ? (
+                                                            <>
+                                                                {app.jobOffer.budgetMin !== null && app.jobOffer.budgetMin !== undefined && `R$ ${app.jobOffer.budgetMin}`}
+                                                                {app.jobOffer.budgetMin !== null && app.jobOffer.budgetMin !== undefined &&
+                                                                    app.jobOffer.budgetMax !== null && app.jobOffer.budgetMax !== undefined && " - "}
+                                                                {app.jobOffer.budgetMax !== null && app.jobOffer.budgetMax !== undefined && `R$ ${app.jobOffer.budgetMax}`}
+                                                            </>
+                                                        ) : (
+                                                            "A combinar"
+                                                        )}
                                                     </span>
                                                 </div>
-                                                <div className="flex items-center gap-1.5">
-                                                    <Briefcase className="h-4 w-4" />
-                                                    <span className="capitalize">
-                                                        {app.jobOffer.jobType === "full_time" ? "Tempo Integral" :
-                                                            app.jobOffer.jobType === "part_time" ? "Meio Período" : app.jobOffer.jobType}
+
+                                                <div className={`flex items-center gap-1.5 py-1 px-3 rounded-full border ${app.counterProposal ? "bg-emerald-50 border-emerald-100 text-emerald-700" : "bg-muted/30 border-dashed"}`}>
+                                                    <DollarSign className={`h-4 w-4 ${app.counterProposal ? "text-emerald-600" : "text-muted-foreground"}`} />
+                                                    <span className={app.counterProposal ? "font-bold" : "text-muted-foreground"}>
+                                                        {app.counterProposal ? `Minha Proposta: R$ ${app.counterProposal}` : "Sem contraproposta"}
                                                     </span>
                                                 </div>
                                             </div>

@@ -12,7 +12,8 @@ import {
     X,
     Mail,
     Phone,
-    MessageCircle
+    MessageCircle,
+    DollarSign
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
@@ -96,6 +97,12 @@ export function CandidateCard({
                                     <Calendar className="h-3.5 w-3.5" />
                                     <span>Aplicou em {format(new Date(candidate.createdAt), "d 'de' MMM", { locale: ptBR })}</span>
                                 </div>
+                                {candidate.counterProposal && candidate.counterProposal > 0 && (
+                                    <div className="flex items-center gap-1.5 text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
+                                        <DollarSign className="h-3.5 w-3.5" />
+                                        <span>Proposta: R$ {candidate.counterProposal}</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

@@ -46,36 +46,40 @@ export function SearchBar({
     return (
         <div
             className={cn(
-                "flex flex-col md:flex-row gap-2 p-2 bg-white rounded-full shadow-lg border border-border/50 max-w-4xl mx-auto items-center",
+                "flex flex-col md:flex-row p-2 bg-card rounded-2xl md:rounded-full shadow-2xl border border-border/40 max-w-4xl mx-auto items-center",
                 className
             )}
         >
             {/* City Input */}
-            <div className="relative flex-1 w-full md:w-auto">
-                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                    placeholder="Cidade"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="pl-10 border-0 shadow-none focus-visible:ring-0 bg-transparent h-12"
-                />
+            <div className="relative flex-1 w-full md:w-auto overflow-hidden">
+                <div className="relative flex items-center h-12 px-6 transition-colors cursor-text group">
+                    <MapPin className="h-5 w-5 text-primary mr-4 shrink-0" />
+                    <Input
+                        placeholder="Em qual cidade?"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        className="p-0 border-0 shadow-none focus-visible:ring-0 bg-transparent h-full text-base font-medium text-foreground placeholder:text-muted-foreground w-full truncate selection:bg-primary/20"
+                    />
+                </div>
             </div>
 
-            <div className="hidden md:block w-px h-8 bg-border" />
+            <div className="hidden md:block w-px h-8 bg-border/60 mx-2" />
 
             {/* Date Picker */}
-            <div className="flex-1 w-full md:w-auto">
+            <div className="flex-1 w-full md:w-auto relative overflow-hidden">
                 <Popover>
                     <PopoverTrigger asChild>
                         <Button
                             variant={"ghost"}
                             className={cn(
-                                "w-full justify-start text-left font-normal h-12 hover:bg-transparent px-4",
+                                "w-full justify-start text-left font-normal h-12 hover:bg-transparent px-6 rounded-none md:rounded-lg",
                                 !date && "text-muted-foreground"
                             )}
                         >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {date ? format(date, "dd/MM/yyyy") : <span>mm/dd/yyyy</span>}
+                            <CalendarIcon className="mr-4 h-5 w-5 text-primary shrink-0" />
+                            <span className={cn("text-base truncate font-medium", !date ? "text-muted-foreground" : "text-foreground")}>
+                                {date ? format(date, "dd/MM/yyyy") : "Data do Job"}
+                            </span>
                         </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -89,15 +93,18 @@ export function SearchBar({
                 </Popover>
             </div>
 
-            <div className="hidden md:block w-px h-8 bg-border" />
+            <div className="hidden md:block w-px h-8 bg-border/60 mx-2" />
 
             {/* Specialty Select */}
-            <div className="flex-1 w-full md:w-auto">
+            <div className="flex-1 w-full md:w-auto relative overflow-hidden">
                 <Select value={specialty} onValueChange={setSpecialty}>
-                    <SelectTrigger className="border-0 shadow-none focus:ring-0 h-12 bg-transparent">
-                        <div className="flex items-center text-muted-foreground">
-                            <Briefcase className="mr-2 h-4 w-4" />
-                            <SelectValue placeholder="Especialidade" />
+                    <SelectTrigger className="border-0 shadow-none focus:ring-0 h-12 bg-transparent hover:bg-transparent px-6 rounded-none md:rounded-lg">
+                        <div className="flex items-center text-left w-full overflow-hidden">
+                            <Briefcase className="mr-4 h-5 w-5 text-primary shrink-0" />
+                            <SelectValue
+                                placeholder="Especialidade"
+                                className="text-base font-medium text-muted-foreground placeholder:text-muted-foreground"
+                            />
                         </div>
                     </SelectTrigger>
                     <SelectContent>
@@ -111,13 +118,16 @@ export function SearchBar({
             </div>
 
             {/* Search Button */}
-            <Button
-                onClick={handleSearch}
-                className="w-full md:w-auto rounded-full px-8 h-10 md:ml-2 bg-blue-600 hover:bg-blue-700 text-white"
-            >
-                <Search className="mr-2 h-4 w-4" />
-                Buscar Disponíveis
-            </Button>
+            <div className="p-1 w-full md:w-auto shrink-0 ml-2">
+                <Button
+                    onClick={handleSearch}
+                    size="lg"
+                    className="w-full md:w-auto rounded-xl md:rounded-full h-12 w-12 md:w-auto md:px-8 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-base shadow-lg transition-all hover:scale-105 active:scale-95"
+                >
+                    <Search className="h-5 w-5 md:mr-2" />
+                    <span className="hidden md:inline">Buscar</span>
+                </Button>
+            </div>
         </div>
     );
 }

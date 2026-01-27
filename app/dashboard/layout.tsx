@@ -15,10 +15,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             if (!userProfile) {
                 router.push("/login");
             } else {
-                // Check for onboarding
-                // We check if cpf, phone or username are missing
-                if (!userProfile.cpf || !userProfile.phone || !userProfile.username) {
-                    // Prevent infinite redirect if we were to use this layout for onboarding (which we don't, onboarding is at /onboarding)
+                // Check if user needs onboarding (missing phone)
+                // AND has not skipped it in this session.
+                // This ensures we ask every time they login/open the app, but not in a loop.
+                const hasSkipped = sessionStorage.getItem("onboarding_skipped");
+
+                if (!userProfile.phone && !hasSkipped) {
                     router.push("/onboarding");
                 }
             }

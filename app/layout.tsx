@@ -46,6 +46,7 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
+          storageKey="iso-theme-preference"
         >
           <AuthProvider>
             {children}

@@ -38,7 +38,7 @@ export function BulkActionBar({
                 initial={{ y: 100, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 100, opacity: 0 }}
-                className="fixed bottom-4 left-2 right-2 md:left-1/2 md:right-auto md:transform md:-translate-x-1/2 z-50 md:w-auto md:min-w-[500px] md:max-w-2xl"
+                className="fixed bottom-4 left-2 right-2 md:left-1/2 md:right-auto md:transform md:-translate-x-1/2 z-[100] md:w-auto md:min-w-[500px] md:max-w-2xl"
             >
                 <Card className="bg-foreground text-background shadow-2xl border-none">
                     <CardContent className="p-3 md:p-4">

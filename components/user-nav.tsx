@@ -119,10 +119,8 @@ export function UserNav() {
             <p className="text-sm font-semibold leading-none text-primary">
               {userProfile.displayName}
             </p>
-            <p className="text-xs leading-none text-muted-foreground">
-              {userProfile.userType === "professional"
-                ? "Profissional"
-                : "Cliente"}
+            <p className="text-xs leading-none text-muted-foreground capitalize">
+              {userProfile.subscriptionTier || 'Free'}
             </p>
           </div>
         </DropdownMenuLabel>

@@ -41,6 +41,7 @@ export interface Professional {
   phoneCountryCode?: string;
   portfolioLink?: string;
   isActive?: boolean;
+  subscriptionTier?: 'free' | 'standard' | 'pro';
 }
 
 export interface JobOffer {
@@ -853,7 +854,8 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
           city,
           state,
           average_rating,
-          total_reviews
+          total_reviews,
+          subscription_tier
         )
       `)
       .eq('job_offer_id', jobId)
@@ -881,6 +883,7 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
         state: app.profiles.state,
         averageRating: app.profiles.average_rating,
         totalReviews: app.profiles.total_reviews,
+        subscriptionTier: app.profiles.subscription_tier,
         // email and phone removed to prevent error
       }
     }));

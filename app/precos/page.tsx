@@ -11,11 +11,50 @@ import { GradientBackground, FloatingParticles } from "@/components/video-backgr
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/components/ui/use-toast";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
 export default function PricingPage() {
+    const { updateSubscriptionTier, userProfile, loading: authLoading } = useAuth();
+    const { toast } = useToast();
+    const router = useRouter();
     const [isAnnual, setIsAnnual] = useState(false);
+    const [loadingTier, setLoadingTier] = useState<string | null>(null);
+
+    const handleSubscribe = async (tierName: string) => {
+        if (authLoading) return;
+
+        if (!userProfile) {
+            router.push("/auth/login?redirect=/precos");
+            return;
+        }
+
+        const tier = tierName.toLowerCase() as 'free' | 'standard' | 'pro';
+        setLoadingTier(tierName);
+
+        try {
+            await updateSubscriptionTier(tier);
+            toast({
+                title: "Plano atualizado!",
+                description: `Você agora é um assinante ${tierName}. Aproveite!`,
+            });
+            // Optional: redirect to dashboard after success
+            // router.push("/dashboard");
+        } catch (error) {
+            console.error(error);
+            toast({
+                variant: "destructive",
+                title: "Erro ao atualizar plano",
+                description: "Tente novamente mais tarde.",
+            });
+        } finally {
+            setLoadingTier(null);
+        }
+    };
 
     const plans = [
         {
@@ -24,11 +63,11 @@ export default function PricingPage() {
             price: 0,
             annualPrice: 0,
             features: [
-                "2 candidaturas em vagas por mês",
+                "5 candidaturas em vagas por mês",
+                "Até 10 visualizações de perfil por mês",
                 "Publique até 1 vaga por mês",
                 "Anuncie 1 equipamento",
-                "Envie até 4 arquivos no portfólio",
-                "Perfil básico na busca"
+                "Envie até 4 arquivos no portfólio"
             ],
             notIncluded: [
                 "Envio de contrapropostas",
@@ -46,9 +85,10 @@ export default function PricingPage() {
             price: 49.90,
             annualPrice: 39.90,
             features: [
-                "6 candidaturas em vagas por mês",
+                "10 candidaturas em vagas por mês",
+                "Até 30 visualizações de perfil por mês",
                 "Publique até 3 vagas por mês",
-                "Envie 1 contraproposta por job",
+                "Envie 3 contrapropostas por job",
                 "Anuncie até 5 equipamentos",
                 "Envie até 10 arquivos no portfólio",
                 "Selo de Perfil Verificado"
@@ -69,10 +109,12 @@ export default function PricingPage() {
             annualPrice: 79.90,
             features: [
                 "Candidaturas ILIMITADAS",
+                "Visualizações de perfil ILIMITADAS",
                 "Publique vagas ILIMITADAS",
                 "Contrapropostas livres",
                 "Equipamentos ILIMITADOS",
                 "Envie até 20 arquivos no portfólio",
+                "Selo de Perfil Verificado",
                 "Destaque máximo nas buscas",
                 "Suporte VIP Prioritário"
             ],
@@ -192,8 +234,11 @@ export default function PricingPage() {
                                                 className="w-full h-11"
                                                 variant={plan.ctaVariant}
                                                 size="lg"
+                                                onClick={() => handleSubscribe(plan.name)}
+                                                disabled={loadingTier === plan.name || (userProfile?.subscriptionTier === plan.name.toLowerCase())}
                                             >
-                                                {plan.cta}
+                                                {loadingTier === plan.name && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                {userProfile?.subscriptionTier === plan.name.toLowerCase() ? "Seu Plano Atual" : plan.cta}
                                             </Button>
                                         </CardFooter>
                                     </Card>

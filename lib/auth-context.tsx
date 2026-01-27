@@ -40,6 +40,7 @@ export interface UserProfile {
   isPublished: boolean;
   createdAt: Date;
   updatedAt: Date;
+  subscriptionTier?: 'free' | 'standard' | 'pro';
 }
 
 interface AuthContextType {
@@ -58,6 +59,7 @@ interface AuthContextType {
   getRedirectUrl: () => string | null;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   updateUserAuth: (attributes: { password?: string; email?: string; data?: any }) => Promise<void>;
+  updateSubscriptionTier: (tier: 'free' | 'standard' | 'pro') => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -317,6 +319,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  const updateSubscriptionTier = async (tier: 'free' | 'standard' | 'pro') => {
+    if (!userProfile) throw new Error("Usuário não autenticado");
+
+    try {
+      // Update in database
+      const { error } = await supabase
+        .from('profiles')
+        .update({ subscription_tier: tier })
+        .eq('id', userProfile.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setUserProfile({
+        ...userProfile,
+        subscriptionTier: tier,
+        updatedAt: new Date(),
+      });
+
+      // Update local storage
+      localStorage.setItem("user_profile", JSON.stringify({
+        ...userProfile,
+        subscriptionTier: tier,
+        updatedAt: new Date(),
+      }));
+
+      console.log(`[auth-context] Subscription updated to ${tier}`);
+    } catch (error) {
+      console.error("[auth-context] Update subscription error:", error);
+      throw error;
+    }
+  };
+
   const isAnonymous = !userProfile;
 
   const value: AuthContextType = {
@@ -331,6 +366,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     getRedirectUrl,
     updateProfile,
     updateUserAuth,
+    updateSubscriptionTier,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

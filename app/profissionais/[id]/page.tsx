@@ -222,7 +222,7 @@ export default function ProfessionalProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
@@ -230,10 +230,10 @@ export default function ProfessionalProfilePage() {
 
   if (!professional) {
     return (
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col bg-background">
         <Header />
         <main className="flex-1 flex items-center justify-center">
-          <Card className="max-w-md">
+          <Card className="max-w-md bg-card border-border">
             <CardContent className="pt-6 text-center">
               <p className="text-muted-foreground mb-4">
                 Profissional não encontrado
@@ -250,7 +250,7 @@ export default function ProfessionalProfilePage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors duration-300">
       <Header />
 
       <main className="flex-1 py-12 px-4">
@@ -258,14 +258,14 @@ export default function ProfessionalProfilePage() {
           {/* Profile Header */}
           <div className="flex flex-col items-center text-center space-y-6">
             {/* Avatar */}
-            <div className="relative h-40 w-40 rounded-full p-1 bg-gradient-to-tr from-amber-200 to-amber-100 shadow-lg flex items-center justify-center">
-              <Avatar className="h-full w-full border-4 border-white shadow-inner">
+            <div className="relative h-40 w-40 rounded-full p-1 bg-gradient-to-tr from-primary/20 to-primary/5 shadow-2xl flex items-center justify-center">
+              <Avatar className="h-full w-full border-4 border-background shadow-inner">
                 <AvatarImage
                   src={professional.avatarUrl || undefined}
                   alt={professional.displayName}
                   className="object-cover"
                 />
-                <AvatarFallback className="text-4xl bg-white text-gray-400">
+                <AvatarFallback className="text-4xl bg-muted text-muted-foreground">
                   {professional.displayName?.charAt(0).toUpperCase() || "P"}
                 </AvatarFallback>
               </Avatar>
@@ -273,7 +273,7 @@ export default function ProfessionalProfilePage() {
 
             {/* Info */}
             <div className="space-y-4">
-              <h1 className="text-4xl font-bold text-gray-900 tracking-tight">
+              <h1 className="text-4xl font-bold text-foreground tracking-tight">
                 {professional.artisticName || professional.displayName}
               </h1>
 
@@ -284,13 +284,13 @@ export default function ProfessionalProfilePage() {
                     <Badge
                       key={spec}
                       variant="secondary"
-                      className="bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-100 px-3 py-1 font-semibold"
+                      className="bg-primary/10 text-primary border-primary/20 px-3 py-1 font-semibold hover:bg-primary/20"
                     >
                       {spec}
                     </Badge>
                   ))
                 ) : (
-                  <p className="text-lg text-gray-600 font-medium">
+                  <p className="text-lg text-muted-foreground font-medium">
                     {professional.specialty || "Profissional"}
                   </p>
                 )}
@@ -298,8 +298,8 @@ export default function ProfessionalProfilePage() {
 
               {/* Location */}
               {(professional.city || professional.state) && (
-                <div className="flex items-center justify-center gap-1.5 text-gray-600 bg-gray-50 px-4 py-2 rounded-full w-fit mx-auto border border-gray-100 shadow-sm">
-                  <MapPin className="h-4 w-4 text-amber-500" />
+                <div className="flex items-center justify-center gap-1.5 text-muted-foreground bg-muted/50 px-4 py-2 rounded-full w-fit mx-auto border border-border shadow-sm">
+                  <MapPin className="h-4 w-4 text-primary" />
                   <span className="text-sm font-semibold">
                     {professional.city}
                     {professional.city && professional.state && ", "}
@@ -311,7 +311,7 @@ export default function ProfessionalProfilePage() {
               {/* Biography */}
               {professional.description && (
                 <div className="max-w-2xl mx-auto pt-2">
-                  <p className="text-gray-600 text-center leading-relaxed">
+                  <p className="text-muted-foreground text-center leading-relaxed">
                     {professional.description}
                   </p>
                 </div>
@@ -323,23 +323,23 @@ export default function ProfessionalProfilePage() {
               {/* Social Icons */}
               <div className="flex gap-4">
                 <Button
-                  variant="secondary"
+                  variant="outline"
                   size="icon"
-                  className="rounded-full h-10 w-10 bg-gray-100 hover:bg-gray-200 text-gray-600"
+                  className="rounded-full h-11 w-11 border-border bg-background/50 hover:bg-primary/10 hover:text-primary hover:scale-110 hover:border-primary/50 transition-all duration-300 shadow-sm"
                 >
                   <Instagram className="h-5 w-5" />
                 </Button>
                 <Button
-                  variant="secondary"
+                  variant="outline"
                   size="icon"
-                  className="rounded-full h-10 w-10 bg-gray-100 hover:bg-gray-200 text-gray-600"
+                  className="rounded-full h-11 w-11 border-border bg-background/50 hover:bg-primary/10 hover:text-primary hover:scale-110 hover:border-primary/50 transition-all duration-300 shadow-sm"
                 >
                   <Linkedin className="h-5 w-5" />
                 </Button>
                 <Button
-                  variant="secondary"
+                  variant="outline"
                   size="icon"
-                  className="rounded-full h-10 w-10 bg-gray-100 hover:bg-gray-200 text-gray-600"
+                  className="rounded-full h-11 w-11 border-border bg-background/50 hover:bg-primary/10 hover:text-primary hover:scale-110 hover:border-primary/50 transition-all duration-300 shadow-sm"
                 >
                   <Globe className="h-5 w-5" />
                 </Button>
@@ -348,7 +348,7 @@ export default function ProfessionalProfilePage() {
               {/* WhatsApp Button */}
               {professional.phone && (
                 <Button
-                  className="bg-green-600 hover:bg-green-700 text-white rounded-full px-8 h-12 gap-2 shadow-lg shadow-green-200"
+                  className="bg-green-600 hover:bg-green-700 text-white rounded-full px-8 h-12 gap-2 shadow-lg shadow-green-900/20 hover:shadow-green-900/40 hover:-translate-y-0.5 transition-all duration-300"
                   onClick={() => {
                     let phone = professional.phone || '';
                     // Remove non-digits and non-plus
@@ -393,23 +393,23 @@ export default function ProfessionalProfilePage() {
 
           {/* Tabs */}
           <Tabs defaultValue="portfolio" className="w-full">
-            <div className="flex justify-center mb-12 border-b border-gray-100">
-              <TabsList className="bg-transparent h-auto p-0 gap-8">
+            <div className="flex justify-center mb-10">
+              <TabsList className="bg-muted/50 p-1.5 h-auto rounded-full gap-2 border border-border/50">
                 <TabsTrigger
                   value="portfolio"
-                  className="bg-transparent border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:shadow-none rounded-none px-4 py-3 text-xs font-bold uppercase tracking-wider text-gray-400 data-[state=active]:text-gray-900"
+                  className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm hover:text-primary/80"
                 >
                   Portfólio
                 </TabsTrigger>
                 <TabsTrigger
                   value="avaliacoes"
-                  className="bg-transparent border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:shadow-none rounded-none px-4 py-3 text-xs font-bold uppercase tracking-wider text-gray-400 data-[state=active]:text-gray-900"
+                  className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm hover:text-primary/80"
                 >
                   Avaliações
                 </TabsTrigger>
                 <TabsTrigger
                   value="disponibilidade"
-                  className="bg-transparent border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:shadow-none rounded-none px-4 py-3 text-xs font-bold uppercase tracking-wider text-gray-400 data-[state=active]:text-gray-900"
+                  className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm hover:text-primary/80"
                 >
                   Disponibilidade
                 </TabsTrigger>
@@ -426,7 +426,7 @@ export default function ProfessionalProfilePage() {
                     return (
                       <div
                         key={item.id}
-                        className="group relative aspect-square bg-gray-100 rounded-2xl overflow-hidden cursor-pointer"
+                        className="group relative aspect-square bg-muted rounded-2xl overflow-hidden cursor-pointer border border-border/50"
                         onClick={() => openLightbox(index)}
                       >
                         {isVideo ? (
@@ -443,8 +443,8 @@ export default function ProfessionalProfilePage() {
                               }}
                             />
                             <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-colors pointer-events-none">
-                              <div className="h-12 w-12 bg-white rounded-full flex items-center justify-center shadow-lg">
-                                <Play className="h-5 w-5 text-gray-900 fill-gray-900 ml-1" />
+                              <div className="h-12 w-12 bg-white/90 rounded-full flex items-center justify-center shadow-lg backdrop-blur-sm">
+                                <Play className="h-5 w-5 text-black ml-1" />
                               </div>
                             </div>
                           </>
@@ -472,7 +472,7 @@ export default function ProfessionalProfilePage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-6">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Avaliações</h2>
+                    <h2 className="text-2xl font-bold text-foreground">Avaliações</h2>
                     <p className="text-muted-foreground text-sm">O que outros profissionais dizem</p>
                   </div>
 
@@ -489,7 +489,7 @@ export default function ProfessionalProfilePage() {
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
-                  <div className="flex items-center gap-2 text-blue-600 font-bold">
+                  <div className="flex items-center gap-2 text-primary font-bold">
                     <span className="text-3xl">
                       {professional.averageRating ? professional.averageRating.toFixed(1) : "—"}
                     </span>
@@ -499,28 +499,17 @@ export default function ProfessionalProfilePage() {
                           <Star
                             key={star}
                             className={`h-4 w-4 ${star <= Math.round(professional.averageRating || 0)
-                              ? "fill-blue-600 text-blue-600"
-                              : "text-gray-200"
+                              ? "fill-primary text-primary"
+                              : "text-muted"
                               }`}
                           />
                         ))}
                       </div>
-                      <span className="text-sm text-gray-400 font-normal">
+                      <span className="text-sm text-muted-foreground font-normal">
                         {professional.totalReviews} avaliações
                       </span>
                     </div>
                   </div>
-
-                  {/* Review Button Logic */}
-                  {/* Review Button Logic - DEBUG INFO */}
-                  {/*
-                  <div className="text-xs text-red-500 flex flex-col items-end">
-                      <p>MyID: {currentUser?.id?.substring(0,5)}...</p>
-                      <p>ProfID: {professional.id?.substring(0,5)}...</p>
-                      <p>Type: {currentUser?.userType}</p>
-                      <p>Reviewed: {hasUserReviewed ? 'Yes' : 'No'}</p>
-                  </div>
-                  */}
 
                   {currentUser &&
                     currentUser.userType === 'professional' &&
@@ -539,19 +528,19 @@ export default function ProfessionalProfilePage() {
                   {reviews.map((review) => (
                     <div
                       key={review.id}
-                      className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow"
+                      className="bg-card border border-border rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow"
                     >
                       <div className="flex items-start gap-4 mb-4">
-                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center text-amber-700 font-bold text-lg shadow-inner border border-white">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shadow-inner border border-primary/20">
                           {review.clientName.charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1">
                           <div className="flex justify-between items-start">
                             <div>
-                              <h3 className="font-bold text-gray-900">
+                              <h3 className="font-bold text-foreground">
                                 {review.clientName}
                               </h3>
-                              <p className="text-xs text-gray-400 uppercase tracking-wide">
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">
                                 {new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }).format(review.createdAt)}
                               </p>
                             </div>
@@ -560,8 +549,8 @@ export default function ProfessionalProfilePage() {
                                 <Star
                                   key={star}
                                   className={`h-4 w-4 ${star <= review.rating
-                                    ? "fill-amber-400 text-amber-400"
-                                    : "text-gray-200"
+                                    ? "fill-primary text-primary"
+                                    : "text-muted"
                                     }`}
                                 />
                               ))}
@@ -574,23 +563,23 @@ export default function ProfessionalProfilePage() {
                       {review.qualities && review.qualities.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-3">
                           {review.qualities.map((q: string, i: number) => (
-                            <Badge key={i} variant="outline" className="text-xs bg-green-50 text-green-700 border-green-100 font-normal">
+                            <Badge key={i} variant="outline" className="text-xs bg-muted text-muted-foreground border-border font-normal">
                               {q}
                             </Badge>
                           ))}
                         </div>
                       )}
 
-                      <p className="text-gray-600 italic leading-relaxed text-sm bg-gray-50/50 p-3 rounded-lg border border-gray-100/50">
+                      <p className="text-muted-foreground italic leading-relaxed text-sm bg-muted/30 p-3 rounded-lg border border-border/50">
                         "{review.comment}"
                       </p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-12 border-2 border-dashed border-gray-100 rounded-xl bg-gray-50/50">
-                  <div className="flex flex-col items-center justify-center text-gray-400 space-y-3">
-                    <MessageCircle className="h-12 w-12 text-gray-200" />
+                <div className="text-center py-12 border-2 border-dashed border-border rounded-xl bg-muted/20">
+                  <div className="flex flex-col items-center justify-center text-muted-foreground space-y-3">
+                    <MessageCircle className="h-12 w-12 text-muted-foreground/50" />
                     <p className="text-muted-foreground">
                       Este profissional ainda não possui avaliações.
                     </p>
@@ -606,7 +595,7 @@ export default function ProfessionalProfilePage() {
 
             <TabsContent value="disponibilidade" className="mt-0 space-y-8">
               <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-gray-900">
+                <h2 className="text-2xl font-bold text-foreground">
                   Disponibilidade
                 </h2>
               </div>

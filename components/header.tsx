@@ -65,7 +65,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-[80] w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-24">
           <Link href="/" className="flex items-center gap-3">
             <Image
               src="/logo-cortada.png"
@@ -200,8 +200,8 @@ export function Header() {
                       size="sm"
                       className="w-full justify-start bg-transparent border-accent/30 hover:bg-accent/10 hover:text-accent"
                     >
-                      <User className="h-4 w-4 mr-2 text-accent" />
-                      Meu Perfil
+                      <User className="h-4 w-4 mr-2 text-blue-500 dark:text-blue-400" />
+                      <span className="font-medium">Meu Perfil</span>
                     </Button>
                   </Link>
                   <Link
@@ -213,8 +213,8 @@ export function Header() {
                       size="sm"
                       className="w-full justify-start bg-transparent border-primary/30 hover:bg-primary/10 hover:text-primary"
                     >
-                      <Settings className="h-4 w-4 mr-2 text-primary" />
-                      Configurações
+                      <Settings className="h-4 w-4 mr-2 text-purple-500 dark:text-purple-400" />
+                      <span className="font-medium">Configurações</span>
                     </Button>
                   </Link>
                   <Button
@@ -253,7 +253,7 @@ export function Header() {
                       size="sm"
                       className="w-full justify-start bg-transparent border-accent/30 hover:bg-accent/10 hover:text-accent"
                     >
-                      <LogIn className="h-4 w-4 mr-2 text-accent" />
+                      <LogIn className="h-4 w-4 mr-2 text-primary" />
                       Entrar
                     </Button>
                   </Link>

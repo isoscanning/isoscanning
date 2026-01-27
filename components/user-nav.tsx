@@ -40,10 +40,10 @@ export function UserNav() {
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
-            className="relative h-10 w-10 rounded-full hover:bg-accent/10"
+            className="relative h-10 w-10 rounded-full hover:bg-transparent"
           >
-            <Avatar className="h-10 w-10 ring-2 ring-accent/20 hover:ring-accent transition-all">
-              <AvatarFallback className="bg-primary/20 text-primary">
+            <Avatar className="h-10 w-10 border border-border/50 hover:border-primary/50 transition-all shadow-sm">
+              <AvatarFallback className="bg-muted text-foreground/70 hover:text-primary transition-colors">
                 <User className="h-5 w-5" />
               </AvatarFallback>
             </Avatar>
@@ -66,13 +66,13 @@ export function UserNav() {
           <DropdownMenuGroup>
             <DropdownMenuItem
               asChild
-              className="cursor-pointer hover:bg-accent/10 dark:hover:bg-primary/25"
+              className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
             >
               <Link
                 href="/login"
                 className="flex items-center w-full text-foreground"
               >
-                <LogIn className="mr-2 h-4 w-4 text-accent" />
+                <LogIn className="mr-2 h-4 w-4 text-primary" />
                 <span>Entrar</span>
               </Link>
             </DropdownMenuItem>
@@ -114,7 +114,7 @@ export function UserNav() {
         align="end"
         sideOffset={8}
       >
-        <DropdownMenuLabel className="font-normal bg-accent/10 dark:bg-primary/25 rounded-md p-3">
+        <DropdownMenuLabel className="font-normal bg-muted/50 rounded-md p-3 mb-1">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-semibold leading-none text-primary">
               {userProfile.displayName}
@@ -130,25 +130,25 @@ export function UserNav() {
         <DropdownMenuGroup>
           <DropdownMenuItem
             asChild
-            className="cursor-pointer hover:bg-accent/10 dark:hover:bg-primary/25"
+            className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
           >
             <Link
               href="/dashboard"
               className="flex items-center w-full text-foreground"
             >
-              <User className="mr-2 h-4 w-4 text-accent" />
+              <User className="mr-2 h-4 w-4 text-primary" />
               <span>Meu Perfil</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem
             asChild
-            className="cursor-pointer hover:bg-accent/10 dark:hover:bg-primary/25"
+            className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
           >
             <Link
               href="/dashboard/perfil"
               className="flex items-center w-full text-foreground"
             >
-              <Settings className="mr-2 h-4 w-4 text-accent" />
+              <Settings className="mr-2 h-4 w-4 text-primary" />
               <span>Configurações</span>
             </Link>
           </DropdownMenuItem>
@@ -156,7 +156,7 @@ export function UserNav() {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => signOut()}
-          className="cursor-pointer text-destructive hover:bg-destructive/10"
+          className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-100 dark:focus:bg-red-900/20"
         >
           <LogOut className="mr-2 h-4 w-4" />
           <span>Sair</span>

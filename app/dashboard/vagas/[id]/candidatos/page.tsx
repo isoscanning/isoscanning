@@ -66,14 +66,14 @@ export default function CandidatosVagaPage() {
         loadData();
     }, [userProfile, authLoading, params.id, router]);
 
-    const handleStatusUpdate = async (applicationId: string, status: 'accepted' | 'rejected') => {
+    const handleStatusUpdate = async (applicationId: string, status: 'accepted' | 'rejected', agreedValue?: number) => {
         setProcessingId(applicationId);
         try {
-            const success = await updateJobApplicationStatus(applicationId, status);
+            const success = await updateJobApplicationStatus(applicationId, status, agreedValue);
 
             if (!success) throw new Error("Falha ao atualizar status.");
 
-            setCandidates(candidates.map(c => c.id === applicationId ? { ...c, status } : c));
+            setCandidates(candidates.map(c => c.id === applicationId ? { ...c, status, agreedValue: status === 'accepted' ? agreedValue : undefined } : c));
 
             toast({
                 title: status === 'accepted' ? "Candidato aprovado!" : "Candidato rejeitado",
@@ -221,6 +221,7 @@ export default function CandidatosVagaPage() {
                                                     candidate={candidate}
                                                     isProcessing={processingId === candidate.id}
                                                     onStatusUpdate={handleStatusUpdate}
+                                                    jobBudgetValue={jobOffer.budgetMax || jobOffer.budgetMin || 0}
                                                 />
                                             ))}
                                     </div>

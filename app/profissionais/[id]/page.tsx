@@ -22,7 +22,8 @@ import {
   ChevronRight,
   X,
   MessageCircle,
-  Plus // Import Plus
+  Plus,
+  BadgeCheck
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
@@ -273,9 +274,16 @@ export default function ProfessionalProfilePage() {
 
             {/* Info */}
             <div className="space-y-4">
-              <h1 className="text-4xl font-bold text-foreground tracking-tight">
-                {professional.artisticName || professional.displayName}
-              </h1>
+              <div className="flex items-center justify-center gap-2">
+                <h1 className="text-4xl font-bold text-foreground tracking-tight">
+                  {professional.artisticName || professional.displayName}
+                </h1>
+                {(professional.subscriptionTier === 'standard' || professional.subscriptionTier === 'pro') && (
+                  <div title="Perfil Verificado">
+                    <BadgeCheck className="h-6 w-6 text-blue-500 fill-blue-500/10" />
+                  </div>
+                )}
+              </div>
 
               {/* Specialties */}
               <div className="flex flex-wrap justify-center gap-2">

@@ -22,7 +22,8 @@ import {
   MessageSquare,
   ArrowRight,
   UserPlus,
-  Briefcase
+  Briefcase,
+  BadgeCheck
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
@@ -148,9 +149,16 @@ export default function DashboardPage() {
           <ScrollReveal>
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary/10 via-purple-500/10 to-blue-500/10 p-8 md:p-12 border border-primary/10">
               <div className="relative z-10 space-y-4">
-                <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600">
-                  Olá, {userProfile.displayName || googleName}!
-                </h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600">
+                    Olá, {userProfile.displayName || googleName}!
+                  </h1>
+                  {(userProfile.subscriptionTier === 'standard' || userProfile.subscriptionTier === 'pro') && (
+                    <div title="Perfil Verificado">
+                      <BadgeCheck className="h-8 w-8 text-blue-500 fill-blue-500/10" />
+                    </div>
+                  )}
+                </div>
                 <p className="text-lg text-muted-foreground max-w-2xl text-foreground/80">
                   {isProfessional
                     ? "Bem-vindo ao seu painel de controle. Acompanhe suas métricas e gerencie seus serviços."

@@ -109,6 +109,19 @@ export default function PortfolioPage() {
     });
   };
 
+  // Limits definition
+  const limits = {
+    free: 4,
+    standard: 10,
+    pro: 20,
+  };
+
+  const currentLimit = userProfile?.subscriptionTier ? limits[userProfile.subscriptionTier as keyof typeof limits] || 4 : 4;
+  const isLimitReached = portfolioItems.length >= currentLimit;
+
+  // Percentage for progress bar
+  const usagePercentage = Math.min(100, (portfolioItems.length / currentLimit) * 100);
+
   const handlePortfolioFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -155,8 +168,8 @@ export default function PortfolioPage() {
       return;
     }
 
-    if (portfolioItems.length >= 9) {
-      setErrorMsg("Você já atingiu o limite de 9 itens no portfólio.");
+    if (isLimitReached) {
+      setErrorMsg(`Você já atingiu o limite de ${currentLimit} itens no portfólio do seu plano.`);
       return;
     }
 
@@ -188,7 +201,12 @@ export default function PortfolioPage() {
       setTimeout(() => setSuccessMsg(""), 5000);
     } catch (err: any) {
       console.error("Error adding portfolio item:", err);
-      setErrorMsg(err.message || "Erro ao adicionar item ao portfólio.");
+      // Nice error message if it's the 403 from backend
+      if (err.message && err.message.includes("Portfolio limit reached")) {
+        setErrorMsg("Limite do plano atingido (validado pelo servidor).");
+      } else {
+        setErrorMsg(err.message || "Erro ao adicionar item ao portfólio.");
+      }
     } finally {
       setLoadingPortfolio(false);
     }
@@ -248,7 +266,7 @@ export default function PortfolioPage() {
                 Meu Portfólio
               </h1>
               <p className="text-muted-foreground text-lg max-w-2xl">
-                Adicione suas melhores fotos e vídeos para criar uma vitrine irresistível e atrair mais clientes para seus serviços.
+                Adicione suas melhores fotos e vídeos. Seu plano atual ({userProfile.subscriptionTier || 'Free'}) permite até {currentLimit} itens.
               </p>
             </div>
           </ScrollReveal>
@@ -291,17 +309,22 @@ export default function PortfolioPage() {
                       Adicionar Novo Item
                     </CardTitle>
                     <CardDescription>
-                      Você pode adicionar até 9 itens (fotos ou vídeos curtos)
+                      Você pode adicionar até {currentLimit} itens em seu plano atual.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
 
-                    {portfolioItems.length >= 9 && (
-                      <Alert className="bg-yellow-500/10 border-yellow-500/20 text-yellow-600 dark:text-yellow-400">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                          Limite de 9 itens atingido.
-                        </AlertDescription>
+                    {isLimitReached && (
+                      <Alert className="bg-yellow-500/10 border-yellow-500/20 text-yellow-600 dark:text-yellow-400 flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            Limite de {currentLimit} itens atingido.
+                          </AlertDescription>
+                        </div>
+                        <Button variant="outline" size="sm" className="w-full mt-1 border-yellow-500/30 text-yellow-600 hover:bg-yellow-500/10" onClick={() => router.push('/precos')}>
+                          Fazer Upgrade do Plano
+                        </Button>
                       </Alert>
                     )}
 
@@ -314,7 +337,7 @@ export default function PortfolioPage() {
                         onChange={(e) =>
                           setNewPortfolioItem({ ...newPortfolioItem, title: e.target.value })
                         }
-                        disabled={loadingPortfolio || portfolioItems.length >= 9}
+                        disabled={loadingPortfolio || isLimitReached}
                         className="bg-background/50 backdrop-blur-sm"
                       />
                     </div>
@@ -322,7 +345,7 @@ export default function PortfolioPage() {
                     <div className="space-y-2">
                       <Label>Arquivo (Imagem ou Vídeo)</Label>
                       <div
-                        className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 relative overflow-hidden group/upload ${portfolioItems.length >= 9
+                        className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 relative overflow-hidden group/upload ${isLimitReached
                           ? "opacity-50 cursor-not-allowed border-muted"
                           : "hover:border-primary border-muted hover:bg-primary/5 cursor-pointer"
                           }`}
@@ -333,9 +356,9 @@ export default function PortfolioPage() {
                           className="hidden"
                           onChange={handlePortfolioFileChange}
                           accept="image/*,video/*"
-                          disabled={loadingPortfolio || portfolioItems.length >= 9}
+                          disabled={loadingPortfolio || isLimitReached}
                         />
-                        <label htmlFor="file-upload" className={`cursor-pointer w-full h-full block relative z-10 ${portfolioItems.length >= 9 ? "pointer-events-none" : ""}`}>
+                        <label htmlFor="file-upload" className={`cursor-pointer w-full h-full block relative z-10 ${isLimitReached ? "pointer-events-none" : ""}`}>
                           {portfolioPreview ? (
                             <div className="relative aspect-video w-full rounded-lg overflow-hidden shadow-sm">
                               {newPortfolioItem.mediaType === "video" ? (
@@ -370,7 +393,7 @@ export default function PortfolioPage() {
                     <Button
                       onClick={handleAddPortfolioItem}
                       className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all"
-                      disabled={loadingPortfolio || !portfolioFile || !newPortfolioItem.title || portfolioItems.length >= 9}
+                      disabled={loadingPortfolio || !portfolioFile || !newPortfolioItem.title || isLimitReached}
                     >
                       {loadingPortfolio ? (
                         <>
@@ -394,9 +417,18 @@ export default function PortfolioPage() {
                     <Layers className="h-5 w-5 text-primary" />
                     Galeria
                   </h2>
-                  <span className="text-xs font-medium text-muted-foreground bg-secondary px-3 py-1 rounded-full border border-border">
-                    {portfolioItems.length} de 9 itens usados
-                  </span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-xs font-medium text-muted-foreground bg-secondary px-3 py-1 rounded-full border border-border">
+                      {portfolioItems.length} de {currentLimit} itens usados
+                    </span>
+                    {/* Progress bar */}
+                    <div className="w-32 h-1.5 bg-secondary rounded-full mt-1.5 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${isLimitReached ? 'bg-red-500' : 'bg-primary'}`}
+                        style={{ width: `${usagePercentage}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </ScrollReveal>
 

@@ -33,7 +33,7 @@ export default function PricingPage() {
             return;
         }
 
-        const tier = tierName.toLowerCase() as 'free' | 'standard' | 'pro';
+        const tier = tierName.toLowerCase() as 'free' | 'standard' | 'pro' | 'vip';
         setLoadingTier(tierName);
 
         try {
@@ -180,24 +180,86 @@ export default function PricingPage() {
                             </ScrollReveal>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl mx-auto">
+
+                        {/* Launch Plan Section */}
+                        <ScrollReveal>
+                            <div className="max-w-4xl mx-auto mb-20">
+                                <Card className="relative overflow-hidden border-2 border-primary shadow-2xl shadow-primary/20 bg-background/60 backdrop-blur-xl">
+                                    <div className="absolute top-0 right-0 p-4">
+                                        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold px-4 py-1 rounded-full shadow-lg animate-pulse">
+                                            Oferta de Lançamento
+                                        </div>
+                                    </div>
+                                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 pointer-events-none" />
+
+                                    <div className="grid md:grid-cols-2 gap-8 p-8 md:p-12">
+                                        <div className="space-y-6">
+                                            <div>
+                                                <h3 className="text-3xl font-bold mb-2">Plano VIP</h3>
+                                                <p className="text-muted-foreground text-lg">
+                                                    Acesso total a todas as funcionalidades do sistema durante o período de lançamento.
+                                                </p>
+                                            </div>
+
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600">
+                                                    R$ 0,00
+                                                </span>
+                                                <span className="text-xl text-muted-foreground line-through">R$ 99,90</span>
+                                            </div>
+
+                                            <Button
+                                                size="lg"
+                                                className="w-full text-lg h-14 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 shadow-lg shadow-primary/25"
+                                                onClick={() => handleSubscribe('vip')}
+                                                disabled={loadingTier === 'vip' || userProfile?.subscriptionTier === 'vip'}
+                                            >
+                                                {loadingTier === 'vip' && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                                                {userProfile?.subscriptionTier === 'vip' ? "Plano Atual Ativo" : "Garantir Acesso Completo Grátis"}
+                                            </Button>
+
+                                            <p className="text-center text-sm text-muted-foreground">
+                                                *Válido por tempo limitado. Cancele quando quiser.
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
+                                                Tudo que você precisa:
+                                            </div>
+                                            <div className="grid gap-3">
+                                                {[
+                                                    "Candidaturas ILIMITADAS",
+                                                    "Visualizações de perfil ILIMITADAS",
+                                                    "Publique vagas ILIMITADAS",
+                                                    "Contrapropostas livres",
+                                                    "Envie até 20 arquivos no portfólio",
+                                                    "Selo de Perfil Verificado",
+                                                    "Destaque máximo nas buscas",
+                                                    "Suporte VIP Prioritário"
+                                                ].map((feature) => (
+                                                    <div key={feature} className="flex items-start gap-3">
+                                                        <div className="mt-1 p-1 rounded-full bg-green-500/10">
+                                                            <Check className="h-3 w-3 text-green-500" />
+                                                        </div>
+                                                        <span className="text-sm md:text-base">{feature}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Card>
+                            </div>
+                        </ScrollReveal>
+
+                        {/* Existing Plans (Disabled) */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl mx-auto opacity-60 grayscale-[0.5] pointer-events-none select-none relative after:absolute after:inset-0 after:z-10">
                             {plans.map((plan, index) => (
                                 <ScrollReveal key={plan.name} delay={index * 0.1}>
-                                    <Card className={`relative flex flex-col h-full overflow-hidden transition-all duration-300 ${plan.popular
-                                        ? 'border-primary shadow-lg shadow-primary/10 scale-105 z-10'
-                                        : 'border-border hover:border-primary/50 hover:shadow-md'
-                                        }`}>
-                                        {plan.popular && (
-                                            <div className="absolute top-0 right-0">
-                                                <div className="bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-bl-lg">
-                                                    Mais Popular
-                                                </div>
-                                            </div>
-                                        )}
-
+                                    <Card className={`relative flex flex-col h-full overflow-hidden border-border bg-card/50`}>
                                         <CardHeader>
                                             <div className="flex items-center justify-between mb-2">
-                                                <div className={`p-2 rounded-lg ${plan.popular ? 'bg-primary/10 text-primary' : 'bg-muted text-foreground'}`}>
+                                                <div className={`p-2 rounded-lg bg-muted text-foreground`}>
                                                     <plan.icon className="h-6 w-6" />
                                                 </div>
                                             </div>
@@ -208,7 +270,7 @@ export default function PricingPage() {
                                         <CardContent className="flex-1 space-y-6">
                                             <div className="flex items-baseline gap-1">
                                                 <span className="text-4xl font-bold">
-                                                    R$ {isAnnual ? plan.annualPrice.toFixed(2).replace('.', ',') : plan.price.toFixed(2).replace('.', ',')}
+                                                    R$ 0,00
                                                 </span>
                                                 <span className="text-muted-foreground">/mês</span>
                                             </div>
@@ -216,13 +278,7 @@ export default function PricingPage() {
                                             <div className="space-y-3">
                                                 {plan.features.map((feature) => (
                                                     <div key={feature} className="flex items-start gap-2 text-sm">
-                                                        <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                                                        <span>{feature}</span>
-                                                    </div>
-                                                ))}
-                                                {plan.notIncluded.map((feature) => (
-                                                    <div key={feature} className="flex items-start gap-2 text-sm text-muted-foreground/60">
-                                                        <X className="h-4 w-4 mt-0.5 shrink-0" />
+                                                        <Check className="h-4 w-4 text-primary/50 mt-0.5 shrink-0" />
                                                         <span>{feature}</span>
                                                     </div>
                                                 ))}
@@ -232,13 +288,11 @@ export default function PricingPage() {
                                         <CardFooter className="pt-6">
                                             <Button
                                                 className="w-full h-11"
-                                                variant={plan.ctaVariant}
+                                                variant="outline"
                                                 size="lg"
-                                                onClick={() => handleSubscribe(plan.name)}
-                                                disabled={loadingTier === plan.name || (userProfile?.subscriptionTier === plan.name.toLowerCase())}
+                                                disabled
                                             >
-                                                {loadingTier === plan.name && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                                {userProfile?.subscriptionTier === plan.name.toLowerCase() ? "Seu Plano Atual" : plan.cta}
+                                                Em breve
                                             </Button>
                                         </CardFooter>
                                     </Card>

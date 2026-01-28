@@ -278,7 +278,7 @@ export default function ProfessionalProfilePage() {
                 <h1 className="text-4xl font-bold text-foreground tracking-tight">
                   {professional.artisticName || professional.displayName}
                 </h1>
-                {(professional.subscriptionTier === 'standard' || professional.subscriptionTier === 'pro') && (
+                {(professional.subscriptionTier === 'standard' || professional.subscriptionTier === 'pro' || professional.subscriptionTier === 'vip') && (
                   <div title="Perfil Verificado">
                     <BadgeCheck className="h-6 w-6 text-blue-500 fill-blue-500/10" />
                   </div>

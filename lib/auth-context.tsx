@@ -40,7 +40,7 @@ export interface UserProfile {
   isPublished: boolean;
   createdAt: Date;
   updatedAt: Date;
-  subscriptionTier?: 'free' | 'standard' | 'pro';
+  subscriptionTier?: 'free' | 'standard' | 'pro' | 'vip';
 }
 
 interface AuthContextType {
@@ -59,7 +59,7 @@ interface AuthContextType {
   getRedirectUrl: () => string | null;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   updateUserAuth: (attributes: { password?: string; email?: string; data?: any }) => Promise<void>;
-  updateSubscriptionTier: (tier: 'free' | 'standard' | 'pro') => Promise<void>;
+  updateSubscriptionTier: (tier: 'free' | 'standard' | 'pro' | 'vip') => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -319,7 +319,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const updateSubscriptionTier = async (tier: 'free' | 'standard' | 'pro') => {
+  const updateSubscriptionTier = async (tier: 'free' | 'standard' | 'pro' | 'vip') => {
     if (!userProfile) throw new Error("Usuário não autenticado");
 
     try {

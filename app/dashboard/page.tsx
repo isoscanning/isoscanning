@@ -153,7 +153,7 @@ export default function DashboardPage() {
                   <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600">
                     Olá, {userProfile.displayName || googleName}!
                   </h1>
-                  {(userProfile.subscriptionTier === 'standard' || userProfile.subscriptionTier === 'pro') && (
+                  {(userProfile.subscriptionTier === 'standard' || userProfile.subscriptionTier === 'pro' || userProfile.subscriptionTier === 'vip') && (
                     <div title="Perfil Verificado">
                       <BadgeCheck className="h-8 w-8 text-blue-500 fill-blue-500/10" />
                     </div>

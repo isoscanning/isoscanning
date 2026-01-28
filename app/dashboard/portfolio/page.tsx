@@ -114,6 +114,7 @@ export default function PortfolioPage() {
     free: 4,
     standard: 10,
     pro: 20,
+    vip: 20,
   };
 
   const currentLimit = userProfile?.subscriptionTier ? limits[userProfile.subscriptionTier as keyof typeof limits] || 4 : 4;

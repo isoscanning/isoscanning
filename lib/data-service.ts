@@ -41,7 +41,7 @@ export interface Professional {
   phoneCountryCode?: string;
   portfolioLink?: string;
   isActive?: boolean;
-  subscriptionTier?: 'free' | 'standard' | 'pro';
+  subscriptionTier?: 'free' | 'standard' | 'pro' | 'vip';
 }
 
 export interface JobOffer {

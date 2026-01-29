@@ -140,14 +140,14 @@ export default function PortfolioPage() {
 
     // Validate based on detected type
     if (isImage) {
-      if (file.size > 5 * 1024 * 1024) {
-        setFileError("Fotos devem ter no máximo 5MB.");
+      if (file.size > 15 * 1024 * 1024) {
+        setFileError("Fotos devem ter no máximo 15MB.");
         return;
       }
       setNewPortfolioItem(prev => ({ ...prev, mediaType: 'image' }));
     } else if (isVideo) {
-      if (file.size > 50 * 1024 * 1024) {
-        setFileError("Vídeos devem ter no máximo 50MB.");
+      if (file.size > 100 * 1024 * 1024) {
+        setFileError("Vídeos devem ter no máximo 100MB.");
         return;
       }
       const duration = await validateVideoDuration(file);
@@ -382,7 +382,7 @@ export default function PortfolioPage() {
                                 Clique ou arraste para enviar
                               </p>
                               <p className="text-xs text-muted-foreground mt-2 max-w-[200px]">
-                                JPG/PNG (max 5MB) ou MP4 (max 50MB, 90s)
+                                JPG/PNG (max 15MB) ou MP4 (max 100MB, 90s)
                               </p>
                             </div>
                           )}

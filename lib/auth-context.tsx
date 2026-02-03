@@ -86,6 +86,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         if (typeof window === "undefined") return;
 
+        // 1. Try to recover/refresh session from Supabase first
+        // This handles cases where localStorage has stale token but Supabase client has valid session
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (session?.access_token) {
+          console.log("[auth-context] Active Supabase session found, syncing tokens...");
+          localStorage.setItem("auth_token", session.access_token);
+          if (session.refresh_token) {
+            localStorage.setItem("refresh_token", session.refresh_token);
+          }
+        }
+
         const token = localStorage.getItem("auth_token");
 
         if (!token) {
@@ -154,6 +166,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     loadProfile();
+
+    // 2. Setup Real-time Auth Listener
+    // This handles auto-refresh when token expires while app is open
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`[auth-context] Auth event: ${event}`);
+
+      if (session?.access_token) {
+        // Update local storage with fresh tokens
+        localStorage.setItem("auth_token", session.access_token);
+        if (session.refresh_token) {
+          localStorage.setItem("refresh_token", session.refresh_token);
+        }
+      }
+
+      // Handle specific events
+      if (event === 'SIGNED_OUT') {
+        setUserProfile(null);
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("refresh_token");
+          localStorage.removeItem("user_profile");
+        }
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log("[auth-context] Token automatically refreshed by Supabase");
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {

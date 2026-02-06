@@ -41,6 +41,7 @@ export interface UserProfile {
   isPublished: boolean;
   createdAt: Date;
   updatedAt: Date;
+  subscriptionTier?: 'free' | 'standard' | 'pro' | 'vip';
 }
 
 interface AuthContextType {
@@ -59,6 +60,7 @@ interface AuthContextType {
   getRedirectUrl: () => string | null;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   updateUserAuth: (attributes: { password?: string; email?: string; data?: any }) => Promise<void>;
+  updateSubscriptionTier: (tier: 'free' | 'standard' | 'pro' | 'vip') => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -84,6 +86,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const loadProfile = async () => {
       try {
         if (typeof window === "undefined") return;
+
+        // 1. Try to recover/refresh session from Supabase first
+        // This handles cases where localStorage has stale token but Supabase client has valid session
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (session?.access_token) {
+          console.log("[auth-context] Active Supabase session found, syncing tokens...");
+          localStorage.setItem("auth_token", session.access_token);
+          if (session.refresh_token) {
+            localStorage.setItem("refresh_token", session.refresh_token);
+          }
+        }
 
         const token = localStorage.getItem("auth_token");
 
@@ -153,6 +167,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     loadProfile();
+
+    // 2. Setup Real-time Auth Listener
+    // This handles auto-refresh when token expires while app is open
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`[auth-context] Auth event: ${event}`);
+
+      if (session?.access_token) {
+        // Update local storage with fresh tokens
+        localStorage.setItem("auth_token", session.access_token);
+        if (session.refresh_token) {
+          localStorage.setItem("refresh_token", session.refresh_token);
+        }
+      }
+
+      // Handle specific events
+      if (event === 'SIGNED_OUT') {
+        setUserProfile(null);
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("refresh_token");
+          localStorage.removeItem("user_profile");
+        }
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log("[auth-context] Token automatically refreshed by Supabase");
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -322,6 +366,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  const updateSubscriptionTier = async (tier: 'free' | 'standard' | 'pro' | 'vip') => {
+    if (!userProfile) throw new Error("Usuário não autenticado");
+
+    try {
+      // Update in database
+      const { error } = await supabase
+        .from('profiles')
+        .update({ subscription_tier: tier })
+        .eq('id', userProfile.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setUserProfile({
+        ...userProfile,
+        subscriptionTier: tier,
+        updatedAt: new Date(),
+      });
+
+      // Update local storage
+      localStorage.setItem("user_profile", JSON.stringify({
+        ...userProfile,
+        subscriptionTier: tier,
+        updatedAt: new Date(),
+      }));
+
+      console.log(`[auth-context] Subscription updated to ${tier}`);
+    } catch (error) {
+      console.error("[auth-context] Update subscription error:", error);
+      throw error;
+    }
+  };
+
   const isAnonymous = !userProfile;
 
   const value: AuthContextType = {
@@ -336,6 +413,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     getRedirectUrl,
     updateProfile,
     updateUserAuth,
+    updateSubscriptionTier,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

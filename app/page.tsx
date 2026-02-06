@@ -441,44 +441,42 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ===== STATS SECTION ===== */}
-        <section className="py-20 md:py-24 bg-gradient-to-r from-primary via-purple-600 to-pink-600 dark:from-primary dark:via-purple-700 dark:to-pink-700">
-          <div className="container mx-auto px-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto text-center text-white">
-              <ScrollReveal delay={0.1}>
-                <div>
-                  <div className="text-4xl md:text-5xl font-bold mb-2">
-                    <CountUp end={500} suffix="+" />
-                  </div>
-                  <p className="text-white/80 text-sm md:text-base">Profissionais Cadastrados</p>
+        {/* ===== LAUNCH CTA SECTION ===== */}
+        <section className="py-20 md:py-24 bg-gradient-to-r from-primary via-purple-600 to-pink-600 dark:from-primary dark:via-purple-700 dark:to-pink-700 relative overflow-hidden">
+          <div className="absolute inset-0 bg-white/5 mix-blend-overlay"></div>
+          <div className="container mx-auto px-4 relative z-10">
+            <div className="max-w-4xl mx-auto text-center text-white space-y-8">
+              <ScrollReveal>
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-sm font-medium mb-4">
+                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                  Oferta de Lançamento
                 </div>
+                <h2 className="text-3xl md:text-5xl font-bold leading-tight">
+                  A Revolução do Audiovisual Começou
+                </h2>
               </ScrollReveal>
 
               <ScrollReveal delay={0.2}>
-                <div>
-                  <div className="text-4xl md:text-5xl font-bold mb-2">
-                    <CountUp end={1200} suffix="+" />
-                  </div>
-                  <p className="text-white/80 text-sm md:text-base">Projetos Realizados</p>
-                </div>
-              </ScrollReveal>
-
-              <ScrollReveal delay={0.3}>
-                <div>
-                  <div className="text-4xl md:text-5xl font-bold mb-2">
-                    <CountUp end={50} suffix="+" />
-                  </div>
-                  <p className="text-white/80 text-sm md:text-base">Cidades Atendidas</p>
-                </div>
+                <p className="text-xl md:text-2xl text-white/90 max-w-2xl mx-auto leading-relaxed">
+                  Estamos no ar! Aproveite nossas condições especiais de lançamento e garanta acesso a todos os recursos da plataforma por tempo limitado.
+                </p>
               </ScrollReveal>
 
               <ScrollReveal delay={0.4}>
-                <div>
-                  <div className="text-4xl md:text-5xl font-bold mb-2">
-                    <CountUp end={98} suffix="%" />
-                  </div>
-                  <p className="text-white/80 text-sm md:text-base">Satisfação</p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+                  <Link href="/precos">
+                    <Button
+                      size="lg"
+                      className="w-full sm:w-auto h-14 px-8 text-lg rounded-full bg-white text-primary hover:bg-white/90 shadow-xl transition-all duration-300 font-bold"
+                    >
+                      Resgatar Plano VIP Grátis
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
                 </div>
+                <p className="text-white/70 text-sm mt-4">
+                  * Oferta por tempo limitado para os primeiros membros
+                </p>
               </ScrollReveal>
             </div>
           </div>

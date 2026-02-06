@@ -521,15 +521,15 @@ export default function PerfilPage() {
 
     // Validate based on detected type
     if (isImage) {
-      if (file.size > 5 * 1024 * 1024) {
-        setFileError("Fotos devem ter no máximo 5MB.")
+      if (file.size > 15 * 1024 * 1024) {
+        setFileError("Fotos devem ter no máximo 15MB.")
         return
       }
       console.log('[Portfolio] Setting mediaType to image')
       setNewPortfolioItem(prev => ({ ...prev, mediaType: 'image' }))
     } else if (isVideo) {
-      if (file.size > 50 * 1024 * 1024) {
-        setFileError("Vídeos devem ter no máximo 50MB.")
+      if (file.size > 100 * 1024 * 1024) {
+        setFileError("Vídeos devem ter no máximo 100MB.")
         return
       }
 

@@ -4,6 +4,7 @@ import { ArrowRight, MapPin, Star } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { type Professional } from "@/lib/data-service";
+import { trackEvent } from "@/lib/analytics";
 
 interface ProfessionalCardProps {
     professional: Professional;
@@ -19,7 +20,15 @@ export function ProfessionalCard({ professional, index }: ProfessionalCardProps)
         >
             <Card className="group hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 border-2 hover:border-primary/30 overflow-hidden bg-card h-full">
                 <CardContent className="p-0">
-                    <Link href={`/profissionais/${professional.id}`}>
+                    <Link
+                        href={`/profissionais/${professional.id}`}
+                        onClick={() => trackEvent({
+                            action: 'view_professional',
+                            category: 'Professional',
+                            label: professional.displayName,
+                            value: 1
+                        })}
+                    >
                         {/* Image Area */}
                         <div className="relative h-72 bg-gradient-to-br from-muted to-muted/50 overflow-hidden">
                             <Avatar className="h-full w-full rounded-none">

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context"; // Import useAuth
+import { trackEvent } from "@/lib/analytics";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Card, CardContent } from "@/components/ui/card";
@@ -135,6 +136,7 @@ export default function ProfessionalProfilePage() {
           const totalRating = reviewsData.reduce((sum: number, r: any) => sum + r.rating, 0);
           const avgRating = totalRating / reviewsData.length;
 
+
           // Update professional object with calculated values
           setProfessional(prev => prev ? {
             ...prev,
@@ -142,6 +144,13 @@ export default function ProfessionalProfilePage() {
             totalReviews: reviewsData.length
           } : null);
         }
+
+        trackEvent({
+          action: 'view_professional',
+          category: 'Professionals',
+          label: profResponse.data.displayName || profResponse.data.artisticName,
+          value: reviewsData.length // sending review count as value
+        });
 
         // Check if current user has reviewed
         if (currentUser) {
@@ -184,6 +193,7 @@ export default function ProfessionalProfilePage() {
   const openLightbox = (index: number) => {
     setLightboxIndex(index);
     setLightboxOpen(true);
+    trackEvent({ action: 'open_lightbox', category: 'Professionals', label: `Item: ${index}` });
   };
 
   const closeLightbox = () => {
@@ -326,6 +336,7 @@ export default function ProfessionalProfilePage() {
                   variant="outline"
                   size="icon"
                   className="rounded-full h-11 w-11 border-border bg-background/50 hover:bg-primary/10 hover:text-primary hover:scale-110 hover:border-primary/50 transition-all duration-300 shadow-sm"
+                  onClick={() => trackEvent({ action: 'click_social', category: 'Professionals', label: 'Instagram', value: 0 })}
                 >
                   <Instagram className="h-5 w-5" />
                 </Button>
@@ -333,6 +344,7 @@ export default function ProfessionalProfilePage() {
                   variant="outline"
                   size="icon"
                   className="rounded-full h-11 w-11 border-border bg-background/50 hover:bg-primary/10 hover:text-primary hover:scale-110 hover:border-primary/50 transition-all duration-300 shadow-sm"
+                  onClick={() => trackEvent({ action: 'click_social', category: 'Professionals', label: 'LinkedIn', value: 0 })}
                 >
                   <Linkedin className="h-5 w-5" />
                 </Button>
@@ -340,6 +352,7 @@ export default function ProfessionalProfilePage() {
                   variant="outline"
                   size="icon"
                   className="rounded-full h-11 w-11 border-border bg-background/50 hover:bg-primary/10 hover:text-primary hover:scale-110 hover:border-primary/50 transition-all duration-300 shadow-sm"
+                  onClick={() => trackEvent({ action: 'click_social', category: 'Professionals', label: 'Website', value: 0 })}
                 >
                   <Globe className="h-5 w-5" />
                 </Button>
@@ -380,6 +393,11 @@ export default function ProfessionalProfilePage() {
                     }
 
                     if (cleanNumber) {
+                      trackEvent({
+                        action: 'contact_professional',
+                        category: 'Professionals',
+                        label: professional.displayName,
+                      });
                       window.open(`https://wa.me/${cleanNumber}`, '_blank');
                     }
                   }}
@@ -398,18 +416,21 @@ export default function ProfessionalProfilePage() {
                 <TabsTrigger
                   value="portfolio"
                   className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm hover:text-primary/80"
+                  onClick={() => trackEvent({ action: 'tab_change', category: 'Professionals', label: 'Portfolio' })}
                 >
                   Portfólio
                 </TabsTrigger>
                 <TabsTrigger
                   value="avaliacoes"
                   className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm hover:text-primary/80"
+                  onClick={() => trackEvent({ action: 'tab_change', category: 'Professionals', label: 'Reviews' })}
                 >
                   Avaliações
                 </TabsTrigger>
                 <TabsTrigger
                   value="disponibilidade"
                   className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm hover:text-primary/80"
+                  onClick={() => trackEvent({ action: 'tab_change', category: 'Professionals', label: 'Availability' })}
                 >
                   Disponibilidade
                 </TabsTrigger>

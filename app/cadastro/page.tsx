@@ -28,6 +28,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ParticleBackground } from "@/components/particle-background";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { motion } from "framer-motion";
+import { trackEvent } from "@/lib/analytics";
 
 export default function CadastroPage() {
   const router = useRouter();
@@ -55,6 +56,7 @@ export default function CadastroPage() {
   const handleGoogleSignUp = async () => {
     setError("");
     setLoading(true);
+    trackEvent({ action: "sign_up", category: "Auth", label: "Google Button Click (Signup)" });
 
     try {
       // Store the userType so we can use it after OAuth callback

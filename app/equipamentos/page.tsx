@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { trackEvent } from "@/lib/analytics"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -102,9 +103,29 @@ export default function EquipamentosPage() {
     setSelectedCondition("all")
     setSelectedState("Todos")
     setSelectedCity("")
+    trackEvent({ action: "filter", category: "Equipment", label: "Clear Filters" })
   }
 
   const hasActiveFilters = selectedCategory !== "Todas" || selectedNegotiation !== "all" || selectedCondition !== "all" || selectedState !== "Todos" || selectedCity !== ""
+
+  useEffect(() => {
+    if (selectedCategory !== "Todas") trackEvent({ action: "filter", category: "Equipment", label: `Category: ${selectedCategory}` })
+  }, [selectedCategory])
+
+  useEffect(() => {
+    if (selectedNegotiation !== "all") trackEvent({ action: "filter", category: "Equipment", label: `Type: ${selectedNegotiation}` })
+  }, [selectedNegotiation])
+
+  useEffect(() => {
+    if (selectedCondition !== "all") trackEvent({ action: "filter", category: "Equipment", label: `Condition: ${selectedCondition}` })
+  }, [selectedCondition])
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm) trackEvent({ action: "search", category: "Equipment", label: searchTerm })
+    }, 1000)
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm])
 
   const getNegotiationLabel = (type: string) => {
     switch (type) {
@@ -488,7 +509,7 @@ export default function EquipamentosPage() {
                   Anuncie seus equipamentos gratuitamente e alcance milhares
                   de profissionais interessados.
                 </p>
-                <Link href="/dashboard/equipamentos">
+                <Link href="/dashboard/equipamentos" onClick={() => trackEvent({ action: 'click_cta', category: 'Equipment', label: 'Post Equipment Footer' })}>
                   <Button
                     size="lg"
                     variant="secondary"

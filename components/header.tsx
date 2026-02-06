@@ -20,6 +20,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { trackEvent } from "@/lib/analytics";
 
 export function Header() {
   const { userProfile, signOut, loading } = useAuth();
@@ -82,25 +83,25 @@ export function Header() {
           <nav className="hidden md:flex items-center gap-6 text-foreground/85">
             <Link
               href="/profissionais"
-              className="text-sm font-medium transition-colors hover:text-primary focus-visible:text-primary"
+              onClick={() => trackEvent({ action: "click_nav", category: "Navigation", label: "Desktop: Encontrar Profissionais" })}
             >
               Encontrar Profissionais
             </Link>
             <Link
               href="/equipamentos"
-              className="text-sm font-medium transition-colors hover:text-primary focus-visible:text-primary"
+              onClick={() => trackEvent({ action: "click_nav", category: "Navigation", label: "Desktop: Equipamentos" })}
             >
               Equipamentos
             </Link>
             <Link
               href="/vagas"
-              className="text-sm font-medium transition-colors hover:text-primary focus-visible:text-primary"
+              onClick={() => trackEvent({ action: "click_nav", category: "Navigation", label: "Desktop: Jobs" })}
             >
               Jobs
             </Link>
             <Link
               href="/precos"
-              className="text-sm font-medium transition-colors hover:text-primary focus-visible:text-primary"
+              onClick={() => trackEvent({ action: "click_nav", category: "Navigation", label: "Desktop: Precos" })}
             >
               Preços
             </Link>
@@ -141,7 +142,10 @@ export function Header() {
             <Link
               href="/profissionais"
               className="flex items-center gap-3 text-sm font-medium hover:text-accent transition-colors hover:bg-accent/10 p-3 rounded-lg"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                trackEvent({ action: "click_nav", category: "Navigation", label: "Mobile: Encontrar Profissionais" });
+              }}
             >
               <Search className="h-4 w-4 text-accent" />
               Encontrar Profissionais
@@ -149,7 +153,10 @@ export function Header() {
             <Link
               href="/equipamentos"
               className="flex items-center gap-3 text-sm font-medium hover:text-success transition-colors hover:bg-success/10 p-3 rounded-lg"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                trackEvent({ action: "click_nav", category: "Navigation", label: "Mobile: Equipamentos" });
+              }}
             >
               <Package className="h-4 w-4 text-success" />
               Equipamentos
@@ -157,7 +164,10 @@ export function Header() {
             <Link
               href="/vagas"
               className="flex items-center gap-3 text-sm font-medium hover:text-primary transition-colors hover:bg-primary/10 p-3 rounded-lg"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                trackEvent({ action: "click_nav", category: "Navigation", label: "Mobile: Jobs" });
+              }}
             >
               <Briefcase className="h-4 w-4 text-primary" />
               Jobs
@@ -165,7 +175,10 @@ export function Header() {
             <Link
               href="/precos"
               className="flex items-center gap-3 text-sm font-medium hover:text-purple-500 transition-colors hover:bg-purple-500/10 p-3 rounded-lg"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                trackEvent({ action: "click_nav", category: "Navigation", label: "Mobile: Precos" });
+              }}
             >
               <Zap className="h-4 w-4 text-purple-500" />
               Preços
@@ -239,6 +252,7 @@ export function Header() {
                     onClick={() => {
                       signOut();
                       setMobileMenuOpen(false);
+                      trackEvent({ action: "sign_out", category: "Auth", label: "Mobile Header" });
                     }}
                   >
                     <LogOut className="h-4 w-4 mr-2" />
@@ -262,7 +276,10 @@ export function Header() {
                       </div>
                     </div>
                   </div>
-                  <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                  <Link href="/login" onClick={() => {
+                    setMobileMenuOpen(false);
+                    trackEvent({ action: "click_nav", category: "Navigation", label: "Mobile: Login" });
+                  }}>
                     <Button
                       variant="outline"
                       size="sm"

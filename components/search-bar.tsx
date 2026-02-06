@@ -1,10 +1,11 @@
 "use client";
 
-import * as React from "react";
-import { format } from "date-fns";
 import { Calendar as CalendarIcon, MapPin, Search, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { trackEvent } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
+import * as React from "react";
 import { Calendar } from "@/components/ui/calendar";
 import {
     Popover,
@@ -41,6 +42,11 @@ export function SearchBar({
 
     const handleSearch = () => {
         onSearch({ city, date, specialty });
+        trackEvent({
+            action: 'search',
+            category: 'Professionals',
+            label: `City: ${city || 'All'}, Spec: ${specialty}, Date: ${date ? 'Yes' : 'No'}`
+        });
     };
 
     return (

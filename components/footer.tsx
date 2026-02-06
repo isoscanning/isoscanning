@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Camera, Mail, Instagram, Linkedin } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 export function Footer() {
   return (
@@ -99,12 +100,14 @@ export function Footer() {
               <a
                 href="#"
                 className="text-muted-foreground hover:text-primary transition-colors"
+                onClick={() => trackEvent({ action: "click_social", category: "Social", label: "Footer: Instagram" })}
               >
                 <Instagram className="h-5 w-5" />
               </a>
               <a
                 href="#"
                 className="text-muted-foreground hover:text-primary transition-colors"
+                onClick={() => trackEvent({ action: "click_social", category: "Social", label: "Footer: LinkedIn" })}
               >
                 <Linkedin className="h-5 w-5" />
               </a>

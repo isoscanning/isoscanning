@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import apiClient from "./api-service";
 import { supabase } from "./supabase";
+import { trackEvent } from "./analytics";
 
 /**
  * LocalStorage keys used by auth context:
@@ -177,6 +178,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         }
         console.log("[auth-context] Sign in successful");
+        trackEvent({ action: 'login', category: 'Auth', label: 'Email' });
       }
     } catch (error) {
       console.error("[auth-context] Sign in error:", error);
@@ -214,6 +216,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         }
         console.log("[auth-context] Sign up successful");
+        trackEvent({ action: 'sign_up', category: 'Auth', label: userData.userType });
       }
     } catch (error) {
       console.error("[auth-context] Sign up error:", error);
@@ -252,6 +255,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
       setUserProfile(null);
       console.log("[auth-context] Sign out successful");
+      trackEvent({ action: 'sign_out', category: 'Auth' });
     } catch (error) {
       console.error("[auth-context] Sign out error:", error);
       throw error;
@@ -292,6 +296,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
 
       console.log("[auth-context] Profile updated successfully");
+      trackEvent({ action: 'update_profile', category: 'User', label: userProfile.userType });
     } catch (error) {
       console.error("[auth-context] Update profile error:", error);
       throw error;

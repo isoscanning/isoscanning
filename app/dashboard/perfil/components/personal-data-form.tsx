@@ -8,7 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { LocationSelector } from "@/components/location-selector";
 import { type Specialty } from "@/lib/data-service";
+import { useState } from "react";
 
 interface PersonalDataFormProps {
     formData: any;
@@ -41,8 +43,12 @@ export function PersonalDataForm({
     countries,
     selectedCountryCode,
     setSelectedCountryCode,
+
     ESTADOS
 }: PersonalDataFormProps) {
+    const [localCountryId, setLocalCountryId] = useState<number | null>(null);
+    const [localStateId, setLocalStateId] = useState<number | null>(null);
+    const [localCityId, setLocalCityId] = useState<number | null>(null);
     return (
         <Card className="border-2 shadow-sm">
             <CardHeader className="space-y-1 pb-6">
@@ -186,43 +192,43 @@ export function PersonalDataForm({
                     />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="city">Cidade *</Label>
-                        <Input
-                            id="city"
-                            value={formData.city}
-                            onChange={(e) => {
-                                setFormData({ ...formData, city: e.target.value });
-                                if (validationErrors.includes("city")) {
-                                    setValidationErrors((prev: string[]) => prev.filter(f => f !== "city"));
-                                }
-                            }}
-                            className={cn(validationErrors.includes("city") && "border-destructive focus-visible:ring-destructive")}
-                            required
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="state">Estado *</Label>
-                        <Select
-                            value={formData.state}
-                            onValueChange={(value) => {
-                                setFormData({ ...formData, state: value });
-                                if (validationErrors.includes("state")) {
-                                    setValidationErrors((prev: string[]) => prev.filter(f => f !== "state"));
-                                }
-                            }}
-                        >
-                            <SelectTrigger className={cn(validationErrors.includes("state") && "border-destructive focus:ring-destructive")}>
-                                <SelectValue placeholder="UF" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {ESTADOS.map((uf) => (
-                                    <SelectItem key={uf} value={uf}>{uf}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                <div className="space-y-2">
+                    <Label>Locais</Label>
+                    <LocationSelector
+                        key={localCountryId} // Remount if country changes to ensure clean state if needed, or rely on internal logic
+                        initialCountryName={formData.country || "Brazil"} // Default to Brazil if not set? Or pass "Brazil" as initial
+                        initialStateUf={formData.state}
+                        initialCityName={formData.city}
+
+                        selectedCountryId={localCountryId}
+                        selectedStateId={localStateId}
+                        selectedCityId={localCityId}
+
+                        onCountryChange={(id, name) => {
+                            setLocalCountryId(id);
+                            setFormData({ ...formData, country: name, state: "", city: "" });
+                            setLocalStateId(null);
+                            setLocalCityId(null);
+                        }}
+                        onStateChange={(id, name, uf) => {
+                            setLocalStateId(id);
+                            setFormData({ ...formData, state: uf, city: "" });
+                            setLocalCityId(null);
+                        }}
+                        onCityChange={(id, name, ddd) => {
+                            setLocalCityId(id);
+
+                            // If we have a DDD and phone is empty, pre-fill it
+                            let newPhone = formData.phone;
+                            if (ddd && (!newPhone || newPhone.trim() === "")) {
+                                newPhone = `(${ddd}) `;
+                            }
+
+                            setFormData({ ...formData, city: name, phone: newPhone });
+                        }}
+
+                        className="grid-cols-1 md:grid-cols-3"
+                    />
                 </div>
 
                 <div className="space-y-2">

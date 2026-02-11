@@ -1,11 +1,23 @@
-
 "use client"
 
 import * as React from "react"
 import { Check, ChevronsUpDown } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { Select, SelectItem } from "@heroui/react"
+import { Button } from "@/components/ui/button"
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
 import apiClient from "@/lib/api-service"
 
 interface State {
@@ -31,8 +43,6 @@ interface LocationSelectorProps {
     selectedCountryId?: number | null
     selectedStateId?: number | null
     selectedCityId?: number | null
-    // Allow passing current string values to matching IDs if needed, but for now lets stick to IDs for selection
-    // But we need to emit names for the parent form
     onCountryChange?: (id: number, name: string) => void
     onStateChange: (id: number, name: string, uf: string) => void
     onCityChange: (id: number, name: string, ddd?: number) => void
@@ -62,6 +72,9 @@ export function LocationSelector({
     const [loadingCountries, setLoadingCountries] = React.useState(false)
     const [loadingStates, setLoadingStates] = React.useState(false)
     const [loadingCities, setLoadingCities] = React.useState(false)
+    const [openCountry, setOpenCountry] = React.useState(false)
+    const [openState, setOpenState] = React.useState(false)
+    const [openCity, setOpenCity] = React.useState(false)
 
     // Fetch countries if onCountryChange is provided
     React.useEffect(() => {
@@ -149,118 +162,154 @@ export function LocationSelector({
         <div className={cn("grid gap-4", className)}>
             {onCountryChange && (
                 <div className="space-y-2">
-                    <Select
-                        label="País"
-                        placeholder={loadingCountries ? "Carregando..." : "Selecione o país"}
-                        isDisabled={isDisabled || loadingCountries}
-                        selectedKeys={selectedCountryId ? [selectedCountryId.toString()] : []}
-                        onSelectionChange={(keys) => {
-                            const key = Array.from(keys)[0];
-                            if (key) {
-                                const countryId = parseInt(key.toString())
-                                const country = countries.find(c => c.id === countryId)
-                                if (country && onCountryChange) {
-                                    onCountryChange(countryId, country.name)
-                                }
-                            }
-                        }}
-                        className="w-full"
-                        variant="bordered"
-                        scrollShadowProps={{
-                            isEnabled: false
-                        }}
-                        listboxProps={{
-                            emptyContent: "Nenhum país encontrado",
-                        }}
-                        popoverProps={{
-                            classNames: {
-                                content: "max-h-[300px]"
-                            }
-                        }}
-                    >
-                        {countries.map((country) => (
-                            <SelectItem key={country.id} value={country.id.toString()}>
-                                {country.name}
-                            </SelectItem>
-                        ))}
-                    </Select>
+                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        País
+                    </label>
+                    <Popover open={openCountry} onOpenChange={setOpenCountry}>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={openCountry}
+                                className="w-full justify-between"
+                                disabled={isDisabled || loadingCountries}
+                            >
+                                {selectedCountryId
+                                    ? countries.find((country) => country.id === selectedCountryId)?.name
+                                    : loadingCountries ? "Carregando..." : "Selecione o país"}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0">
+                            <Command>
+                                <CommandInput placeholder="Buscar país..." />
+                                <CommandList>
+                                    <CommandEmpty>Nenhum país encontrado.</CommandEmpty>
+                                    <CommandGroup>
+                                        {countries.map((country) => (
+                                            <CommandItem
+                                                key={country.id}
+                                                value={country.name}
+                                                onSelect={() => {
+                                                    onCountryChange(country.id, country.name)
+                                                    setOpenCountry(false)
+                                                }}
+                                            >
+                                                <Check
+                                                    className={cn(
+                                                        "mr-2 h-4 w-4",
+                                                        selectedCountryId === country.id ? "opacity-100" : "opacity-0"
+                                                    )}
+                                                />
+                                                {country.name}
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
                 </div>
             )}
 
             <div className="space-y-2">
-                <Select
-                    label="Estado"
-                    placeholder={loadingStates ? "Carregando..." : !selectedCountryId && onCountryChange ? "Selecione o país" : "Selecione o estado"}
-                    isDisabled={isDisabled || loadingStates}
-                    selectedKeys={selectedStateId ? [selectedStateId.toString()] : []}
-                    onSelectionChange={(keys) => {
-                        const key = Array.from(keys)[0];
-                        if (key) {
-                            const stateId = parseInt(key.toString())
-                            const state = states.find(s => s.id === stateId)
-                            if (state) {
-                                onStateChange(stateId, state.name, state.uf)
-                            }
-                        }
-                    }}
-                    className="w-full"
-                    variant="bordered"
-                    scrollShadowProps={{
-                        isEnabled: false
-                    }}
-                    listboxProps={{
-                        emptyContent: "Nenhum estado encontrado",
-                    }}
-                    popoverProps={{
-                        classNames: {
-                            content: "max-h-[300px]"
-                        }
-                    }}
-                >
-                    {states.map((state) => (
-                        <SelectItem key={state.id} value={state.id.toString()}>
-                            {state.name} ({state.uf})
-                        </SelectItem>
-                    ))}
-                </Select>
+                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Estado
+                </label>
+                <Popover open={openState} onOpenChange={setOpenState}>
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={openState}
+                            className="w-full justify-between"
+                            disabled={isDisabled || loadingStates}
+                        >
+                            {selectedStateId
+                                ? states.find((state) => state.id === selectedStateId)?.name + " (" + states.find((state) => state.id === selectedStateId)?.uf + ")"
+                                : loadingStates ? "Carregando..." : !selectedCountryId && onCountryChange ? "Selecione o país" : "Selecione o estado"}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                        <Command>
+                            <CommandInput placeholder="Buscar estado..." />
+                            <CommandList>
+                                <CommandEmpty>Nenhum estado encontrado.</CommandEmpty>
+                                <CommandGroup>
+                                    {states.map((state) => (
+                                        <CommandItem
+                                            key={state.id}
+                                            value={`${state.name} ${state.uf}`}
+                                            onSelect={() => {
+                                                onStateChange(state.id, state.name, state.uf)
+                                                setOpenState(false)
+                                            }}
+                                        >
+                                            <Check
+                                                className={cn(
+                                                    "mr-2 h-4 w-4",
+                                                    selectedStateId === state.id ? "opacity-100" : "opacity-0"
+                                                )}
+                                            />
+                                            {state.name} ({state.uf})
+                                        </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                            </CommandList>
+                        </Command>
+                    </PopoverContent>
+                </Popover>
             </div>
 
             <div className="space-y-2">
-                <Select
-                    label="Cidade"
-                    placeholder={!selectedStateId ? "Selecione o estado primeiro" : loadingCities ? "Carregando..." : "Selecione a cidade"}
-                    isDisabled={isDisabled || !selectedStateId || loadingCities}
-                    selectedKeys={selectedCityId ? [selectedCityId.toString()] : []}
-                    onSelectionChange={(keys) => {
-                        const key = Array.from(keys)[0];
-                        if (key) {
-                            const cityId = parseInt(key.toString())
-                            const city = cities.find(c => c.id === cityId)
-                            if (city) {
-                                onCityChange(cityId, city.name, city.ddd)
-                            }
-                        }
-                    }}
-                    className="w-full"
-                    variant="bordered"
-                    scrollShadowProps={{
-                        isEnabled: false
-                    }}
-                    listboxProps={{
-                        emptyContent: "Nenhuma cidade encontrada",
-                    }}
-                    popoverProps={{
-                        classNames: {
-                            content: "max-h-[300px]"
-                        }
-                    }}
-                >
-                    {cities.map((city) => (
-                        <SelectItem key={city.id} value={city.id.toString()}>
-                            {city.name}
-                        </SelectItem>
-                    ))}
-                </Select>
+                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Cidade
+                </label>
+                <Popover open={openCity} onOpenChange={setOpenCity}>
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={openCity}
+                            className="w-full justify-between"
+                            disabled={isDisabled || !selectedStateId || loadingCities}
+                        >
+                            {selectedCityId
+                                ? cities.find((city) => city.id === selectedCityId)?.name
+                                : !selectedStateId ? "Selecione o estado primeiro" : loadingCities ? "Carregando..." : "Selecione a cidade"}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                        <Command>
+                            <CommandInput placeholder="Buscar cidade..." />
+                            <CommandList>
+                                <CommandEmpty>Nenhuma cidade encontrada.</CommandEmpty>
+                                <CommandGroup>
+                                    {cities.map((city) => (
+                                        <CommandItem
+                                            key={city.id}
+                                            value={city.name}
+                                            onSelect={() => {
+                                                onCityChange(city.id, city.name, city.ddd)
+                                                setOpenCity(false)
+                                            }}
+                                        >
+                                            <Check
+                                                className={cn(
+                                                    "mr-2 h-4 w-4",
+                                                    selectedCityId === city.id ? "opacity-100" : "opacity-0"
+                                                )}
+                                            />
+                                            {city.name}
+                                        </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                            </CommandList>
+                        </Command>
+                    </PopoverContent>
+                </Popover>
             </div>
         </div>
     )

@@ -5,13 +5,7 @@ import * as React from "react"
 import { Check, ChevronsUpDown } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
+import { Select, SelectItem } from "@heroui/react"
 import apiClient from "@/lib/api-service"
 
 interface State {
@@ -50,17 +44,17 @@ interface LocationSelectorProps {
 }
 
 export function LocationSelector({
+    selectedCountryId,
     selectedStateId,
     selectedCityId,
+    onCountryChange,
     onStateChange,
     onCityChange,
     isDisabled = false,
     className,
+    initialCountryName,
     initialStateUf,
     initialCityName,
-    selectedCountryId,
-    onCountryChange,
-    initialCountryName
 }: LocationSelectorProps) {
     const [countries, setCountries] = React.useState<Country[]>([])
     const [states, setStates] = React.useState<State[]>([])
@@ -69,94 +63,84 @@ export function LocationSelector({
     const [loadingStates, setLoadingStates] = React.useState(false)
     const [loadingCities, setLoadingCities] = React.useState(false)
 
-    // Fetch countries on mount
+    // Fetch countries if onCountryChange is provided
     React.useEffect(() => {
-        async function fetchCountries() {
-            setLoadingCountries(true)
-            try {
-                const response = await apiClient.get<Country[]>('/locations/countries')
-                setCountries(response.data)
-            } catch (error) {
-                console.error("Failed to fetch countries", error)
-            } finally {
-                setLoadingCountries(false)
-            }
+        if (onCountryChange) {
+            setLoadingCountries(true);
+            apiClient.get('/locations/countries')
+                .then(response => {
+                    setCountries(response.data);
+                })
+                .catch(error => {
+                    console.error('Error fetching countries:', error);
+                })
+                .finally(() => {
+                    setLoadingCountries(false);
+                });
         }
-        fetchCountries()
-    }, [])
+    }, [onCountryChange]);
 
-    // Fetch states when country changes
+    // Fetch states when country changes (or on mount if no country selector)
     React.useEffect(() => {
-        // If we want to allow states without country (e.g. legacy), we might fetch all if no countryId.
-        // But better to clear if country is expected but not selected.
-        // For now, let's fetch states if we have country OR if we want to support default (maybe fetch all if no country filtered?)
-        // The backend supports filtering.
-
-        async function fetchStates() {
-            setLoadingStates(true)
-            try {
-                const url = selectedCountryId ? `/locations/states?countryId=${selectedCountryId}` : '/locations/states'
-                const response = await apiClient.get<State[]>(url)
-                setStates(response.data)
-            } catch (error) {
-                console.error("Failed to fetch states", error)
-            } finally {
-                setLoadingStates(false)
-            }
-        }
-        fetchStates()
-    }, [selectedCountryId])
+        const countryIdToUse = selectedCountryId || 1; // Default to Brazil (id=1)
+        setLoadingStates(true);
+        apiClient.get(`/locations/countries/${countryIdToUse}/states`)
+            .then(response => {
+                setStates(response.data);
+            })
+            .catch(error => {
+                console.error('Error fetching states:', error);
+            })
+            .finally(() => {
+                setLoadingStates(false);
+            });
+    }, [selectedCountryId]);
 
     // Fetch cities when state changes
     React.useEffect(() => {
-        if (!selectedStateId) {
-            setCities([])
-            return
+        if (selectedStateId) {
+            setLoadingCities(true);
+            apiClient.get(`/locations/states/${selectedStateId}/cities`)
+                .then(response => {
+                    setCities(response.data);
+                })
+                .catch(error => {
+                    console.error('Error fetching cities:', error);
+                })
+                .finally(() => {
+                    setLoadingCities(false);
+                });
+        } else {
+            setCities([]);
         }
+    }, [selectedStateId]);
 
-        async function fetchCities() {
-            setLoadingCities(true)
-            try {
-                const response = await apiClient.get<City[]>(`/locations/cities/${selectedStateId}`)
-                setCities(response.data)
-            } catch (error) {
-                console.error("Failed to fetch cities", error)
-                setCities([])
-            } finally {
-                setLoadingCities(false)
-            }
-        }
-        fetchCities()
-    }, [selectedStateId])
-
-    // Effect to sync initial string values to IDs if provided
+    // Hydrate country ID from initial name
     React.useEffect(() => {
         if (initialCountryName && countries.length > 0 && !selectedCountryId && onCountryChange) {
-            const match = countries.find(c => c.name === initialCountryName || c.code === initialCountryName); // Handle code or name?
-            if (match) {
-                onCountryChange(match.id, match.name);
-            } else {
-                // Try Brazil default if nothing matches? Code 'BR' matches Brazil?
-                // Let's rely on exact name for now
+            const country = countries.find(c => c.name.toLowerCase() === initialCountryName.toLowerCase());
+            if (country) {
+                onCountryChange(country.id, country.name);
             }
         }
     }, [initialCountryName, countries, selectedCountryId, onCountryChange]);
 
+    // Hydrate state ID from initial UF
     React.useEffect(() => {
         if (initialStateUf && states.length > 0 && !selectedStateId) {
-            const match = states.find(s => s.uf === initialStateUf);
-            if (match) {
-                onStateChange(match.id, match.name, match.uf);
+            const state = states.find(s => s.uf.toLowerCase() === initialStateUf.toLowerCase());
+            if (state) {
+                onStateChange(state.id, state.name, state.uf);
             }
         }
     }, [initialStateUf, states, selectedStateId, onStateChange]);
 
+    // Hydrate city ID from initial name
     React.useEffect(() => {
-        // If we have a selected state and loaded cities, try to match initial city name
-        if (initialCityName && cities.length > 0 && !selectedCityId && selectedStateId) {
-            const match = cities.find(c => c.name === initialCityName);
-            if (match) {
-                onCityChange(match.id, match.name);
+        if (initialCityName && cities.length > 0 && selectedStateId && !selectedCityId) {
+            const city = cities.find(c => c.name.toLowerCase() === initialCityName.toLowerCase());
+            if (city) {
+                onCityChange(city.id, city.name, city.ddd);
             }
         }
     }, [initialCityName, cities, selectedStateId, selectedCityId, onCityChange]);
@@ -165,91 +149,117 @@ export function LocationSelector({
         <div className={cn("grid gap-4", className)}>
             {onCountryChange && (
                 <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        País
-                    </label>
                     <Select
-                        disabled={isDisabled || loadingCountries}
-                        value={selectedCountryId?.toString() || ""}
-                        onValueChange={(value) => {
-                            const countryId = parseInt(value)
-                            const country = countries.find(c => c.id === countryId)
-                            if (country && onCountryChange) {
-                                onCountryChange(countryId, country.name)
-                                // Reset state and city? Parent should handle or we rely on useEffects
+                        label="País"
+                        placeholder={loadingCountries ? "Carregando..." : "Selecione o país"}
+                        isDisabled={isDisabled || loadingCountries}
+                        selectedKeys={selectedCountryId ? [selectedCountryId.toString()] : []}
+                        onSelectionChange={(keys) => {
+                            const key = Array.from(keys)[0];
+                            if (key) {
+                                const countryId = parseInt(key.toString())
+                                const country = countries.find(c => c.id === countryId)
+                                if (country && onCountryChange) {
+                                    onCountryChange(countryId, country.name)
+                                }
+                            }
+                        }}
+                        className="w-full"
+                        variant="bordered"
+                        scrollShadowProps={{
+                            isEnabled: false
+                        }}
+                        listboxProps={{
+                            emptyContent: "Nenhum país encontrado",
+                        }}
+                        popoverProps={{
+                            classNames: {
+                                content: "max-h-[300px]"
                             }
                         }}
                     >
-                        <SelectTrigger className="w-full">
-                            <SelectValue placeholder={loadingCountries ? "Carregando..." : "Selecione o país"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {countries.map((country) => (
-                                <SelectItem key={country.id} value={country.id.toString()}>
-                                    {country.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
+                        {countries.map((country) => (
+                            <SelectItem key={country.id} value={country.id.toString()}>
+                                {country.name}
+                            </SelectItem>
+                        ))}
                     </Select>
                 </div>
             )}
 
             <div className="space-y-2">
-                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                    Estado
-                </label>
                 <Select
-                    disabled={isDisabled || loadingStates}
-                    value={selectedStateId?.toString() || ""}
-                    onValueChange={(value) => {
-                        const stateId = parseInt(value)
-                        const state = states.find(s => s.id === stateId)
-                        if (state) {
-                            onStateChange(stateId, state.name, state.uf)
-                            // Reset city when state changes
-                            // onCityChange(0) // or null, but props say number. Let's assume 0 is invalid/empty.
-                            // The parent component should handle resetting the city when the state changes
+                    label="Estado"
+                    placeholder={loadingStates ? "Carregando..." : !selectedCountryId && onCountryChange ? "Selecione o país" : "Selecione o estado"}
+                    isDisabled={isDisabled || loadingStates}
+                    selectedKeys={selectedStateId ? [selectedStateId.toString()] : []}
+                    onSelectionChange={(keys) => {
+                        const key = Array.from(keys)[0];
+                        if (key) {
+                            const stateId = parseInt(key.toString())
+                            const state = states.find(s => s.id === stateId)
+                            if (state) {
+                                onStateChange(stateId, state.name, state.uf)
+                            }
+                        }
+                    }}
+                    className="w-full"
+                    variant="bordered"
+                    scrollShadowProps={{
+                        isEnabled: false
+                    }}
+                    listboxProps={{
+                        emptyContent: "Nenhum estado encontrado",
+                    }}
+                    popoverProps={{
+                        classNames: {
+                            content: "max-h-[300px]"
                         }
                     }}
                 >
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder={loadingStates ? "Carregando..." : !selectedCountryId && onCountryChange ? "Selecione o país" : "Selecione o estado"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {states.map((state) => (
-                            <SelectItem key={state.id} value={state.id.toString()}>
-                                {state.name} ({state.uf})
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
+                    {states.map((state) => (
+                        <SelectItem key={state.id} value={state.id.toString()}>
+                            {state.name} ({state.uf})
+                        </SelectItem>
+                    ))}
                 </Select>
             </div>
 
             <div className="space-y-2">
-                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                    Cidade
-                </label>
                 <Select
-                    disabled={isDisabled || !selectedStateId || loadingCities}
-                    value={selectedCityId?.toString() || ""}
-                    onValueChange={(value) => {
-                        const cityId = parseInt(value)
-                        const city = cities.find(c => c.id === cityId)
-                        if (city) {
-                            onCityChange(cityId, city.name, city.ddd)
+                    label="Cidade"
+                    placeholder={!selectedStateId ? "Selecione o estado primeiro" : loadingCities ? "Carregando..." : "Selecione a cidade"}
+                    isDisabled={isDisabled || !selectedStateId || loadingCities}
+                    selectedKeys={selectedCityId ? [selectedCityId.toString()] : []}
+                    onSelectionChange={(keys) => {
+                        const key = Array.from(keys)[0];
+                        if (key) {
+                            const cityId = parseInt(key.toString())
+                            const city = cities.find(c => c.id === cityId)
+                            if (city) {
+                                onCityChange(cityId, city.name, city.ddd)
+                            }
+                        }
+                    }}
+                    className="w-full"
+                    variant="bordered"
+                    scrollShadowProps={{
+                        isEnabled: false
+                    }}
+                    listboxProps={{
+                        emptyContent: "Nenhuma cidade encontrada",
+                    }}
+                    popoverProps={{
+                        classNames: {
+                            content: "max-h-[300px]"
                         }
                     }}
                 >
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder={!selectedStateId ? "Selecione o estado primeiro" : loadingCities ? "Carregando..." : "Selecione a cidade"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {cities.map((city) => (
-                            <SelectItem key={city.id} value={city.id.toString()}>
-                                {city.name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
+                    {cities.map((city) => (
+                        <SelectItem key={city.id} value={city.id.toString()}>
+                            {city.name}
+                        </SelectItem>
+                    ))}
                 </Select>
             </div>
         </div>

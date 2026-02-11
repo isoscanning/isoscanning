@@ -361,7 +361,7 @@ export default function EditarVagaPage() {
                                                 </div>
 
                                                 <LocationSelector
-                                                    className="col-span-1 md:col-span-2 md:grid-cols-2"
+                                                    className="col-span-1 md:col-span-2 grid-cols-1 sm:grid-cols-2"
                                                     isDisabled={formData.locationType === "remote"}
                                                     selectedStateId={locationIds.stateId}
                                                     selectedCityId={locationIds.cityId}

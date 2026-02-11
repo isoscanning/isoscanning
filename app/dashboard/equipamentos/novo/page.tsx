@@ -518,7 +518,7 @@ export default function NovoEquipamentoPage() {
                         <div className="grid grid-cols-1 gap-2">
                           <Label>Localização *</Label>
                           <LocationSelector
-                            className="grid-cols-1 md:grid-cols-2"
+                            className="grid-cols-1 sm:grid-cols-2"
                             selectedStateId={locationIds.stateId}
                             selectedCityId={locationIds.cityId}
                             initialStateUf={formData.state}

@@ -162,7 +162,7 @@ export function LocationSelector({
     }, [initialCityName, cities, selectedStateId, selectedCityId, onCityChange]);
 
     return (
-        <div className={cn("grid grid-cols-1 md:grid-cols-3 gap-4", className)}>
+        <div className={cn("grid gap-4", className)}>
             {onCountryChange && (
                 <div className="space-y-2">
                     <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
@@ -180,7 +180,7 @@ export function LocationSelector({
                             }
                         }}
                     >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                             <SelectValue placeholder={loadingCountries ? "Carregando..." : "Selecione o país"} />
                         </SelectTrigger>
                         <SelectContent>
@@ -212,7 +212,7 @@ export function LocationSelector({
                         }
                     }}
                 >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                         <SelectValue placeholder={loadingStates ? "Carregando..." : !selectedCountryId && onCountryChange ? "Selecione o país" : "Selecione o estado"} />
                     </SelectTrigger>
                     <SelectContent>
@@ -240,7 +240,7 @@ export function LocationSelector({
                         }
                     }}
                 >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                         <SelectValue placeholder={!selectedStateId ? "Selecione o estado primeiro" : loadingCities ? "Carregando..." : "Selecione a cidade"} />
                     </SelectTrigger>
                     <SelectContent>

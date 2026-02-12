@@ -20,6 +20,15 @@ import {
 } from "@/components/ui/popover"
 import apiClient from "@/lib/api-service"
 
+// Utility function to normalize strings for search (remove accents, trim, lowercase)
+const normalizeString = (str: string): string => {
+    return str
+        .normalize("NFD") // Decompose accented characters
+        .replace(/[\u0300-\u036f]/g, "") // Remove diacritics
+        .toLowerCase()
+        .trim();
+}
+
 interface State {
     id: number
     name: string
@@ -189,7 +198,8 @@ export function LocationSelector({
                                         {countries.map((country) => (
                                             <CommandItem
                                                 key={country.id}
-                                                value={country.name}
+                                                value={normalizeString(country.name)}
+                                                keywords={[country.name]}
                                                 onSelect={() => {
                                                     onCountryChange(country.id, country.name)
                                                     setOpenCountry(false)
@@ -240,7 +250,8 @@ export function LocationSelector({
                                     {states.map((state) => (
                                         <CommandItem
                                             key={state.id}
-                                            value={`${state.name} ${state.uf}`}
+                                            value={normalizeString(`${state.name} ${state.uf}`)}
+                                            keywords={[state.name, state.uf]}
                                             onSelect={() => {
                                                 onStateChange(state.id, state.name, state.uf)
                                                 setOpenState(false)
@@ -290,7 +301,8 @@ export function LocationSelector({
                                     {cities.map((city) => (
                                         <CommandItem
                                             key={city.id}
-                                            value={city.name}
+                                            value={normalizeString(city.name)}
+                                            keywords={[city.name]}
                                             onSelect={() => {
                                                 onCityChange(city.id, city.name, city.ddd)
                                                 setOpenCity(false)

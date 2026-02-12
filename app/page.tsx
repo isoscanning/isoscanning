@@ -5,6 +5,7 @@ import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
+import { AuthAwareLink } from "@/components/auth-aware-link";
 import { Search, Calendar, Package, Users, Star, Zap, Shield, ArrowRight, CheckCircle2, Play, Camera, Video, Image as ImageIcon } from "lucide-react";
 import { ParticleBackground } from "@/components/particle-background";
 import { ScrollReveal, StaggerReveal } from "@/components/scroll-reveal";
@@ -63,7 +64,7 @@ export default function HomePage() {
 
               <ScrollReveal delay={0.8}>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-                  <Link href="/cadastro">
+                  <AuthAwareLink href="/cadastro">
                     <Button
                       size="lg"
                       className="w-full sm:w-auto h-14 px-8 text-lg rounded-full shadow-lg hover:shadow-xl hover:shadow-primary/25 transition-all duration-300 group"
@@ -71,7 +72,7 @@ export default function HomePage() {
                       Começar Gratuitamente
                       <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                     </Button>
-                  </Link>
+                  </AuthAwareLink>
                   <Link href="/profissionais">
                     <Button
                       size="lg"
@@ -311,12 +312,12 @@ export default function HomePage() {
                   </ul>
 
                   <div className="pt-4">
-                    <Link href="/cadastro?tipo=profissional">
+                    <AuthAwareLink href="/cadastro?tipo=profissional">
                       <Button size="lg" className="h-14 px-8 rounded-full shadow-lg hover:shadow-xl transition-all duration-300">
                         Criar Meu Perfil Grátis
                         <ArrowRight className="ml-2 h-5 w-5" />
                       </Button>
-                    </Link>
+                    </AuthAwareLink>
                   </div>
                 </div>
               </ScrollReveal>
@@ -569,7 +570,7 @@ export default function HomePage() {
 
               <ScrollReveal delay={0.4}>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-                  <Link href="/cadastro">
+                  <AuthAwareLink href="/cadastro">
                     <Button
                       size="lg"
                       variant="secondary"
@@ -578,7 +579,7 @@ export default function HomePage() {
                       Criar Conta Gratuita
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
-                  </Link>
+                  </AuthAwareLink>
                   <Link href="/login">
                     <Button
                       size="lg"

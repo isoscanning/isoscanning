@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { AuthAwareLink } from "@/components/auth-aware-link";
 import {
   Search,
   Package,
@@ -100,11 +101,11 @@ export default function ComoFuncionaPage() {
 
             <ScrollReveal delay={0.6}>
               <div className="flex flex-wrap justify-center gap-4 pt-4">
-                <Link href="/cadastro">
+                <AuthAwareLink href="/cadastro">
                   <Button size="lg" className="rounded-full px-8 h-12 shadow-lg hover:shadow-primary/20">
                     Começar Agora <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
-                </Link>
+                </AuthAwareLink>
               </div>
             </ScrollReveal>
           </div>
@@ -409,11 +410,11 @@ export default function ComoFuncionaPage() {
 
               <ScrollReveal delay={0.2}>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Link href="/cadastro">
+                  <AuthAwareLink href="/cadastro">
                     <Button size="lg" className="w-full sm:w-auto px-8 h-12 text-lg rounded-full shadow-xl">
                       Criar Conta Gratuita
                     </Button>
-                  </Link>
+                  </AuthAwareLink>
                   <Link href="/vagas">
                     <Button size="lg" variant="outline" className="w-full sm:w-auto px-8 h-12 text-lg rounded-full border-2">
                       Ver Vagas Disponíveis

@@ -24,7 +24,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { AlertCircle, CheckCircle2, CalendarIcon } from "lucide-react";
+import { AlertCircle, CheckCircle2, CalendarIcon, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { format, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -146,7 +146,7 @@ export default function AgendarServicoPage() {
       console.error("[agendar] Error creating booking:", err);
       setError(
         err.response?.data?.message ||
-          "Erro ao agendar serviço. Tente novamente."
+        "Erro ao agendar serviço. Tente novamente."
       );
     } finally {
       setSubmitting(false);
@@ -254,8 +254,8 @@ export default function AgendarServicoPage() {
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {selectedDate
                           ? format(selectedDate, "dd 'de' MMMM 'de' yyyy", {
-                              locale: ptBR,
-                            })
+                            locale: ptBR,
+                          })
                           : "Selecione uma data"}
                       </Button>
                     </PopoverTrigger>
@@ -300,7 +300,14 @@ export default function AgendarServicoPage() {
                   className="w-full"
                   disabled={submitting || loading}
                 >
-                  {submitting ? "Agendando..." : "Agendar Serviço"}
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Agendando...
+                    </>
+                  ) : (
+                    "Agendar Serviço"
+                  )}
                 </Button>
               </form>
             </CardContent>

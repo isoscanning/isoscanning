@@ -589,11 +589,17 @@ export default function EditarEquipamentoPage() {
                           <Input
                             id="price"
                             type="number"
+                            min="0"
                             step="0.01"
                             value={formData.price}
-                            onChange={(e) =>
-                              setFormData({ ...formData, price: e.target.value })
-                            }
+                            onChange={(e) => {
+                              let val = e.target.value;
+                              if (val.includes('-')) return;
+                              if (val.startsWith('0') && val.length > 1 && val[1] !== '.') {
+                                val = val.replace(/^0+/, '');
+                              }
+                              setFormData({ ...formData, price: val })
+                            }}
                             placeholder="0,00"
                             required={formData.negotiationType !== "free"}
                             className="text-lg font-bold"

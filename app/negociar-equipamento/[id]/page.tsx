@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import apiClient from "@/lib/api-service";
 import type { Equipment } from "@/lib/data-service";
@@ -105,7 +105,7 @@ export default function NegociarEquipamentoPage() {
       console.error("[negociar-equipamento] Error creating proposal:", err);
       setError(
         err.response?.data?.message ||
-          "Erro ao enviar proposta. Tente novamente."
+        "Erro ao enviar proposta. Tente novamente."
       );
     } finally {
       setSubmitting(false);
@@ -282,7 +282,14 @@ export default function NegociarEquipamentoPage() {
                   className="w-full"
                   disabled={submitting || loading}
                 >
-                  {submitting ? "Enviando..." : "Enviar Proposta"}
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    "Enviar Proposta"
+                  )}
                 </Button>
               </form>
             </CardContent>

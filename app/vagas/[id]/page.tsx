@@ -190,6 +190,15 @@ export default function DetalhesVagaPage() {
             return;
         }
 
+        if (Number(proposalAmount) < 0) {
+            toast({
+                title: "Valor inválido",
+                description: "O valor da proposta não pode ser negativo.",
+                variant: "destructive",
+            });
+            return;
+        }
+
         setApplying(true);
         try {
             await applyToJob(vaga!.id, userProfile.id, proposalMessage, parseFloat(proposalAmount));
@@ -523,9 +532,17 @@ export default function DetalhesVagaPage() {
                                                             <Input
                                                                 id="amount"
                                                                 type="number"
+                                                                min="0"
                                                                 placeholder="Ex: 600"
                                                                 value={proposalAmount}
-                                                                onChange={(e) => setProposalAmount(e.target.value)}
+                                                                onChange={(e) => {
+                                                                    let val = e.target.value;
+                                                                    if (val.includes('-')) return;
+                                                                    if (val.startsWith('0') && val.length > 1 && val[1] !== '.') {
+                                                                        val = val.replace(/^0+/, '');
+                                                                    }
+                                                                    setProposalAmount(val);
+                                                                }}
                                                             />
                                                         </div>
                                                         <div className="grid gap-2">
@@ -601,9 +618,17 @@ export default function DetalhesVagaPage() {
                                             <Input
                                                 id="amount-mobile"
                                                 type="number"
+                                                min="0"
                                                 placeholder="Ex: 600"
                                                 value={proposalAmount}
-                                                onChange={(e) => setProposalAmount(e.target.value)}
+                                                onChange={(e) => {
+                                                    let val = e.target.value;
+                                                    if (val.includes('-')) return;
+                                                    if (val.startsWith('0') && val.length > 1 && val[1] !== '.') {
+                                                        val = val.replace(/^0+/, '');
+                                                    }
+                                                    setProposalAmount(val);
+                                                }}
                                             />
                                         </div>
                                     </div>

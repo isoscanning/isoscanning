@@ -35,7 +35,8 @@ import {
     FileText,
     ArrowLeft,
     Save,
-    Pencil
+    Pencil,
+    Loader2
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { fetchJobOffers, updateJobOffer, fetchSpecialties, type JobOffer, type Specialty } from "@/lib/data-service";
@@ -528,7 +529,12 @@ export default function EditarVagaPage() {
                                                 disabled={saving || success}
                                                 className="px-6 rounded-full shadow-md hover:shadow-lg transition-all"
                                             >
-                                                {saving ? "Salvando..." : (
+                                                {saving ? (
+                                                    <>
+                                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                        Salvando...
+                                                    </>
+                                                ) : (
                                                     <>
                                                         <Save className="h-4 w-4 mr-2" />
                                                         Salvar Alterações

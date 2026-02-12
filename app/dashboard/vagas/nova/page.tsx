@@ -34,7 +34,8 @@ import {
     DollarSign,
     FileText,
     ArrowLeft,
-    Save
+    Save,
+    Loader2
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { createJobOffer, fetchSpecialties, Specialty } from "@/lib/data-service";
@@ -103,6 +104,35 @@ export default function NovaVagaPage() {
         try {
             const selectedSpecialty = specialties.find(s => s.id === formData.specialtyId);
             const categoryName = selectedSpecialty ? selectedSpecialty.name : "Outros";
+
+            if (formData.budgetMin && Number(formData.budgetMin) < 0) {
+                throw new Error("O orçamento mínimo não pode ser negativo.");
+            }
+            if (formData.budgetMax && Number(formData.budgetMax) < 0) {
+                throw new Error("O orçamento máximo não pode ser negativo.");
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            if (formData.startDate) {
+                const startDate = new Date(formData.startDate);
+                // Adjust for timezone offset to compare correctly with date picker value
+                const startDateAdjusted = new Date(startDate.getTime() + startDate.getTimezoneOffset() * 60000);
+
+                if (startDateAdjusted < today) {
+                    throw new Error("A data de início não pode ser anterior à data atual.");
+                }
+
+                if (formData.endDate) {
+                    const endDate = new Date(formData.endDate);
+                    const endDateAdjusted = new Date(endDate.getTime() + endDate.getTimezoneOffset() * 60000);
+
+                    if (endDateAdjusted < startDateAdjusted) {
+                        throw new Error("A data de término não pode ser anterior à data de início.");
+                    }
+                }
+            }
 
             await createJobOffer({
                 ...formData,
@@ -364,9 +394,17 @@ export default function NovaVagaPage() {
                                                         <Input
                                                             id="budgetMin"
                                                             type="number"
+                                                            min="0"
                                                             className="pl-12"
                                                             value={formData.budgetMin}
-                                                            onChange={(e) => setFormData({ ...formData, budgetMin: e.target.value })}
+                                                            onChange={(e) => {
+                                                                let val = e.target.value;
+                                                                if (val.includes('-')) return;
+                                                                if (val.startsWith('0') && val.length > 1 && val[1] !== '.') {
+                                                                    val = val.replace(/^0+/, '');
+                                                                }
+                                                                setFormData({ ...formData, budgetMin: val })
+                                                            }}
                                                         />
                                                     </div>
                                                     <div className="relative flex-1">
@@ -374,9 +412,17 @@ export default function NovaVagaPage() {
                                                         <Input
                                                             id="budgetMax"
                                                             type="number"
+                                                            min="0"
                                                             className="pl-12"
                                                             value={formData.budgetMax}
-                                                            onChange={(e) => setFormData({ ...formData, budgetMax: e.target.value })}
+                                                            onChange={(e) => {
+                                                                let val = e.target.value;
+                                                                if (val.includes('-')) return;
+                                                                if (val.startsWith('0') && val.length > 1 && val[1] !== '.') {
+                                                                    val = val.replace(/^0+/, '');
+                                                                }
+                                                                setFormData({ ...formData, budgetMax: val })
+                                                            }}
                                                         />
                                                     </div>
                                                 </div>
@@ -388,18 +434,37 @@ export default function NovaVagaPage() {
                                                     <Input
                                                         id="startDate"
                                                         type="date"
+                                                        min={new Date().toISOString().split('T')[0]}
                                                         value={formData.startDate}
                                                         onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                                                        className={
+                                                            formData.startDate && new Date(formData.startDate) < new Date(new Date().setHours(0, 0, 0, 0))
+                                                                ? "border-red-500 focus-visible:ring-red-500"
+                                                                : ""
+                                                        }
                                                     />
+                                                    {formData.startDate && new Date(formData.startDate) < new Date(new Date().setHours(0, 0, 0, 0)) && (
+                                                        <span className="text-xs text-red-500">A data não pode ser menor que hoje</span>
+                                                    )}
                                                 </div>
                                                 <div className="space-y-2">
                                                     <Label htmlFor="endDate">Término</Label>
                                                     <Input
                                                         id="endDate"
                                                         type="date"
+                                                        min={formData.startDate || new Date().toISOString().split('T')[0]}
                                                         value={formData.endDate}
                                                         onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                                                        className={
+                                                            formData.endDate && formData.startDate && new Date(formData.endDate) < new Date(formData.startDate)
+                                                                ? "border-red-500 focus-visible:ring-red-500"
+                                                                : ""
+                                                        }
+                                                        disabled={!formData.startDate}
                                                     />
+                                                    {formData.endDate && formData.startDate && new Date(formData.endDate) < new Date(formData.startDate) && (
+                                                        <span className="text-xs text-red-500">A data final não pode ser menor que a inicial</span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -471,7 +536,12 @@ export default function NovaVagaPage() {
                                             disabled={saving || success}
                                             className="px-6 rounded-full shadow-md hover:shadow-lg transition-all"
                                         >
-                                            {saving ? "Publicando..." : (
+                                            {saving ? (
+                                                <>
+                                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                    Publicando...
+                                                </>
+                                            ) : (
                                                 <>
                                                     <Save className="h-4 w-4 mr-2" />
                                                     Publicar Vaga

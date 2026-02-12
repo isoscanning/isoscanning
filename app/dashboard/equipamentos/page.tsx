@@ -8,7 +8,7 @@ import { Footer } from "@/components/footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, Package, ImageIcon, MoreHorizontal, Camera } from "lucide-react";
+import { Plus, Edit, Trash2, Package, ImageIcon, MoreHorizontal, Camera, Loader2 } from "lucide-react";
 import Link from "next/link";
 import {
   fetchUserEquipments,
@@ -17,6 +17,16 @@ import {
 } from "@/lib/data-service";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Equipment {
   id: string;
@@ -34,6 +44,8 @@ export default function MeusEquipamentosPage() {
   const { userProfile, loading } = useAuth();
   const [equipments, setEquipments] = useState<Equipment[]>([]);
   const [loadingEquipments, setLoadingEquipments] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [equipmentToDelete, setEquipmentToDelete] = useState<string | null>(null);
 
   const fetchEquipments = useCallback(async () => {
     if (!userProfile) return;
@@ -70,21 +82,29 @@ export default function MeusEquipamentosPage() {
     }
   }, [userProfile, loading, fetchEquipments]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este equipamento?")) return;
+  const handleDeleteClick = (id: string) => {
+    setEquipmentToDelete(id);
+  };
 
+  const confirmDelete = async () => {
+    if (!equipmentToDelete) return;
+
+    setIsDeleting(true);
     try {
       // Find equipment to get image URLs
-      const equipment = equipments.find((e) => e.id === id);
+      const equipment = equipments.find((e) => e.id === equipmentToDelete);
       if (equipment?.imageUrls && equipment.imageUrls.length > 0) {
         await deleteEquipmentImages(equipment.imageUrls);
       }
 
-      await deleteEquipment(id);
-      setEquipments(equipments.filter((e) => e.id !== id));
+      await deleteEquipment(equipmentToDelete);
+      setEquipments(equipments.filter((e) => e.id !== equipmentToDelete));
+      setEquipmentToDelete(null);
     } catch (error) {
       console.error("[v0] Error deleting equipment:", error);
       alert("Erro ao excluir equipamento");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -241,7 +261,7 @@ export default function MeusEquipamentosPage() {
                         <Button
                           variant="outline"
                           className="px-3 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors"
-                          onClick={() => handleDelete(equip.id)}
+                          onClick={() => handleDeleteClick(equip.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -256,6 +276,27 @@ export default function MeusEquipamentosPage() {
       </main>
 
       <Footer />
+
+      <AlertDialog open={equipmentToDelete !== null} onOpenChange={(open) => !open && !isDeleting && setEquipmentToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Isso excluirá permanentemente o equipamento e todas as suas fotos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); confirmDelete(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
+            >
+              {isDeleting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Excluindo...</> : "Confirmar Exclusão"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

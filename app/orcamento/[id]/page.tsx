@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import apiClient from "@/lib/api-service";
 import type { Professional } from "@/lib/data-service";
@@ -102,7 +102,7 @@ export default function OrcamentoPage() {
       console.error("[orcamento] Error creating quote request:", err);
       setError(
         err.response?.data?.message ||
-          "Erro ao enviar solicitação de orçamento. Tente novamente."
+        "Erro ao enviar solicitação de orçamento. Tente novamente."
       );
     } finally {
       setSubmitting(false);
@@ -240,7 +240,14 @@ export default function OrcamentoPage() {
                   className="w-full"
                   disabled={submitting || loading}
                 >
-                  {submitting ? "Enviando..." : "Enviar Solicitação"}
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    "Enviar Solicitação"
+                  )}
                 </Button>
               </form>
             </CardContent>

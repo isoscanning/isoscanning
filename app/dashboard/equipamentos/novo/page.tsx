@@ -41,35 +41,7 @@ const CATEGORIAS = [
   "Edição",
 ];
 
-const ESTADOS = [
-  "AC",
-  "AL",
-  "AP",
-  "AM",
-  "BA",
-  "CE",
-  "DF",
-  "ES",
-  "GO",
-  "MA",
-  "MT",
-  "MS",
-  "MG",
-  "PA",
-  "PB",
-  "PR",
-  "PE",
-  "PI",
-  "RJ",
-  "RN",
-  "RS",
-  "RO",
-  "RR",
-  "SC",
-  "SP",
-  "SE",
-  "TO",
-];
+import { LocationSelector } from "@/components/location-selector";
 
 export default function NovoEquipamentoPage() {
   const router = useRouter();
@@ -88,6 +60,12 @@ export default function NovoEquipamentoPage() {
     city: "",
     state: "",
     additionalConditions: "",
+  });
+
+  const [locationIds, setLocationIds] = useState({
+    countryId: 0,
+    stateId: 0,
+    cityId: 0
   });
 
   const [saving, setSaving] = useState(false);
@@ -543,40 +521,23 @@ export default function NovoEquipamentoPage() {
                       )}
 
                       <div className="pt-4 border-t space-y-4">
-                        <div className="grid grid-cols-3 gap-2">
-                          <div className="col-span-2 space-y-2">
-                            <Label>Cidade *</Label>
-                            <Input
-                              id="city"
-                              value={formData.city}
-                              onChange={(e) =>
-                                setFormData({ ...formData, city: e.target.value })
-                              }
-                              required
-                              placeholder="Cidade"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>UF *</Label>
-                            <Select
-                              value={formData.state}
-                              onValueChange={(value) =>
-                                setFormData({ ...formData, state: value })
-                              }
-                              required
-                            >
-                              <SelectTrigger id="state">
-                                <SelectValue placeholder="UF" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {ESTADOS.map((estado) => (
-                                  <SelectItem key={estado} value={estado}>
-                                    {estado}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                        <div className="grid grid-cols-1 gap-2">
+                          <Label>Localização *</Label>
+                          <LocationSelector
+                            className="grid-cols-1 sm:grid-cols-2"
+                            selectedStateId={locationIds.stateId}
+                            selectedCityId={locationIds.cityId}
+                            initialStateUf={formData.state}
+                            initialCityName={formData.city}
+                            onStateChange={(id, name, uf) => {
+                              setLocationIds(prev => ({ ...prev, stateId: id, cityId: 0 }));
+                              setFormData(prev => ({ ...prev, state: uf, city: '' }));
+                            }}
+                            onCityChange={(id, name) => {
+                              setLocationIds(prev => ({ ...prev, cityId: id }));
+                              setFormData(prev => ({ ...prev, city: name }));
+                            }}
+                          />
                         </div>
                       </div>
 

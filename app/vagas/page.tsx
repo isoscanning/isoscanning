@@ -24,6 +24,7 @@ import {
     X,
 } from "lucide-react";
 import { fetchJobOffers, fetchSpecialties, type JobOffer, type Specialty } from "@/lib/data-service";
+import { trackEvent } from "@/lib/analytics";
 import Link from "next/link";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { CountUp } from "@/components/typing-text";
@@ -95,9 +96,30 @@ export default function VagasPublicasPage() {
         setSelectedJobType("all");
         setSelectedState("Todos");
         setSelectedCity("");
+        trackEvent({ action: "filter", category: "Jobs", label: "Clear Filters" });
     };
 
     const hasActiveFilters = selectedCategory !== "Todas" || selectedJobType !== "all" || selectedState !== "Todos" || selectedCity !== "";
+
+    // Track Filter Changes
+    useEffect(() => {
+        if (selectedCategory !== "Todas") trackEvent({ action: "filter", category: "Jobs", label: `Category: ${selectedCategory}` });
+    }, [selectedCategory]);
+
+    useEffect(() => {
+        if (selectedJobType !== "all") trackEvent({ action: "filter", category: "Jobs", label: `Job Type: ${selectedJobType}` });
+    }, [selectedJobType]);
+
+    useEffect(() => {
+        if (selectedState !== "Todos") trackEvent({ action: "filter", category: "Jobs", label: `State: ${selectedState}` });
+    }, [selectedState]);
+
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            if (searchTerm) trackEvent({ action: "search", category: "Jobs", label: searchTerm });
+        }, 1000);
+        return () => clearTimeout(timeoutId);
+    }, [searchTerm]);
 
     const getJobTypeLabel = (type: string) => {
         const types: Record<string, string> = {
@@ -451,7 +473,7 @@ export default function VagasPublicasPage() {
                                     Publique sua vaga gratuitamente e encontre os melhores talentos
                                     para o seu projeto audiovisual.
                                 </p>
-                                <Link href="/dashboard/vagas/nova">
+                                <Link href="/dashboard/vagas/nova" onClick={() => trackEvent({ action: 'click_cta', category: 'Jobs', label: 'Post Job Footer' })}>
                                     <Button
                                         size="lg"
                                         variant="secondary"

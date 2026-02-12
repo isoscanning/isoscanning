@@ -11,6 +11,7 @@ import { MapPin, Package, MessageSquare, User, ChevronLeft, ChevronRight, X, Max
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
 import apiClient from "@/lib/api-service"
+import { trackEvent } from "@/lib/analytics"
 import { ScrollReveal } from "@/components/scroll-reveal"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -51,6 +52,7 @@ export default function EquipmentDetailsPage() {
   const openLightbox = (index: number) => {
     setCurrentImageIndex(index)
     setIsLightboxOpen(true)
+    trackEvent({ action: 'open_lightbox', category: 'Equipment', label: `Image: ${index}` });
   }
 
   const closeLightbox = () => {
@@ -90,6 +92,12 @@ export default function EquipmentDetailsPage() {
       const response = await apiClient.get(`/equipments/${equipmentId}`)
       console.log("[EquipmentDetails] Fetched data:", response.data);
       setEquipment(response.data)
+      trackEvent({
+        action: 'view_equipment',
+        category: 'Equipment',
+        label: response.data.name,
+        value: response.data.price || 0
+      })
     } catch (error) {
       console.error("Erro ao buscar equipamento:", error)
       setEquipment(null)
@@ -233,8 +241,8 @@ export default function EquipmentDetailsPage() {
                         key={idx}
                         onClick={() => setCurrentImageIndex(idx)}
                         className={`aspect-square bg-muted rounded-xl overflow-hidden border-2 transition-all relative ${idx === currentImageIndex
-                            ? "border-primary shadow-md ring-2 ring-primary/20"
-                            : "border-transparent hover:border-primary/50 opacity-70 hover:opacity-100"
+                          ? "border-primary shadow-md ring-2 ring-primary/20"
+                          : "border-transparent hover:border-primary/50 opacity-70 hover:opacity-100"
                           }`}
                       >
                         <img
@@ -357,7 +365,14 @@ export default function EquipmentDetailsPage() {
                                 cleanNumber = cleanPhone;
                               }
                             }
-                            window.open(`https://wa.me/${cleanNumber}`, '_blank');
+                            if (cleanNumber) {
+                              trackEvent({
+                                action: 'contact_seller',
+                                category: 'Equipment',
+                                label: equipment.name,
+                              });
+                              window.open(`https://wa.me/${cleanNumber}`, '_blank');
+                            }
                           }}
                         >
                           <MessageCircle className="h-5 w-5 mr-2" />
@@ -366,7 +381,13 @@ export default function EquipmentDetailsPage() {
                       )}
 
                       {userProfile && userProfile.id !== equipment.ownerId && equipment.available ? (
-                        <Link href={`/negociar-equipamento/${equipment.id}`} className="block">
+                        <Link href={`/negociar-equipamento/${equipment.id}`} className="block" onClick={() => {
+                          trackEvent({
+                            action: 'negotiate_equipment_click',
+                            category: 'Equipment',
+                            label: equipment.name,
+                          });
+                        }}>
                           <Button className="w-full h-12 text-base rounded-xl" variant="outline" size="lg">
                             <MessageSquare className="h-5 w-5 mr-2" />
                             {equipment.negotiationType === "sale" ? "Fazer Proposta na Plataforma" : "Solicitar Pela Plataforma"}

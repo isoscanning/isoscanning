@@ -48,6 +48,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { fetchJobOfferById, type JobOffer, checkJobApplication, applyToJob, fetchJobApplication, type JobApplication } from "@/lib/data-service";
 import apiClient from "@/lib/api-service";
+import { trackEvent } from "@/lib/analytics";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion } from "framer-motion";
@@ -88,6 +89,13 @@ export default function DetalhesVagaPage() {
                         console.error("Error fetching employer stats:", e);
                     }
                 }
+
+                trackEvent({
+                    action: 'view_job_offer',
+                    category: 'Jobs',
+                    label: vagaData?.title,
+                    value: (vagaData?.budgetMax ?? vagaData?.budgetMin) ?? 0
+                });
 
                 if (userProfile) {
                     const application = await fetchJobApplication(params.id as string, userProfile.id);

@@ -3,6 +3,7 @@
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Card, CardContent } from "@/components/ui/card";
+import { trackEvent } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { MapPin, Star, Search, Users, Filter, ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
@@ -177,6 +178,7 @@ export default function ProfissionaisPage() {
                       setSelectedCity("");
                       setSelectedSpecialty("Todos");
                       setSelectedDate(undefined);
+                      trackEvent({ action: 'filter', category: 'Professionals', label: 'Clear Filters' });
                     }}
                     className="rounded-full"
                   >
@@ -207,7 +209,7 @@ export default function ProfissionaisPage() {
                   Cadastre-se gratuitamente e seja encontrado por clientes
                   que precisam do seu talento.
                 </p>
-                <Link href="/cadastro?tipo=profissional">
+                <Link href="/cadastro?tipo=profissional" onClick={() => trackEvent({ action: 'click_cta', category: 'Professionals', label: 'Create Profile Footer' })}>
                   <Button
                     size="lg"
                     variant="secondary"

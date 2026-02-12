@@ -55,10 +55,7 @@ const MODALIDADES = [
     { value: "hybrid", label: "Híbrido" },
 ];
 
-const ESTADOS = [
-    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
-    "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
-];
+import { LocationSelector } from "@/components/location-selector";
 
 export default function EditarVagaPage() {
     const params = useParams();
@@ -82,6 +79,12 @@ export default function EditarVagaPage() {
         startDate: "",
         endDate: "",
         requiresInvoice: false,
+    });
+
+    const [locationIds, setLocationIds] = useState({
+        countryId: 0,
+        stateId: 0,
+        cityId: 0
     });
 
     const [fetching, setFetching] = useState(true);
@@ -358,40 +361,22 @@ export default function EditarVagaPage() {
                                                     </Select>
                                                 </div>
 
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="city">Cidade</Label>
-                                                    <Input
-                                                        id="city"
-                                                        value={formData.city}
-                                                        onChange={(e) =>
-                                                            setFormData({ ...formData, city: e.target.value })
-                                                        }
-                                                        disabled={formData.locationType === "remote"}
-                                                        placeholder="Digite a cidade"
-                                                    />
-                                                </div>
-
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="state">Estado</Label>
-                                                    <Select
-                                                        value={formData.state}
-                                                        onValueChange={(value) =>
-                                                            setFormData({ ...formData, state: value })
-                                                        }
-                                                        disabled={formData.locationType === "remote"}
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="UF" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {ESTADOS.map((estado) => (
-                                                                <SelectItem key={estado} value={estado}>
-                                                                    {estado}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
+                                                <LocationSelector
+                                                    className="col-span-1 md:col-span-2 grid-cols-1 sm:grid-cols-2"
+                                                    isDisabled={formData.locationType === "remote"}
+                                                    selectedStateId={locationIds.stateId}
+                                                    selectedCityId={locationIds.cityId}
+                                                    initialStateUf={formData.state}
+                                                    initialCityName={formData.city}
+                                                    onStateChange={(id, name, uf) => {
+                                                        setLocationIds(prev => ({ ...prev, stateId: id, cityId: 0 }));
+                                                        setFormData(prev => ({ ...prev, state: uf, city: '' }));
+                                                    }}
+                                                    onCityChange={(id, name) => {
+                                                        setLocationIds(prev => ({ ...prev, cityId: id }));
+                                                        setFormData(prev => ({ ...prev, city: name }));
+                                                    }}
+                                                />
                                             </div>
                                         </div>
 

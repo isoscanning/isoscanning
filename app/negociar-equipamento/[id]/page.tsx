@@ -20,6 +20,7 @@ import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import apiClient from "@/lib/api-service";
 import type { Equipment } from "@/lib/data-service";
+import { trackEvent } from "@/lib/analytics";
 
 export default function NegociarEquipamentoPage() {
   const params = useParams();
@@ -97,6 +98,12 @@ export default function NegociarEquipamentoPage() {
 
       console.log("[negociar-equipamento] Proposal created:", response.data);
       setSuccess(true);
+      trackEvent({
+        action: 'submit_proposal',
+        category: 'Equipment',
+        label: equipment?.name,
+        value: proposedPrice ? parseFloat(proposedPrice) : 0
+      });
 
       setTimeout(() => {
         router.push("/equipamentos");

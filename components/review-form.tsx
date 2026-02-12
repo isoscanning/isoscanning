@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Star } from "lucide-react"
+import { trackEvent } from "@/lib/analytics"
 
 interface ReviewFormProps {
   professionalId: string
@@ -33,6 +34,13 @@ export function ReviewForm({ professionalId, bookingId, onSubmit }: ReviewFormPr
       onSubmit(review)
     }
 
+    trackEvent({
+      action: 'review_professional',
+      category: 'Professional',
+      label: `Rating: ${rating}`,
+      value: rating
+    })
+
     // Simular envio
     await new Promise((resolve) => setTimeout(resolve, 1000))
 
@@ -56,9 +64,8 @@ export function ReviewForm({ professionalId, bookingId, onSubmit }: ReviewFormPr
               className="transition-transform hover:scale-110"
             >
               <Star
-                className={`h-8 w-8 ${
-                  star <= (hoveredRating || rating) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
-                }`}
+                className={`h-8 w-8 ${star <= (hoveredRating || rating) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+                  }`}
               />
             </button>
           ))}

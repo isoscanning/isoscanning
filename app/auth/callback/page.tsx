@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import apiClient from "@/lib/api-service";
+import { trackEvent } from "@/lib/analytics";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -22,6 +23,7 @@ export default function AuthCallbackPage() {
 
         if (session) {
           console.log("[auth-callback] Session found.");
+          trackEvent({ action: 'login', category: 'Auth', label: 'Google' });
 
           // Store tokens
           localStorage.setItem("auth_token", session.access_token);

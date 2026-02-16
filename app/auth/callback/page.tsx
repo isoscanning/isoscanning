@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import apiClient from "@/lib/api-service";
@@ -9,127 +9,145 @@ import { trackEvent } from "@/lib/analytics";
 export default function AuthCallbackPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<string>("Verificando sessão...");
+  const hasHandled = useRef(false);
 
   useEffect(() => {
+    // Prevent multiple executions in Strict Mode
+    if (hasHandled.current) return;
+    hasHandled.current = true;
+
     const handleCallback = async () => {
       try {
-        console.log("[auth-callback] Verifying Supabase session...");
+        console.log("[auth-callback] Starting authentication callback handler...");
 
-        // Supabase client automatically handles the hash fragment or code exchange
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        // 1. Get the session. Supabase handles the code exchange automatically 
+        // but we'll be explicit and wait for it.
+        let { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        // If no session, wait a bit and try once more (sometimes the fragment takes a moment to process)
+        if (!session && !sessionError) {
+          console.log("[auth-callback] No session found immediately, waiting 1s...");
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const retry = await supabase.auth.getSession();
+          session = retry.data.session;
+          sessionError = retry.error;
+        }
 
         if (sessionError) throw sessionError;
 
-        if (session) {
-          console.log("[auth-callback] Session found.");
-          trackEvent({ action: 'login', category: 'Auth', label: 'Google' });
+        if (!session) {
+          console.warn("[auth-callback] Authentication failed: No session detected.");
+          throw new Error("Não foi possível estabelecer uma sessão de login. Por favor, tente entrar novamente.");
+        }
 
-          // Store tokens
-          localStorage.setItem("auth_token", session.access_token);
-          if (session.refresh_token) {
-            localStorage.setItem("refresh_token", session.refresh_token);
-          }
+        console.log("[auth-callback] Session confirmed for user:", session.user.email);
+        setStatus("Sessão confirmada! Preparando sua conta...");
+        trackEvent({ action: 'login', category: 'Auth', label: 'Google' });
 
+        // 2. Persist tokens for the API client
+        localStorage.setItem("auth_token", session.access_token);
+        if (session.refresh_token) {
+          localStorage.setItem("refresh_token", session.refresh_token);
+        }
+
+        // 3. Sync with Backend
+        // This is where the backend automatically creates the profile if missing.
+        console.log("[auth-callback] Syncing with backend API (/auth/me)...");
+        try {
+          const response = await apiClient.get("/auth/me", {
+            headers: { "X-Skip-Auth-Redirect": "true" }
+          });
+
+          const userProfile = response.data;
+          console.log("[auth-callback] Backend sync successful. Profile ID:", userProfile.id);
+
+          localStorage.setItem("user_profile", JSON.stringify(userProfile));
+          localStorage.removeItem("signupUserType");
+
+          // 4. Determine destination
           let redirectUrl = localStorage.getItem("redirectAfterLogin") || "/dashboard";
           localStorage.removeItem("redirectAfterLogin");
 
-          try {
-            // Fetch profile - the backend will automatically create it if missing
-            // We pass X-Skip-Auth-Redirect to prevent api network interceptor from redirecting to login on 401
-            const response = await apiClient.get("/auth/me", {
-              headers: { "X-Skip-Auth-Redirect": "true" }
-            });
-            const userProfile = response.data;
-
-            localStorage.setItem("user_profile", JSON.stringify(userProfile));
-            localStorage.removeItem("signupUserType");
-
-            // Logic: If user doesn't have a phone number, send to onboarding.
-            if (!userProfile.phone) {
-              console.log("[auth-callback] Phone number missing, redirecting to onboarding...");
-              redirectUrl = "/onboarding";
-            } else {
-              console.log("[auth-callback] Profile ready, proceeding to destination...");
-            }
-
-          } catch (profileError: any) {
-            console.error("[auth-callback] Error fetching/creating profile:", profileError);
-            if (profileError.response?.data) {
-              console.error("[auth-callback] Detail error data:", profileError.response.data);
-            }
-
-            const errorMsg = profileError.response?.data?.message || profileError.message || "Erro ao carregar perfil";
-            setError(`Ocorreu um erro ao preparar sua conta: ${errorMsg}. Por favor, tente novamente.`);
-            setLoading(false);
-
-            // Cleanup to allow retry
-            await supabase.auth.signOut();
-            localStorage.removeItem("auth_token");
-            localStorage.removeItem("user_profile");
-            return;
+          if (!userProfile.phone) {
+            console.log("[auth-callback] Required info missing (phone), directing to onboarding.");
+            redirectUrl = "/onboarding";
           }
 
-          if (!error) {
-            window.location.href = redirectUrl;
-          }
-        } else {
-          // Retry or wait logic removed for simplicity, relying on immediate session check
-          // If no session, try listening once
-          const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            if (event === 'SIGNED_IN' && session) {
-              localStorage.setItem("auth_token", session.access_token);
-              window.location.href = "/dashboard";
-            }
-          });
+          setStatus("Conta pronta! Redirecionando...");
 
-          // If session detection times out, it might be a new user or a glitch.
-          // In either case, redirecting to /cadastro allows them to try again or sign up.
-          // This aligns with user request to handle "no account" scenarios gracefully.
-          setTimeout(() => {
-            if (loading) {
-              console.warn("[auth-callback] Session timeout. Redirecting to signup...");
-              router.push("/cadastro");
-            }
-          }, 10000); // Increased to 10s to account for slow mobile networks
+          // Use window.location.href for a full page refresh to ensure all contexts (AuthContext etc)
+          // pick up the new localStorage state properly.
+          window.location.href = redirectUrl;
+
+        } catch (apiError: any) {
+          console.error("[auth-callback] Critical backend sync error:", apiError);
+          if (apiError.response?.data) {
+            console.error("[auth-callback] Error details:", apiError.response.data);
+          }
+
+          const detail = apiError.response?.data?.message || apiError.message || "Erro de conexão com o servidor.";
+          throw new Error(`Erro ao sincronizar sua conta: ${detail}`);
         }
+
       } catch (err: any) {
-        console.error("[auth-callback] Error:", err);
-        setError(err.message || "Erro ao processar autenticação");
-        setLoading(false);
+        console.error("[auth-callback] Final catch:", err);
+        setError(err.message || "Ocorreu um erro inesperado durante o login.");
+
+        // Cleanup failed session to allow retry
+        await supabase.auth.signOut();
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("user_profile");
       }
     };
 
     handleCallback();
-  }, [router]);
+  }, []);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-10 w-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-          <p className="text-muted-foreground animate-pulse">Entrando...</p>
-        </div>
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+      <div className="w-full max-w-sm flex flex-col items-center text-center">
+        {error ? (
+          <div className="space-y-6">
+            <div className="h-20 w-20 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto">
+              <svg className="h-10 w-10 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+
+            <div className="space-y-2">
+              <h1 className="text-2xl font-bold text-foreground">Falha no Login</h1>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                {error}
+              </p>
+            </div>
+
+            <button
+              onClick={() => window.location.href = "/login"}
+              className="w-full h-12 bg-primary text-primary-foreground font-bold rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
+            >
+              Tentar Novamente
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div className="relative">
+              <div className="h-20 w-20 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="h-2 w-2 bg-primary rounded-full animate-ping" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-foreground">Autenticando</h2>
+              <p className="text-muted-foreground text-sm animate-pulse">
+                {status}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <div className="text-center max-w-md w-full bg-destructive/5 border border-destructive/20 rounded-2xl p-8">
-          <h1 className="text-xl font-bold text-destructive mb-2">Erro na autenticação</h1>
-          <p className="text-sm text-muted-foreground mb-6">{error}</p>
-          <button
-            onClick={() => router.push("/login")}
-            className="w-full px-4 py-3 bg-primary text-primary-foreground font-medium rounded-xl hover:bg-primary/90 transition-all"
-          >
-            Voltar tentar novamente
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
+    </div>
+  );
 }

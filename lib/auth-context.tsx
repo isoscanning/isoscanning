@@ -112,13 +112,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // This ensures we have the most up-to-date profile data
         try {
           console.log("[auth-context] Token found, fetching profile from API...");
-          const response = await apiClient.get("/auth/me");
+          // We pass X-Skip-Auth-Redirect to prevent api network interceptor from redirecting to login on 401
+          const response = await apiClient.get("/auth/me", {
+            headers: { "X-Skip-Auth-Redirect": "true" }
+          });
           profile = response.data;
           localStorage.setItem("user_profile", JSON.stringify(response.data));
           console.log("[auth-context] Profile loaded from API successfully");
-        } catch (apiError) {
-          console.error("[auth-context] Error fetching from API, falling back to localStorage:", apiError);
-          // Fallback to localStorage only if API fails
+        } catch (apiError: any) {
+          console.error("[auth-context] Error fetching from API:", apiError);
+
+          // If unauthorized, clear everything to avoid loops
+          if (apiError.response?.status === 401 || apiError.response?.status === 403) {
+            console.log("[auth-context] Unauthorized session, clearing local and supabase state...");
+            await supabase.auth.signOut();
+            localStorage.removeItem("auth_token");
+            localStorage.removeItem("refresh_token");
+            localStorage.removeItem("user_profile");
+            setLoading(false);
+            return;
+          }
+
+          // Fallback to localStorage only if API fails for other reasons
           const savedProfile = localStorage.getItem("user_profile");
           if (savedProfile) {
             profile = JSON.parse(savedProfile);

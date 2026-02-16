@@ -276,7 +276,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== "undefined" ? window.location.origin : "");
 
       // Force sign out before starting new login to ensure clean state
-      await supabase.auth.signOut();
+      // await supabase.auth.signOut(); // Commented out as it might be breaking PKCE flow
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",

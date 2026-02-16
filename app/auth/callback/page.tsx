@@ -59,7 +59,35 @@ export default function AuthCallbackPage() {
 
             // Check if error is related to missing profile (401 from backend now throws UnauthorizedException)
             if (profileError.response?.status === 401 || profileError.response?.status === 404) {
-              console.log("[auth-callback] Profile not found, redirecting to signup...");
+              console.log("[auth-callback] Profile not found.");
+
+              // Check if we have a pending signup (user came from /cadastro)
+              const signupUserType = localStorage.getItem("signupUserType");
+
+              if (signupUserType) {
+                console.log("[auth-callback] Found pending signup, creating profile...");
+                try {
+                  // Complete signup by creating the profile
+                  const { data: newProfile } = await apiClient.post("/auth/complete-google-signup", {
+                    userType: signupUserType,
+                    displayName: session.user.user_metadata.full_name || session.user.email?.split('@')[0],
+                    avatarUrl: session.user.user_metadata.avatar_url
+                  });
+
+                  localStorage.setItem("user_profile", JSON.stringify(newProfile));
+                  localStorage.removeItem("signupUserType"); // clear it
+
+                  console.log("[auth-callback] Profile created successfully. Redirecting...");
+                  window.location.href = redirectUrl || "/dashboard";
+                  return;
+
+                } catch (createError) {
+                  console.error("[auth-callback] Failed to create profile:", createError);
+                  // Fallthrough to cleanup and redirect to signup
+                }
+              }
+
+              console.log("[auth-callback] Redirecting to signup...");
 
               // Clear session locally and in Supabase
               await supabase.auth.signOut();
@@ -98,7 +126,7 @@ export default function AuthCallbackPage() {
               console.warn("[auth-callback] Session timeout. Redirecting to signup...");
               router.push("/cadastro");
             }
-          }, 4000);
+          }, 10000); // Increased to 10s to account for slow mobile networks
         }
       } catch (err: any) {
         console.error("[auth-callback] Error:", err);

@@ -23,21 +23,51 @@ export default function AuthCallbackPage() {
 
         // 1. Get the session. Supabase handles the code exchange automatically 
         // but we'll be explicit and wait for it.
-        let { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        let session = null;
+        let sessionError = null;
 
-        // If no session, wait a bit and try once more (sometimes the fragment takes a moment to process)
-        if (!session && !sessionError) {
-          console.log("[auth-callback] No session found immediately, waiting 1s...");
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          const retry = await supabase.auth.getSession();
-          session = retry.data.session;
-          sessionError = retry.error;
+        // Try multiple times to get session (up to 5 retries with backoff)
+        for (let i = 0; i < 5; i++) {
+          console.log(`[auth-callback] Session check attempt ${i + 1}...`);
+          const result = await supabase.auth.getSession();
+          session = result.data.session;
+          sessionError = result.error;
+
+          if (session) {
+            console.log("[auth-callback] Session found via getSession()");
+            break;
+          }
+
+          if (sessionError) {
+            console.warn("[auth-callback] Session error:", sessionError);
+          }
+
+          // If no session from Supabase client directly, check if the parent AuthContext 
+          // or another process already captured it and put it in localStorage
+          const localToken = localStorage.getItem("auth_token");
+          if (localToken) {
+            console.log("[auth-callback] Found session token in localStorage, verifying it...");
+            // We use getUser to verify the token is valid and get user info
+            const { data: { user }, error: userError } = await supabase.auth.getUser(localToken);
+            if (user && !userError) {
+              console.log("[auth-callback] Re-using verified session from localStorage");
+              session = { access_token: localToken, user } as any;
+              break;
+            }
+          }
+
+          // Wait with backoff
+          if (i < 4) {
+            const delay = 500 * (i + 1);
+            console.log(`[auth-callback] Still no session, waiting ${delay}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
         }
 
-        if (sessionError) throw sessionError;
+        if (sessionError && !session) throw sessionError;
 
         if (!session) {
-          console.warn("[auth-callback] Authentication failed: No session detected.");
+          console.warn("[auth-callback] Authentication failed: No session detected after retries.");
           throw new Error("Não foi possível estabelecer uma sessão de login. Por favor, tente entrar novamente.");
         }
 
@@ -95,6 +125,7 @@ export default function AuthCallbackPage() {
         setError(err.message || "Ocorreu um erro inesperado durante o login.");
 
         // Cleanup failed session to allow retry
+        // But only if we are absolutely sure it's a failure (to prevent loops)
         await supabase.auth.signOut();
         localStorage.removeItem("auth_token");
         localStorage.removeItem("refresh_token");

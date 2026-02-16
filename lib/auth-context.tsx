@@ -87,6 +87,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         if (typeof window === "undefined") return;
 
+        // CRITICAL: If we are on the auth/callback page, let THAT page handle EVERYTHING.
+        // We don't want to race for the session or call the API here.
+        if (window.location.pathname === "/auth/callback") {
+          console.log("[auth-context] On callback page, skipping loadProfile...");
+          return;
+        }
+
         // 1. Try to recover/refresh session from Supabase first
         // This handles cases where localStorage has stale token but Supabase client has valid session
         const { data: { session } } = await supabase.auth.getSession();
@@ -210,6 +217,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       // Handle specific events
       if (event === 'SIGNED_OUT') {
+        const isCallbackPage = typeof window !== "undefined" && window.location.pathname === "/auth/callback";
+
+        if (isCallbackPage) {
+          console.log("[auth-context] SIGNED_OUT event detected on callback page, ignoring side effects to prevent loops.");
+          return;
+        }
+
         setUserProfile(null);
         if (typeof window !== "undefined") {
           localStorage.removeItem("auth_token");

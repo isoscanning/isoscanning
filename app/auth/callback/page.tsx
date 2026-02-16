@@ -56,8 +56,7 @@ export default function AuthCallbackPage() {
 
             // Check if error is related to missing profile (401 from backend now throws UnauthorizedException)
             if (profileError.response?.status === 401 || profileError.response?.status === 404) {
-              setError("Sua conta não foi encontrada. Por favor, crie uma conta.");
-              setLoading(false);
+              console.log("[auth-callback] Profile not found, redirecting to signup...");
 
               // Clear session locally and in Supabase
               await supabase.auth.signOut();
@@ -65,10 +64,8 @@ export default function AuthCallbackPage() {
               localStorage.removeItem("refresh_token");
               localStorage.removeItem("user_profile");
 
-              // Redirect to signup after a delay
-              setTimeout(() => {
-                router.push("/cadastro");
-              }, 3000);
+              // Redirect immediately to signup
+              router.push("/cadastro");
               return;
             }
 

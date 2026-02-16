@@ -37,9 +37,13 @@ apiClient.interceptors.response.use(
 
     if (error.response?.status === 401) {
       if (typeof window !== "undefined" && !skipRedirect) {
-        // Prevent redirect loop if already on login page
-        if (window.location.pathname === "/login") {
-          console.warn("[api-service] 401 Unauthorized on /login page, suppressing redirect to avoid loop");
+        // Prevent redirect loop if already on login page OR in the auth callback phase
+        const currentPath = window.location.pathname;
+        if (currentPath === "/login" || currentPath === "/auth/callback") {
+          console.warn(`[api-service] 401 Unauthorized on ${currentPath}, suppressing redirect to allow page-level handling`);
+          if (error.response?.data) {
+            console.error("[api-service] Backend error data:", error.response.data);
+          }
           return Promise.reject(error);
         }
 

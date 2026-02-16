@@ -121,9 +121,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
           console.log("[auth-context] Profile loaded from API successfully");
         } catch (apiError: any) {
           console.error("[auth-context] Error fetching from API:", apiError);
+          if (apiError.response?.data) {
+            console.error("[auth-context] Profile fetch error data:", apiError.response.data);
+          }
 
           // If unauthorized, clear everything to avoid loops
           if (apiError.response?.status === 401 || apiError.response?.status === 403) {
+            // CRITICAL: If we are on the auth/callback page, do NOT sign out yet.
+            // The callback page might be trying to complete the signup, and signing out
+            // here would invalidate the session it's trying to use.
+            if (typeof window !== "undefined" && window.location.pathname === "/auth/callback") {
+              console.log("[auth-context] Unauthorized on callback page, letting the page handle it...");
+              setLoading(false);
+              return;
+            }
+
             console.log("[auth-context] Unauthorized session, clearing local and supabase state...");
             await supabase.auth.signOut();
             localStorage.removeItem("auth_token");

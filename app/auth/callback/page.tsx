@@ -51,13 +51,35 @@ export default function AuthCallbackPage() {
               console.log("[auth-callback] Profile has phone, proceeding to destination...");
             }
 
-          } catch (profileError) {
+          } catch (profileError: any) {
             console.error("[auth-callback] Error fetching profile:", profileError);
-            // If profile fetch fails (maybe first login/trigger delay), send to onboarding to be safe/retry
+
+            // Check if error is related to missing profile (401 from backend now throws UnauthorizedException)
+            if (profileError.response?.status === 401 || profileError.response?.status === 404) {
+              setError("Sua conta não foi encontrada. Por favor, crie uma conta.");
+              setLoading(false);
+
+              // Clear session locally and in Supabase
+              await supabase.auth.signOut();
+              localStorage.removeItem("auth_token");
+              localStorage.removeItem("refresh_token");
+              localStorage.removeItem("user_profile");
+
+              // Redirect to signup after a delay
+              setTimeout(() => {
+                router.push("/cadastro");
+              }, 3000);
+              return;
+            }
+
+            // If other error, send to onboarding to be safe/retry
             redirectUrl = "/onboarding";
+            window.location.href = redirectUrl;
           }
 
-          window.location.href = redirectUrl;
+          if (!error) {
+            window.location.href = redirectUrl;
+          }
         } else {
           // Retry or wait logic removed for simplicity, relying on immediate session check
           // If no session, try listening once

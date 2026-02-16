@@ -54,7 +54,7 @@ interface AuthContextType {
     password: string,
     userData: Partial<UserProfile>
   ) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
+  signInWithGoogle: (options?: { queryParams?: { [key: string]: string } }) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   getRedirectUrl: () => string | null;
@@ -268,17 +268,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (options?: { queryParams?: { [key: string]: string } }) => {
     try {
-      console.log("[auth-context] Initiating Google login with Supabase...");
+      console.log("[auth-context] Initiating Google login with Supabase...", options);
 
       // Use NEXT_PUBLIC_SITE_URL for production, fallback to window.location.origin for dev
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== "undefined" ? window.location.origin : "");
+
+      // Force sign out before starting new login to ensure clean state
+      await supabase.auth.signOut();
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${siteUrl}/auth/callback`,
+          queryParams: {
+            prompt: "select_account",
+            ...options?.queryParams,
+          },
         },
       });
 

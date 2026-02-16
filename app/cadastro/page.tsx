@@ -62,7 +62,14 @@ export default function CadastroPage() {
       // Store the userType so we can use it after OAuth callback
       localStorage.setItem("signupUserType", userType);
       localStorage.setItem("redirectAfterLogin", redirectTo);
-      await signInWithGoogle();
+      localStorage.setItem("redirectAfterLogin", redirectTo);
+      await signInWithGoogle({
+        queryParams: {
+          prompt: "select_account",
+          access_type: "offline",
+          consent: "prompt" // Force consent screen as extra measure
+        }
+      });
     } catch (err: any) {
       setError(err.message || "Erro ao cadastrar com Google.");
       setLoading(false);

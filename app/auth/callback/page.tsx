@@ -90,11 +90,13 @@ export default function AuthCallbackPage() {
             }
           });
 
+          // If session detection times out, it might be a new user or a glitch.
+          // In either case, redirecting to /cadastro allows them to try again or sign up.
+          // This aligns with user request to handle "no account" scenarios gracefully.
           setTimeout(() => {
             if (loading) {
-              // Check if we didn't get a session after timeout
-              setError("Time out waiting for session.");
-              setLoading(false);
+              console.warn("[auth-callback] Session timeout. Redirecting to signup...");
+              router.push("/cadastro");
             }
           }, 4000);
         }

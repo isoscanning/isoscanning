@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -32,9 +32,16 @@ import { trackEvent } from "@/lib/analytics";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signInWithGoogle, getRedirectUrl } = useAuth();
+  const { signInWithGoogle, getRedirectUrl, userProfile, loading: authLoading } = useAuth();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!authLoading && userProfile) {
+      router.push("/dashboard");
+    }
+  }, [userProfile, authLoading, router]);
 
   // Obter URL de redirecionamento ou usar dashboard como padrão
   const redirectTo = getRedirectUrl() || "/dashboard";
@@ -46,7 +53,14 @@ export default function LoginPage() {
 
     try {
       localStorage.setItem("redirectAfterLogin", redirectTo);
-      await signInWithGoogle();
+      localStorage.setItem("redirectAfterLogin", redirectTo);
+      await signInWithGoogle({
+        queryParams: {
+          prompt: "select_account",
+          access_type: "offline",
+          consent: "prompt"
+        }
+      });
     } catch (err: any) {
       setError(err.message || "Erro ao fazer login com Google.");
       setLoading(false);

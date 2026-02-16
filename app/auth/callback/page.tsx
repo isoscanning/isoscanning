@@ -37,7 +37,10 @@ export default function AuthCallbackPage() {
           try {
             // Fetch profile to check if we have the required contact info (Phone/WhatsApp)
             // The user explicitly requested to ONLY check for this contact info.
-            const response = await apiClient.get("/auth/me");
+            // We pass X-Skip-Auth-Redirect to prevent api network interceptor from redirecting to login on 401
+            const response = await apiClient.get("/auth/me", {
+              headers: { "X-Skip-Auth-Redirect": "true" }
+            });
             const userProfile = response.data;
 
             localStorage.setItem("user_profile", JSON.stringify(userProfile));

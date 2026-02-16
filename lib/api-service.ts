@@ -30,17 +30,17 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      if (typeof window !== "undefined") {
-        // Check for specific header or config to skip redirect
-        const skipRedirect = error.config?.headers?.["X-Skip-Auth-Redirect"];
+    // Check for specific header or config to skip redirect
+    // Axios config headers can be in different places depending on version/context
+    const skipRedirect = error.config?.headers?.["X-Skip-Auth-Redirect"] ||
+      error.config?.headers?.["x-skip-auth-redirect"];
 
-        if (!skipRedirect) {
-          localStorage.removeItem("auth_token");
-          localStorage.removeItem("refresh_token");
-          localStorage.removeItem("user_profile");
-          window.location.href = "/login";
-        }
+    if (error.response?.status === 401) {
+      if (typeof window !== "undefined" && !skipRedirect) {
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("user_profile");
+        window.location.href = "/login";
       }
     }
     return Promise.reject(error);

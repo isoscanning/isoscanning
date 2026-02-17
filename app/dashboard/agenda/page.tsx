@@ -1,114 +1,208 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { AvailabilityManager } from "../perfil/components/availability-manager";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Calendar } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import apiClient from "@/lib/api-service";
+  fetchAvailability,
+  createAvailability,
+  deleteAvailability,
+  deleteAvailabilities,
+  type AvailabilitySlot
+} from "@/lib/data-service";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-
-interface Booking {
-  id: string;
-  serviceType: string;
-  location: string;
-  date: string;
-  startTime: string;
-  notes?: string;
-  status: "pending" | "confirmed" | "completed" | "cancelled";
-  professionalName?: string;
-  clientName?: string;
-  createdAt: string;
-}
+import { ArrowLeft, Calendar } from "lucide-react";
+import Link from "next/link";
+import { ScrollReveal } from "@/components/scroll-reveal";
 
 export default function AgendaPage() {
   const router = useRouter();
-  const { userProfile, loading: authLoading } = useAuth();
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [filterStatus, setFilterStatus] = useState<
-    "all" | "pending" | "confirmed" | "completed"
-  >("all");
+  const { userProfile, loading } = useAuth();
+
+  const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
+  const [loadingAvailability, setLoadingAvailability] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+
+  // State copied from PerfilPage
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  const [lastClickedDate, setLastClickedDate] = useState<Date | null>(null);
+  const [selectedSlotsToDelete, setSelectedSlotsToDelete] = useState<string[]>([]);
+  const [isAllDay, setIsAllDay] = useState(false);
+  const [newSlot, setNewSlot] = useState({
+    startTime: "09:00",
+    endTime: "18:00"
+  });
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [deletingBulk, setDeletingBulk] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && !userProfile) {
+    if (!loading && !userProfile) {
       router.push("/login");
+    }
+  }, [userProfile, loading, router]);
+
+  useEffect(() => {
+    if (userProfile?.id) {
+      loadAvailability();
+    }
+  }, [userProfile]);
+
+  // Success message timeout management
+  useEffect(() => {
+    if (successMsg) {
+      const timer = setTimeout(() => setSuccessMsg(""), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMsg]);
+
+  const loadAvailability = async () => {
+    if (!userProfile?.id) return;
+    setLoadingAvailability(true);
+    try {
+      const slots = await fetchAvailability(userProfile.id);
+      setAvailabilitySlots(slots);
+    } catch (error) {
+      console.error("Error loading availability", error);
+      setErrorMsg("Erro ao carregar disponibilidade.");
+    } finally {
+      setLoadingAvailability(false);
+    }
+  };
+
+  const handleAddAvailability = async () => {
+    if (!userProfile?.id || selectedDates.length === 0) {
+      setErrorMsg("Selecione pelo menos uma data.");
       return;
     }
 
-    if (userProfile) {
-      fetchBookings();
-    }
-  }, [userProfile, authLoading]);
-
-  const fetchBookings = async () => {
     try {
-      console.log("[agenda] Fetching bookings for user:", userProfile?.id);
+      setLoadingAvailability(true);
+      const dates = selectedDates.map(date => format(date, "yyyy-MM-dd"));
 
-      // Fetch bookings where user is either professional or client
-      const response = await apiClient.get(
-        `/bookings?userId=${userProfile?.id}`
-      );
-      const data = response.data.data || response.data || [];
-      setBookings(data);
-      console.log("[agenda] Bookings loaded:", data);
-    } catch (err) {
-      console.error("[agenda] Error fetching bookings:", err);
-      setError("Erro ao carregar agendamentos");
+      await createAvailability({
+        dates,
+        startTime: isAllDay ? undefined : newSlot.startTime,
+        endTime: isAllDay ? undefined : newSlot.endTime,
+        isAllDay,
+        professionalId: userProfile.id
+      });
+
+      await loadAvailability();
+      setSelectedDates([]);
+      setLastClickedDate(null);
+      setSuccessMsg(`${dates.length} disponibilidade(s) adicionada(s)!`);
+    } catch (err: any) {
+      setErrorMsg("Erro ao adicionar disponibilidade.");
     } finally {
-      setLoading(false);
+      setLoadingAvailability(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "confirmed":
-        return "bg-blue-100 text-blue-800";
-      case "completed":
-        return "bg-green-100 text-green-800";
-      case "cancelled":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+  const handleDateSelect = (dates: Date[] | undefined) => {
+    if (!dates) {
+      setSelectedDates([]);
+      setLastClickedDate(null);
+      return;
+    }
+    setSelectedDates(dates);
+  };
+
+  const handleDayClick = (day: Date, modifiers: any, e: React.MouseEvent) => {
+    if (modifiers.disabled) return;
+
+    if (e.shiftKey && lastClickedDate) {
+      const start = lastClickedDate < day ? lastClickedDate : day;
+      const end = lastClickedDate < day ? day : start === day ? lastClickedDate : day;
+
+      const dateRange: Date[] = [];
+      const current = new Date(start);
+      while (current <= end) {
+        dateRange.push(new Date(current));
+        current.setDate(current.getDate() + 1);
+      }
+
+      const newSelectedDates = [...selectedDates];
+      dateRange.forEach(date => {
+        const exists = newSelectedDates.some(
+          selected => selected.toDateString() === date.toDateString()
+        );
+        if (!exists) {
+          newSelectedDates.push(date);
+        }
+      });
+
+      setSelectedDates(newSelectedDates);
+    } else {
+      const isAlreadySelected = selectedDates.some(
+        selected => selected.toDateString() === day.toDateString()
+      );
+
+      if (isAlreadySelected) {
+        setSelectedDates(selectedDates.filter(
+          selected => selected.toDateString() !== day.toDateString()
+        ));
+      } else {
+        setSelectedDates([...selectedDates, day]);
+      }
+    }
+
+    setLastClickedDate(day);
+  };
+
+  const handleDeleteAvailability = async (id: string) => {
+    try {
+      setLoadingAvailability(true);
+      await deleteAvailability(id);
+      await loadAvailability();
+      setSelectedSlotsToDelete(prev => prev.filter(slotId => slotId !== id));
+    } catch (err) {
+      setErrorMsg("Erro ao excluir disponibilidade.");
+    } finally {
+      setLoadingAvailability(false);
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "Pendente";
-      case "confirmed":
-        return "Confirmado";
-      case "completed":
-        return "Concluído";
-      case "cancelled":
-        return "Cancelado";
-      default:
-        return status;
+  const toggleSlotSelection = (slotId: string) => {
+    setSelectedSlotsToDelete(prev =>
+      prev.includes(slotId)
+        ? prev.filter(id => id !== slotId)
+        : [...prev, slotId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedSlotsToDelete.length === availabilitySlots.length) {
+      setSelectedSlotsToDelete([]);
+    } else {
+      setSelectedSlotsToDelete(availabilitySlots.map(slot => slot.id));
     }
   };
 
-  const filteredBookings =
-    filterStatus === "all"
-      ? bookings
-      : bookings.filter((b) => b.status === filterStatus);
+  const handleBulkDelete = async () => {
+    if (selectedSlotsToDelete.length === 0) return;
 
-  if (authLoading || loading) {
+    try {
+      setDeletingBulk(true);
+      setLoadingAvailability(true);
+      await deleteAvailabilities(selectedSlotsToDelete);
+
+      await loadAvailability();
+      setSelectedSlotsToDelete([]);
+      setSuccessMsg(`${selectedSlotsToDelete.length} disponibilidade(s) excluída(s)!`);
+    } catch (err) {
+      setErrorMsg("Erro ao excluir disponibilidades.");
+    } finally {
+      setDeletingBulk(false);
+      setLoadingAvailability(false);
+    }
+  };
+
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -117,128 +211,55 @@ export default function AgendaPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background">
       <Header />
 
-      <main className="flex-1 py-12 px-4">
-        <div className="container mx-auto max-w-6xl">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold mb-2">Minha Agenda</h1>
-            <p className="text-muted-foreground">
-              Gerencie seus agendamentos e serviços
-            </p>
+      <main className="flex-1 container max-w-5xl mx-auto py-8 px-4">
+        <div className="mb-6 flex items-center gap-4">
+          <Link href="/dashboard" className="p-2 rounded-full hover:bg-accent transition-colors">
+            <ArrowLeft className="h-6 w-6" />
+          </Link>
+          <div className="space-y-1">
+            <h1 className="text-3xl font-bold tracking-tight">Minha Agenda</h1>
+            <p className="text-muted-foreground">Gerencie seus horários e datas disponíveis para contratação.</p>
           </div>
-
-          {error && (
-            <Alert
-              variant="destructive"
-              className="mb-6 border-destructive/50 bg-destructive/5"
-            >
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="mb-6 flex gap-2 flex-wrap">
-            <Button
-              variant={filterStatus === "all" ? "default" : "outline"}
-              onClick={() => setFilterStatus("all")}
-              size="sm"
-            >
-              Todos ({bookings.length})
-            </Button>
-            <Button
-              variant={filterStatus === "pending" ? "default" : "outline"}
-              onClick={() => setFilterStatus("pending")}
-              size="sm"
-            >
-              Pendentes ({bookings.filter((b) => b.status === "pending").length}
-              )
-            </Button>
-            <Button
-              variant={filterStatus === "confirmed" ? "default" : "outline"}
-              onClick={() => setFilterStatus("confirmed")}
-              size="sm"
-            >
-              Confirmados (
-              {bookings.filter((b) => b.status === "confirmed").length})
-            </Button>
-            <Button
-              variant={filterStatus === "completed" ? "default" : "outline"}
-              onClick={() => setFilterStatus("completed")}
-              size="sm"
-            >
-              Concluídos (
-              {bookings.filter((b) => b.status === "completed").length})
-            </Button>
-          </div>
-
-          {filteredBookings.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">
-                  Nenhum agendamento encontrado
-                </p>
-                <Button onClick={() => router.push("/profissionais")}>
-                  Agendar Serviço
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {filteredBookings.map((booking) => (
-                <Card key={booking.id}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{booking.serviceType}</CardTitle>
-                        <CardDescription>
-                          {booking.professionalName ||
-                            booking.clientName ||
-                            "Sem nome"}
-                        </CardDescription>
-                      </div>
-                      <Badge className={getStatusColor(booking.status)}>
-                        {getStatusLabel(booking.status)}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Data</p>
-                        <p className="font-medium">
-                          {format(new Date(booking.date), "dd 'de' MMMM", {
-                            locale: ptBR,
-                          })}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Hora</p>
-                        <p className="font-medium">{booking.startTime}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Local</p>
-                        <p className="font-medium line-clamp-1">
-                          {booking.location}
-                        </p>
-                      </div>
-                    </div>
-                    {booking.notes && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          Observações
-                        </p>
-                        <p className="text-sm line-clamp-2">{booking.notes}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
         </div>
+
+        <ScrollReveal>
+          <div className="bg-card border border-border rounded-xl shadow-sm p-6">
+            {errorMsg && (
+              <div className="mb-4 p-4 bg-destructive/10 text-destructive rounded-lg border border-destructive/20">
+                {errorMsg}
+              </div>
+            )}
+            {successMsg && (
+              <div className="mb-4 p-4 bg-green-500/10 text-green-600 rounded-lg border border-green-500/20">
+                {successMsg}
+              </div>
+            )}
+
+            <AvailabilityManager
+              selectedDates={selectedDates}
+              handleDateSelect={handleDateSelect}
+              handleDayClick={handleDayClick}
+              availabilitySlots={availabilitySlots}
+              isAllDay={isAllDay}
+              setIsAllDay={setIsAllDay}
+              newSlot={newSlot}
+              setNewSlot={setNewSlot}
+              handleAddAvailability={handleAddAvailability}
+              loadingAvailability={loadingAvailability}
+              handleSelectAll={handleSelectAll}
+              selectedSlotsToDelete={selectedSlotsToDelete}
+              toggleSlotSelection={toggleSlotSelection}
+              showBulkDeleteConfirm={showBulkDeleteConfirm}
+              setShowBulkDeleteConfirm={setShowBulkDeleteConfirm}
+              deletingBulk={deletingBulk}
+              handleBulkDelete={handleBulkDelete}
+              handleDeleteAvailability={handleDeleteAvailability}
+            />
+          </div>
+        </ScrollReveal>
       </main>
 
       <Footer />

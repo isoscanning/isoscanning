@@ -274,6 +274,29 @@ export default function DashboardPage() {
               </ScrollReveal>
               {/* END: Profile Card */}
 
+              {/* START: Agenda Card */}
+              <ScrollReveal delay={0.65}>
+                <Link href="/dashboard/agenda" className="block h-full group">
+                  <Card className="h-full border-border hover:border-pink-500/50 transition-all duration-300 hover:shadow-lg bg-card">
+                    <CardHeader>
+                      <div className="w-12 h-12 rounded-2xl bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                        <Calendar className="h-6 w-6" />
+                      </div>
+                      <CardTitle className="group-hover:text-pink-500 transition-colors">Minha Agenda</CardTitle>
+                      <CardDescription>
+                        Gerencie seus dias e horários disponíveis para receber novas solicitações.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-end">
+                      <div className="w-8 h-8 rounded-full bg-background border flex items-center justify-center group-hover:bg-pink-500 group-hover:text-white group-hover:border-pink-500 transition-colors">
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </ScrollReveal>
+              {/* END: Agenda Card */}
+
               {/* START: Equipments Card */}
               <ScrollReveal delay={0.6}>
                 <Link href="/dashboard/equipamentos" className="block h-full group">
@@ -305,7 +328,7 @@ export default function DashboardPage() {
                       <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
                         <Calendar className="h-6 w-6" />
                       </div>
-                      <CardTitle className="group-hover:text-purple-500 transition-colors">Solicitações e Agenda</CardTitle>
+                      <CardTitle className="group-hover:text-purple-500 transition-colors">Minhas Solicitações</CardTitle>
                       <CardDescription>
                         Acompanhe pedidos de orçamento, mensagens de clientes e sua agenda.
                       </CardDescription>

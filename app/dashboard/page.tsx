@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Camera,
   Package,
@@ -28,6 +29,7 @@ import {
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
 import { ScrollReveal } from "@/components/scroll-reveal";
+import { OnboardingTour, TourStep } from "@/components/onboarding-tour";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -41,6 +43,9 @@ export default function DashboardPage() {
     requests: 0,
     equipments: 0
   });
+
+  // Tour State
+  const [showTour, setShowTour] = useState(false);
 
   useEffect(() => {
     if (!loading && !userProfile) {
@@ -122,6 +127,35 @@ export default function DashboardPage() {
 
     fetchDashboardData();
 
+    // 3. Check for Tour
+    if (userProfile) {
+      const hasSeenTour = localStorage.getItem(`hasSeenDashboardTour_${userProfile.id}`);
+      if (!hasSeenTour) {
+        // Small delay to ensure elements are rendered
+        setTimeout(() => setShowTour(true), 1000);
+      }
+    }
+
+  }, [userProfile]);
+
+  const handleTourComplete = () => {
+    if (userProfile) {
+      localStorage.setItem(`hasSeenDashboardTour_${userProfile.id}`, "true");
+    }
+    setShowTour(false);
+  };
+
+  const handleResetTour = () => {
+    if (userProfile) {
+      localStorage.removeItem(`hasSeenDashboardTour_${userProfile.id}`);
+      setShowTour(true);
+    }
+  };
+
+  useEffect(() => {
+    const handleResetEvent = () => handleResetTour();
+    window.addEventListener("reset-dashboard-tour", handleResetEvent);
+    return () => window.removeEventListener("reset-dashboard-tour", handleResetEvent);
   }, [userProfile]);
 
   if (loading) {
@@ -138,16 +172,76 @@ export default function DashboardPage() {
 
   const isProfessional = userProfile.userType === "professional";
 
+  const tourSteps: TourStep[] = [
+    {
+      target: "#welcome-section",
+      title: "Bem-vindo ao seu Painel!",
+      description: "Aqui você tem uma visão geral de tudo o que acontece na sua conta. Vamos fazer um tour rápido?",
+    },
+    {
+      target: "#quick-profile",
+      title: "Seu Perfil",
+      description: "Mantenha seus dados atualizados para que clientes possam encontrar você facilmente.",
+    },
+    {
+      target: "#quick-requests",
+      title: "Minhas Solicitações",
+      description: "Acompanhe pedidos de orçamento, mensagens de clientes e gerencie suas interações.",
+    },
+    {
+      target: "#quick-equipments",
+      title: "Seus Equipamentos",
+      description: "Cadastre seus equipamentos para aluguel ou venda e gerencie seu inventário.",
+    },
+    {
+      target: "#quick-agenda",
+      title: "Sua Agenda",
+      description: "Defina sua disponibilidade para receber novas propostas de trabalho.",
+    },
+    // Conditionally add steps based on user type if needed
+    ...(isProfessional ? [
+      {
+        target: "#quick-portfolio",
+        title: "Seu Portfólio",
+        description: "Mostre seu melhor trabalho! Adicione fotos e vídeos para impressionar clientes.",
+      }
+    ] : [
+      {
+        target: "#quick-find-pros",
+        title: "Encontrar Profissionais",
+        description: "Busque pelos melhores talentos para o seu projeto aqui.",
+      }
+    ]),
+    {
+      target: "#quick-jobs",
+      title: "Vagas e Jobs",
+      description: "Encontre oportunidades ou gerencie as vagas que você publicou.",
+    },
+    {
+      target: "#quick-applications",
+      title: "Minhas Candidaturas",
+      description: "Veja o status das vagas para as quais você se candidatou.",
+    }
+  ];
+
   return (
     <div className="min-h-screen flex flex-col bg-background/50">
       <Header />
+
+      {showTour && (
+        <OnboardingTour
+          steps={tourSteps}
+          onComplete={handleTourComplete}
+          onSkip={handleTourComplete}
+        />
+      )}
 
       <main className="flex-1 py-12 px-4">
         <div className="container mx-auto max-w-6xl space-y-10">
 
           {/* Welcome Section with Gradient */}
           <ScrollReveal>
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary/10 via-purple-500/10 to-blue-500/10 p-8 md:p-12 border border-primary/10">
+            <div id="welcome-section" className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary/10 via-purple-500/10 to-blue-500/10 p-8 md:p-12 border border-primary/10">
               <div className="relative z-10 space-y-4">
                 <div className="flex items-center gap-2">
                   <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600">
@@ -253,7 +347,7 @@ export default function DashboardPage() {
 
               {/* START: Profile Card (Highlight) */}
               <ScrollReveal delay={0.5}>
-                <Link href="/dashboard/perfil" className="block h-full group">
+                <Link href="/dashboard/perfil" className="block h-full group" id="quick-profile">
                   <Card className="h-full border-2 border-primary/5 hover:border-primary/30 transition-all duration-300 hover:shadow-lg dark:hover:shadow-primary/5 bg-gradient-to-br from-background to-primary/5">
                     <CardHeader>
                       <div className="w-12 h-12 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center mb-4 shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-300">
@@ -276,7 +370,7 @@ export default function DashboardPage() {
 
               {/* START: Agenda Card */}
               <ScrollReveal delay={0.65}>
-                <Link href="/dashboard/agenda" className="block h-full group">
+                <Link href="/dashboard/agenda" className="block h-full group" id="quick-agenda">
                   <Card className="h-full border-border hover:border-pink-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                     <CardHeader>
                       <div className="w-12 h-12 rounded-2xl bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
@@ -299,7 +393,7 @@ export default function DashboardPage() {
 
               {/* START: Equipments Card */}
               <ScrollReveal delay={0.6}>
-                <Link href="/dashboard/equipamentos" className="block h-full group">
+                <Link href="/dashboard/equipamentos" className="block h-full group" id="quick-equipments">
                   <Card className="h-full border-border hover:border-green-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                     <CardHeader>
                       <div className="w-12 h-12 rounded-2xl bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
@@ -322,7 +416,7 @@ export default function DashboardPage() {
 
               {/* START: Requests Card */}
               <ScrollReveal delay={0.7}>
-                <Link href="/dashboard/solicitacoes" className="block h-full group">
+                <Link href="/dashboard/solicitacoes" className="block h-full group" id="quick-requests">
                   <Card className="h-full border-border hover:border-purple-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                     <CardHeader>
                       <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
@@ -346,7 +440,7 @@ export default function DashboardPage() {
               {/* START: Portfolio Card (Only Professional) */}
               {isProfessional && (
                 <ScrollReveal delay={0.8}>
-                  <Link href="/dashboard/portfolio" className="block h-full group">
+                  <Link href="/dashboard/portfolio" className="block h-full group" id="quick-portfolio">
                     <Card className="h-full border-border hover:border-blue-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                       <CardHeader>
                         <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
@@ -371,7 +465,7 @@ export default function DashboardPage() {
               {/* START: Find Professionals (Only Client) */}
               {!isProfessional && (
                 <ScrollReveal delay={0.8}>
-                  <Link href="/profissionais" className="block h-full group">
+                  <Link href="/profissionais" className="block h-full group" id="quick-find-pros">
                     <Card className="h-full border-border hover:border-blue-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                       <CardHeader>
                         <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
@@ -395,7 +489,7 @@ export default function DashboardPage() {
 
               {/* START: Jobs Card */}
               <ScrollReveal delay={0.9}>
-                <Link href="/dashboard/vagas" className="block h-full group">
+                <Link href="/dashboard/vagas" className="block h-full group" id="quick-jobs">
                   <Card className="h-full border-border hover:border-orange-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                     <CardHeader>
                       <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
@@ -418,7 +512,7 @@ export default function DashboardPage() {
 
               {/* START: My Applications Card */}
               <ScrollReveal delay={1.0}>
-                <Link href="/dashboard/candidaturas" className="block h-full group">
+                <Link href="/dashboard/candidaturas" className="block h-full group" id="quick-applications">
                   <Card className="h-full border-border hover:border-cyan-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                     <CardHeader>
                       <div className="w-12 h-12 rounded-2xl bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
@@ -438,15 +532,12 @@ export default function DashboardPage() {
                 </Link>
               </ScrollReveal>
               {/* END: My Applications Card */}
-
-
-
             </div>
           </div>
         </div>
-      </main>
+      </main >
 
       <Footer />
-    </div>
+    </div >
   );
 }

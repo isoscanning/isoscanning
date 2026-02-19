@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, Settings, LogOut, LogIn, UserPlus, Briefcase } from "lucide-react";
+import { User, Settings, LogOut, LogIn, UserPlus, Briefcase, PlayCircle } from "lucide-react";
 
 export function UserNav() {
   const { userProfile, signOut, loading } = useAuth();
@@ -149,6 +149,17 @@ export function UserNav() {
               <Settings className="mr-2 h-4 w-4 text-primary" />
               <span>Configurações</span>
             </Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
+            onClick={() => {
+              // Dispatch custom event for dashboard to listen to
+              window.dispatchEvent(new Event("reset-dashboard-tour"));
+            }}
+          >
+            <PlayCircle className="mr-2 h-4 w-4 text-emerald-500" />
+            <span>Reiniciar Tour</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />

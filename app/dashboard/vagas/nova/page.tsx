@@ -68,6 +68,7 @@ export default function NovaVagaPage() {
         jobType: "freelance",
         locationType: "on_site",
         description: "",
+        country: "",
         city: "",
         state: "",
         budgetMin: "",
@@ -345,12 +346,18 @@ export default function NovaVagaPage() {
                                             </div>
 
                                             <LocationSelector
-                                                className="col-span-1 md:col-span-2 grid-cols-1 sm:grid-cols-2"
+                                                className="col-span-1 md:col-span-3 grid-cols-1 md:grid-cols-3"
                                                 isDisabled={formData.locationType === "remote"}
+                                                selectedCountryId={locationIds.countryId}
                                                 selectedStateId={locationIds.stateId}
                                                 selectedCityId={locationIds.cityId}
+                                                initialCountryName={formData.country}
                                                 initialStateUf={formData.state}
                                                 initialCityName={formData.city}
+                                                onCountryChange={(id, name) => {
+                                                    setLocationIds(prev => ({ ...prev, countryId: id, stateId: 0, cityId: 0 }));
+                                                    setFormData(prev => ({ ...prev, country: name, state: '', city: '' }));
+                                                }}
                                                 onStateChange={(id, name, uf) => {
                                                     setLocationIds(prev => ({ ...prev, stateId: id, cityId: 0 }));
                                                     setFormData(prev => ({ ...prev, state: uf, city: '' }));

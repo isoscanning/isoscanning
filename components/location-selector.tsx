@@ -102,20 +102,24 @@ export function LocationSelector({
         }
     }, [onCountryChange]);
 
-    // Fetch states when country changes (or on mount if no country selector)
+    // Fetch states when country changes
     React.useEffect(() => {
-        const countryIdToUse = selectedCountryId || 1; // Default to Brazil (id=1)
-        setLoadingStates(true);
-        apiClient.get(`/locations/countries/${countryIdToUse}/states`)
-            .then(response => {
-                setStates(response.data);
-            })
-            .catch(error => {
-                console.error('Error fetching states:', error);
-            })
-            .finally(() => {
-                setLoadingStates(false);
-            });
+        if (selectedCountryId) {
+            setLoadingStates(true);
+            apiClient.get(`/locations/countries/${selectedCountryId}/states`)
+                .then(response => {
+                    setStates(response.data);
+                })
+                .catch(error => {
+                    console.error('Error fetching states:', error);
+                    setStates([]);
+                })
+                .finally(() => {
+                    setLoadingStates(false);
+                });
+        } else {
+            setStates([]);
+        }
     }, [selectedCountryId]);
 
     // Fetch cities when state changes
@@ -140,9 +144,22 @@ export function LocationSelector({
     // Hydrate country ID from initial name
     React.useEffect(() => {
         if (initialCountryName && countries.length > 0 && !selectedCountryId && onCountryChange) {
-            const country = countries.find(c => c.name.toLowerCase() === initialCountryName.toLowerCase());
+            // Try explicit match first, then normalize
+            let country = countries.find(c => c.name.toLowerCase() === initialCountryName.toLowerCase());
+
+            // Special case for Brazil/Brasil common mismatch
+            if (!country && (initialCountryName.toLowerCase() === 'brazil' || initialCountryName.toLowerCase() === 'brasil')) {
+                country = countries.find(c => c.name.toLowerCase() === 'brazil' || c.name.toLowerCase() === 'brasil');
+            }
+
             if (country) {
                 onCountryChange(country.id, country.name);
+            } else {
+                // Try to Find Brazil as default if nothing else matches and initial was empty or defaulted
+                if (initialCountryName === 'Brazil') {
+                    const brazil = countries.find(c => c.name.toLowerCase() === 'brazil' || c.name.toLowerCase() === 'brasil');
+                    if (brazil) onCountryChange(brazil.id, brazil.name);
+                }
             }
         }
     }, [initialCountryName, countries, selectedCountryId, onCountryChange]);
@@ -168,7 +185,7 @@ export function LocationSelector({
     }, [initialCityName, cities, selectedStateId, selectedCityId, onCityChange]);
 
     return (
-        <div className={cn("grid gap-4", className)}>
+        <div className={cn("grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4", className)}>
             {onCountryChange && (
                 <div className="space-y-2">
                     <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
@@ -233,11 +250,11 @@ export function LocationSelector({
                             role="combobox"
                             aria-expanded={openState}
                             className="w-full justify-between"
-                            disabled={isDisabled || loadingStates}
+                            disabled={isDisabled || loadingStates || (!selectedCountryId && !!onCountryChange)}
                         >
                             {selectedStateId
                                 ? states.find((state) => state.id === selectedStateId)?.name + " (" + states.find((state) => state.id === selectedStateId)?.uf + ")"
-                                : loadingStates ? "Carregando..." : !selectedCountryId && onCountryChange ? "Selecione o país" : "Selecione o estado"}
+                                : loadingStates ? "Carregando..." : !selectedCountryId && onCountryChange ? "Selecione o país primeiro" : "Selecione o estado"}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                     </PopoverTrigger>

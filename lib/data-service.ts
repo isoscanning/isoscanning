@@ -53,6 +53,7 @@ export interface JobOffer {
   category: string;
   jobType: "freelance" | "full_time" | "part_time" | "project";
   locationType: "on_site" | "remote" | "hybrid";
+  country?: string | null;
   city?: string | null;
   state?: string | null;
   budgetMin?: number | null;
@@ -113,6 +114,7 @@ export interface CreateJobOfferData {
   category: string;
   jobType: "freelance" | "full_time" | "part_time" | "project";
   locationType: "on_site" | "remote" | "hybrid";
+  country?: string;
   city?: string;
   state?: string;
   budgetMin?: number;

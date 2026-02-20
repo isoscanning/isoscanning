@@ -54,6 +54,15 @@ export function OnboardingTour({ steps, onComplete, onSkip }: OnboardingTourProp
         return () => window.removeEventListener("resize", updateTargetPosition);
     }, [currentStepIndex, currentStep, steps]);
 
+    useEffect(() => {
+        // Lock body scroll when tour is active
+        document.body.style.overflow = "hidden";
+
+        return () => {
+            document.body.style.overflow = "unset";
+        };
+    }, []);
+
     const handleNext = () => {
         if (currentStepIndex < steps.length - 1) {
             setCurrentStepIndex(currentStepIndex + 1);
@@ -116,7 +125,7 @@ export function OnboardingTour({ steps, onComplete, onSkip }: OnboardingTourProp
     return (
         <>
             {/* Searchlight Overlay */}
-            <div className="fixed inset-0 z-50 pointer-events-none">
+            <div className="fixed inset-0 z-[5000] pointer-events-none">
                 {/* We use a path to create a hole in the overlay */}
                 {/* This is complex to implement robustly with just CSS/Divs. 
              Easier alternative: use a semi-transparent border on a massive div around the target? 
@@ -152,7 +161,7 @@ export function OnboardingTour({ steps, onComplete, onSkip }: OnboardingTourProp
 
             {/* Popover Card */}
             <div
-                className="fixed z-50 w-full max-w-sm"
+                className="fixed z-[5001] w-full max-w-sm"
                 style={getPopoverStyle()}
             >
                 <AnimatePresence mode="wait">
@@ -180,23 +189,33 @@ export function OnboardingTour({ steps, onComplete, onSkip }: OnboardingTourProp
                                     {currentStep?.description}
                                 </p>
                             </CardContent>
-                            <CardFooter className="flex justify-between pt-2">
+                            <CardFooter className="flex justify-between pt-2 items-center">
                                 <Button
-                                    variant="outline"
+                                    variant="ghost"
                                     size="sm"
-                                    onClick={handlePrev}
-                                    disabled={currentStepIndex === 0}
+                                    onClick={onSkip}
+                                    className="text-muted-foreground hover:text-foreground"
                                 >
-                                    <ArrowLeft className="mr-2 h-3 w-3" />
-                                    Voltar
+                                    Pular
                                 </Button>
-                                <Button
-                                    size="sm"
-                                    onClick={handleNext}
-                                >
-                                    {currentStepIndex === steps.length - 1 ? "Concluir" : "Próximo"}
-                                    {currentStepIndex !== steps.length - 1 && <ArrowRight className="ml-2 h-3 w-3" />}
-                                </Button>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handlePrev}
+                                        disabled={currentStepIndex === 0}
+                                    >
+                                        <ArrowLeft className="mr-2 h-3 w-3" />
+                                        Voltar
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        onClick={handleNext}
+                                    >
+                                        {currentStepIndex === steps.length - 1 ? "Concluir" : "Próximo"}
+                                        {currentStepIndex !== steps.length - 1 && <ArrowRight className="ml-2 h-3 w-3" />}
+                                    </Button>
+                                </div>
                             </CardFooter>
                         </Card>
                     </motion.div>
@@ -205,3 +224,4 @@ export function OnboardingTour({ steps, onComplete, onSkip }: OnboardingTourProp
         </>
     );
 }
+

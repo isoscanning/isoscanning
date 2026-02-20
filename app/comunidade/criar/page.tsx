@@ -14,6 +14,14 @@ import Link from "next/link";
 import api from "@/lib/api-service";
 import { toast } from "sonner";
 import { uploadFile } from "@/lib/supabase-storage";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog";
 
 export default function CreateCommunityPage() {
     const router = useRouter();
@@ -27,6 +35,8 @@ export default function CreateCommunityPage() {
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
 
     // Helper to generate slug
     const handleNameChange = (val: string) => {
@@ -105,7 +115,9 @@ export default function CreateCommunityPage() {
             router.push(`/c/${slug}`);
         } catch (error: any) {
             console.error("Error creating community:", error);
-            toast.error("Erro ao criar a comunidade. Verifique se o slug já existe.");
+            const message = error.response?.data?.message || "Erro ao criar a comunidade. Verifique se o slug já existe.";
+            setErrorMessage(message);
+            setIsErrorDialogOpen(true);
         } finally {
             setLoading(false);
         }
@@ -240,6 +252,22 @@ export default function CreateCommunityPage() {
                     </form>
                 </Card>
             </div>
+
+            <Dialog open={isErrorDialogOpen} onOpenChange={setIsErrorDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Aviso</DialogTitle>
+                        <DialogDescription>
+                            {errorMessage}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button onClick={() => setIsErrorDialogOpen(false)}>
+                            Entendi
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

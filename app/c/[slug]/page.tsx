@@ -24,6 +24,7 @@ interface Community {
     avatarUrl?: string;
     bannerUrl?: string;
     ownerId: string;
+    ownerName?: string;
     rules?: string[];
     createdAt: string;
     _count?: {
@@ -55,6 +56,7 @@ export default function CommunityDetail() {
             setCommunity(response.data);
 
             if (response.data?.id) {
+                // Fetch posts in parallel with other initial community data if needed, but since it depends on community ID, we just await it here.
                 const postsRes = await api.get(`/posts/community/${response.data.id}`);
                 setPosts(postsRes.data);
             }
@@ -119,12 +121,14 @@ export default function CommunityDetail() {
 
             <div className="container mx-auto px-4">
                 {/* Header Info */}
-                <div className="relative -mt-10 mb-6 flex flex-col md:flex-row items-start md:items-end gap-4">
-                    <Avatar className="h-24 w-24 border-4 border-background shadow-md">
-                        <AvatarImage src={community.avatarUrl} alt={community.name} />
-                        <AvatarFallback className="text-2xl">{community.name.substring(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 mb-2">
+                <div className="relative mb-6 flex flex-col md:flex-row items-start md:items-end gap-4">
+                    <div className="-mt-12">
+                        <Avatar className="h-24 w-24 border-4 border-background shadow-md">
+                            <AvatarImage src={community.avatarUrl} alt={community.name} />
+                            <AvatarFallback className="text-2xl">{community.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                    </div>
+                    <div className="flex-1 mt-4 md:mb-2">
                         <h1 className="text-3xl font-bold">{community.name}</h1>
                         <p className="text-muted-foreground font-medium">c/{community.slug}</p>
 
@@ -134,7 +138,7 @@ export default function CommunityDetail() {
                             </p>
                         )}
                     </div>
-                    <div className="flex gap-2 mb-4 md:mb-2">
+                    <div className="flex gap-2 mb-4 md:mb-2 md:pb-2">
                         {userProfile?.id === community.ownerId && (
                             <Button
                                 variant="outline"

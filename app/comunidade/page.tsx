@@ -18,6 +18,10 @@ interface Community {
     description: string;
     avatarUrl?: string;
     memberCount?: number;
+    _count?: {
+        members: number;
+        posts: number;
+    };
 }
 
 export default function CommunityPage() {
@@ -102,10 +106,10 @@ export default function CommunityPage() {
                                         <div className="flex items-center text-xs text-muted-foreground gap-4">
                                             <span className="flex items-center gap-1">
                                                 <MessageSquare className="h-3 w-3" />
-                                                Discussions
+                                                {community._count?.posts || 0} Posts
                                             </span>
                                             <span className="flex items-center gap-1">
-                                                {community.memberCount} membros
+                                                {community._count?.members || 0} membros
                                             </span>
                                         </div>
                                     </CardContent>

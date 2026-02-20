@@ -18,6 +18,7 @@ import {
   Settings,
   Briefcase,
   Zap,
+  MessageSquare,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { trackEvent } from "@/lib/analytics";
@@ -105,6 +106,13 @@ export function Header() {
             >
               Preços
             </Link>
+            <Link
+              href="/comunidade"
+              className="text-primary font-medium"
+              onClick={() => trackEvent({ action: "click_nav", category: "Navigation", label: "Desktop: Comunidade" })}
+            >
+              Comunidade
+            </Link>
             {isAuthenticated && (
               // Link removed - accessible via Dashboard
               null
@@ -182,6 +190,17 @@ export function Header() {
             >
               <Zap className="h-4 w-4 text-purple-500" />
               Preços
+            </Link>
+            <Link
+              href="/comunidade"
+              className="flex items-center gap-3 text-sm font-medium hover:text-orange-500 transition-colors hover:bg-orange-500/10 p-3 rounded-lg"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                trackEvent({ action: "click_nav", category: "Navigation", label: "Mobile: Comunidade" });
+              }}
+            >
+              <MessageSquare className="h-4 w-4 text-orange-500" />
+              Comunidade
             </Link>
             {isAuthenticated && (
               // Link removed as per redesign - accessible via Dashboard

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -43,9 +43,11 @@ export default function CommunityDetail() {
     const [loading, setLoading] = useState(true);
     const [joining, setJoining] = useState(false);
     const [isMember, setIsMember] = useState(false);
+    const fetchedForSlug = useRef("");
 
     useEffect(() => {
-        if (slug) {
+        if (slug && fetchedForSlug.current !== slug) {
+            fetchedForSlug.current = slug;
             fetchCommunity();
         }
     }, [slug]);
@@ -67,9 +69,15 @@ export default function CommunityDetail() {
         }
     };
 
+    const checkMembershipRef = useRef("");
+
     useEffect(() => {
         const checkMembership = async () => {
             if (community?.id && userProfile?.id) {
+                const depKey = `${community.id}-${userProfile.id}`;
+                if (checkMembershipRef.current === depKey) return;
+                checkMembershipRef.current = depKey;
+
                 try {
                     const res = await api.get(`/communities/${community.id}/members/${userProfile.id}`);
                     setIsMember(res.data.isMember);

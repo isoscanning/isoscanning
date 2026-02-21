@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -25,7 +26,10 @@ import { trackEvent } from "@/lib/analytics";
 
 export function Header() {
   const { userProfile, signOut, loading } = useAuth();
+  const pathname = usePathname() || "";
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const isActive = (path: string) => pathname === path || pathname.startsWith(`${path}/`);
   const [googleName, setGoogleName] = useState("");
   const [googleAvatar, setGoogleAvatar] = useState("");
 
@@ -84,31 +88,35 @@ export function Header() {
           <nav className="hidden md:flex items-center gap-6 text-foreground/85">
             <Link
               href="/profissionais"
+              className={isActive("/profissionais") ? "text-primary font-medium" : "hover:text-primary transition-colors"}
               onClick={() => trackEvent({ action: "click_nav", category: "Navigation", label: "Desktop: Encontrar Profissionais" })}
             >
               Encontrar Profissionais
             </Link>
             <Link
               href="/equipamentos"
+              className={isActive("/equipamentos") ? "text-primary font-medium" : "hover:text-primary transition-colors"}
               onClick={() => trackEvent({ action: "click_nav", category: "Navigation", label: "Desktop: Equipamentos" })}
             >
               Equipamentos
             </Link>
             <Link
               href="/vagas"
+              className={isActive("/vagas") ? "text-primary font-medium" : "hover:text-primary transition-colors"}
               onClick={() => trackEvent({ action: "click_nav", category: "Navigation", label: "Desktop: Jobs" })}
             >
               Jobs
             </Link>
             <Link
               href="/precos"
+              className={isActive("/precos") ? "text-primary font-medium" : "hover:text-primary transition-colors"}
               onClick={() => trackEvent({ action: "click_nav", category: "Navigation", label: "Desktop: Precos" })}
             >
               Preços
             </Link>
             <Link
               href="/comunidade"
-              className="text-primary font-medium"
+              className={isActive("/comunidade") ? "text-primary font-medium" : "hover:text-primary transition-colors"}
               onClick={() => trackEvent({ action: "click_nav", category: "Navigation", label: "Desktop: Comunidade" })}
             >
               Comunidade
@@ -149,7 +157,7 @@ export function Header() {
           <nav className="container mx-auto flex flex-col gap-3 p-4 text-foreground/80">
             <Link
               href="/profissionais"
-              className="flex items-center gap-3 text-sm font-medium hover:text-accent transition-colors hover:bg-accent/10 p-3 rounded-lg"
+              className={`flex items-center gap-3 text-sm font-medium transition-colors p-3 rounded-lg ${isActive("/profissionais") ? "text-accent bg-accent/10" : "hover:text-accent hover:bg-accent/10"}`}
               onClick={() => {
                 setMobileMenuOpen(false);
                 trackEvent({ action: "click_nav", category: "Navigation", label: "Mobile: Encontrar Profissionais" });
@@ -160,7 +168,7 @@ export function Header() {
             </Link>
             <Link
               href="/equipamentos"
-              className="flex items-center gap-3 text-sm font-medium hover:text-success transition-colors hover:bg-success/10 p-3 rounded-lg"
+              className={`flex items-center gap-3 text-sm font-medium transition-colors p-3 rounded-lg ${isActive("/equipamentos") ? "text-success bg-success/10" : "hover:text-success hover:bg-success/10"}`}
               onClick={() => {
                 setMobileMenuOpen(false);
                 trackEvent({ action: "click_nav", category: "Navigation", label: "Mobile: Equipamentos" });
@@ -171,7 +179,7 @@ export function Header() {
             </Link>
             <Link
               href="/vagas"
-              className="flex items-center gap-3 text-sm font-medium hover:text-primary transition-colors hover:bg-primary/10 p-3 rounded-lg"
+              className={`flex items-center gap-3 text-sm font-medium transition-colors p-3 rounded-lg ${isActive("/vagas") ? "text-primary bg-primary/10" : "hover:text-primary hover:bg-primary/10"}`}
               onClick={() => {
                 setMobileMenuOpen(false);
                 trackEvent({ action: "click_nav", category: "Navigation", label: "Mobile: Jobs" });
@@ -182,7 +190,7 @@ export function Header() {
             </Link>
             <Link
               href="/precos"
-              className="flex items-center gap-3 text-sm font-medium hover:text-purple-500 transition-colors hover:bg-purple-500/10 p-3 rounded-lg"
+              className={`flex items-center gap-3 text-sm font-medium transition-colors p-3 rounded-lg ${isActive("/precos") ? "text-purple-500 bg-purple-500/10" : "hover:text-purple-500 hover:bg-purple-500/10"}`}
               onClick={() => {
                 setMobileMenuOpen(false);
                 trackEvent({ action: "click_nav", category: "Navigation", label: "Mobile: Precos" });
@@ -193,7 +201,7 @@ export function Header() {
             </Link>
             <Link
               href="/comunidade"
-              className="flex items-center gap-3 text-sm font-medium hover:text-orange-500 transition-colors hover:bg-orange-500/10 p-3 rounded-lg"
+              className={`flex items-center gap-3 text-sm font-medium transition-colors p-3 rounded-lg ${isActive("/comunidade") ? "text-orange-500 bg-orange-500/10" : "hover:text-orange-500 hover:bg-orange-500/10"}`}
               onClick={() => {
                 setMobileMenuOpen(false);
                 trackEvent({ action: "click_nav", category: "Navigation", label: "Mobile: Comunidade" });

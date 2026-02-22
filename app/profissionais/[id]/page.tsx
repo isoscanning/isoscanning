@@ -27,6 +27,7 @@ import {
   BadgeCheck
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import apiClient from "@/lib/api-service";
 import { type Professional, type AvailabilitySlot, fetchAvailability } from "@/lib/data-service";
 import { AvailabilityCalendar } from "@/components/availability-calendar";
@@ -39,6 +40,7 @@ import {
 interface Review {
   id: string;
   clientName: string;
+  clientAvatar?: string;
   rating: number;
   comment: string;
   qualities?: string[]; // Add qualities
@@ -123,6 +125,7 @@ export default function ProfessionalProfilePage() {
           (review: any) => ({
             id: review.id,
             clientName: review.clientName,
+            clientAvatar: review.clientAvatar,
             rating: review.rating,
             comment: review.comment,
             qualities: review.qualities || [],
@@ -520,14 +523,14 @@ export default function ProfessionalProfilePage() {
                 <div className="flex flex-col items-end gap-2">
                   <div className="flex items-center gap-2 text-primary font-bold">
                     <span className="text-3xl">
-                      {professional.averageRating ? professional.averageRating.toFixed(1) : "—"}
+                      {professional.totalReviews && professional.totalReviews > 0 && professional.averageRating ? professional.averageRating.toFixed(1) : "—"}
                     </span>
                     <div className="flex flex-col items-start">
                       <div className="flex">
                         {[1, 2, 3, 4, 5].map((star) => (
                           <Star
                             key={star}
-                            className={`h-4 w-4 ${star <= Math.round(professional.averageRating || 0)
+                            className={`h-4 w-4 ${star <= Math.round(professional.averageRating || 0) && professional.totalReviews && professional.totalReviews > 0
                               ? "fill-primary text-primary"
                               : "text-muted"
                               }`}
@@ -535,7 +538,7 @@ export default function ProfessionalProfilePage() {
                         ))}
                       </div>
                       <span className="text-sm text-muted-foreground font-normal">
-                        {professional.totalReviews} avaliações
+                        {professional.totalReviews && professional.totalReviews > 0 ? `${professional.totalReviews} avaliações` : "Sem avaliação"}
                       </span>
                     </div>
                   </div>
@@ -560,14 +563,26 @@ export default function ProfessionalProfilePage() {
                       className="bg-card border border-border rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow"
                     >
                       <div className="flex items-start gap-4 mb-4">
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shadow-inner border border-primary/20">
-                          {review.clientName.charAt(0).toUpperCase()}
-                        </div>
+                        {review.clientAvatar ? (
+                          <div className="h-10 w-10 relative overflow-hidden rounded-full border border-border shadow-sm">
+                            <Image
+                              src={review.clientAvatar}
+                              alt={review.clientName || "Usuário"}
+                              width={40}
+                              height={40}
+                              className="object-cover w-full h-full"
+                            />
+                          </div>
+                        ) : (
+                          <div className="h-10 w-10 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shadow-inner border border-primary/20">
+                            {(review.clientName || "Usuário").charAt(0).toUpperCase()}
+                          </div>
+                        )}
                         <div className="flex-1">
                           <div className="flex justify-between items-start">
                             <div>
                               <h3 className="font-bold text-foreground">
-                                {review.clientName}
+                                {review.clientName || "Usuário"}
                               </h3>
                               <p className="text-xs text-muted-foreground uppercase tracking-wide">
                                 {new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }).format(review.createdAt)}

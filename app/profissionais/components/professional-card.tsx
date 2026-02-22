@@ -90,10 +90,18 @@ export function ProfessionalCard({ professional, index }: ProfessionalCardProps)
                                     )}
                                 </div>
 
-                                <div className="flex items-center gap-1 text-yellow-500">
-                                    <Star className="h-4 w-4 fill-current" />
-                                    <span className="text-sm font-medium text-foreground">5.0</span>
-                                </div>
+                                {professional.totalReviews && professional.totalReviews > 0 ? (
+                                    <div className="flex items-center gap-1 text-yellow-500">
+                                        <Star className="h-4 w-4 fill-current" />
+                                        <span className="text-sm font-medium text-foreground">
+                                            {professional.averageRating?.toFixed(1) || "5.0"}
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-xs text-muted-foreground font-medium">Sem avaliação</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </Link>

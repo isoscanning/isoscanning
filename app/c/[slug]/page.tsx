@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, Users, Info, Flag, Share2, Plus, Edit } from "lucide-react";
 import { PostCard } from "@/components/community/post-card";
+import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/lib/api-service";
 
 import { Header } from "@/components/header";
@@ -108,7 +109,76 @@ export default function CommunityDetail() {
     };
 
     if (loading) {
-        return <div className="container mx-auto py-8 text-center">Carregando comunidade...</div>;
+        return (
+            <div className="min-h-screen bg-background">
+                <Header />
+                {/* Banner Skeleton */}
+                <Skeleton className="h-32 md:h-48 w-full rounded-none" />
+
+                <div className="container mx-auto px-4">
+                    {/* Header Info Skeleton */}
+                    <div className="relative mb-6 flex flex-col md:flex-row items-start md:items-end gap-4">
+                        <div className="-mt-12">
+                            <Skeleton className="h-24 w-24 rounded-full border-4 border-background" />
+                        </div>
+                        <div className="flex-1 mt-4 md:mb-2 space-y-3">
+                            <Skeleton className="h-8 w-56" />
+                            <Skeleton className="h-4 w-28" />
+                            <Skeleton className="h-4 w-full max-w-lg" />
+                            <Skeleton className="h-4 w-4/5 max-w-lg" />
+                        </div>
+                        <div className="flex gap-2 mb-4 md:mb-2">
+                            <Skeleton className="h-10 w-32 rounded-full" />
+                        </div>
+                    </div>
+
+                    {/* Content + Sidebar Skeleton */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div className="md:col-span-2 space-y-4">
+                            {/* Create post input skeleton */}
+                            <Skeleton className="h-16 w-full rounded-lg" />
+                            {/* Posts skeleton */}
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <div key={i} className="border border-border/50 rounded-lg p-4 space-y-3">
+                                    <div className="flex items-center gap-3">
+                                        <Skeleton className="h-8 w-8 rounded-full" />
+                                        <Skeleton className="h-3 w-32" />
+                                    </div>
+                                    <Skeleton className="h-5 w-3/4" />
+                                    <Skeleton className="h-3 w-full" />
+                                    <Skeleton className="h-3 w-5/6" />
+                                    <div className="flex gap-4 pt-1">
+                                        <Skeleton className="h-3 w-16" />
+                                        <Skeleton className="h-3 w-16" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Sidebar skeleton */}
+                        <div className="space-y-6">
+                            <div className="border border-border/50 rounded-lg p-4 space-y-4">
+                                <Skeleton className="h-4 w-36" />
+                                <Skeleton className="h-3 w-full" />
+                                <Skeleton className="h-3 w-4/5" />
+                                <div className="flex justify-between pt-2">
+                                    <Skeleton className="h-8 w-16" />
+                                    <Skeleton className="h-8 w-16" />
+                                    <Skeleton className="h-8 w-16" />
+                                </div>
+                                <Skeleton className="h-10 w-full rounded-full" />
+                            </div>
+                            <div className="border border-border/50 rounded-lg p-4 space-y-3">
+                                <Skeleton className="h-4 w-20" />
+                                <Skeleton className="h-3 w-full" />
+                                <Skeleton className="h-3 w-4/5" />
+                                <Skeleton className="h-3 w-3/5" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     if (!community) {

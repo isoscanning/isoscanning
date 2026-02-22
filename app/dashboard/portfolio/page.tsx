@@ -146,8 +146,8 @@ export default function PortfolioPage() {
       }
       setNewPortfolioItem(prev => ({ ...prev, mediaType: 'image' }));
     } else if (isVideo) {
-      if (file.size > 100 * 1024 * 1024) {
-        setFileError("Vídeos devem ter no máximo 100MB.");
+      if (file.size > 150 * 1024 * 1024) {
+        setFileError("Vídeos devem ter no máximo 150MB.");
         return;
       }
       const duration = await validateVideoDuration(file);
@@ -382,7 +382,7 @@ export default function PortfolioPage() {
                                 Clique ou arraste para enviar
                               </p>
                               <p className="text-xs text-muted-foreground mt-2 max-w-[200px]">
-                                JPG/PNG (max 15MB) ou MP4 (max 100MB, 90s)
+                                JPG/PNG (max 15MB) ou MP4 (max 150MB, 90s)
                               </p>
                             </div>
                           )}

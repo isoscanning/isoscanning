@@ -528,8 +528,8 @@ export default function PerfilPage() {
       console.log('[Portfolio] Setting mediaType to image')
       setNewPortfolioItem(prev => ({ ...prev, mediaType: 'image' }))
     } else if (isVideo) {
-      if (file.size > 100 * 1024 * 1024) {
-        setFileError("Vídeos devem ter no máximo 100MB.")
+      if (file.size > 150 * 1024 * 1024) {
+        setFileError("Vídeos devem ter no máximo 150MB.")
         return
       }
 

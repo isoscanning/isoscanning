@@ -104,10 +104,16 @@ export function CandidateCard({
                                             <MapPin className="h-3.5 w-3.5" />
                                             <span>{candidate.profile.city || "N/A"}/{candidate.profile.state || "UF"}</span>
                                         </div>
-                                        <div className="flex items-center gap-1">
-                                            <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
-                                            <span>{candidate.profile.averageRating?.toFixed(1) || "New"} ({candidate.profile.totalReviews || 0})</span>
-                                        </div>
+                                        {candidate.profile.totalReviews && candidate.profile.totalReviews > 0 ? (
+                                            <div className="flex items-center gap-1">
+                                                <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
+                                                <span>{candidate.profile.averageRating?.toFixed(1) || "5.0"} ({candidate.profile.totalReviews})</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-1 text-muted-foreground text-xs font-medium">
+                                                <span>Sem avaliação</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 

@@ -89,7 +89,7 @@ export function PortfolioGallery({
                                             </div>
                                             <div className="text-center">
                                                 <p className="font-medium">Carregar mídia</p>
-                                                <p className="text-xs text-muted-foreground mt-1">Fotos (máx 15MB) ou Vídeos (máx 1m30s, 100MB)</p>
+                                                <p className="text-xs text-muted-foreground mt-1">Fotos (máx 15MB) ou Vídeos (máx 1m30s, 150MB)</p>
                                             </div>
                                         </>
                                     )}

@@ -49,6 +49,8 @@ export function NotificationBell() {
             router.push(`/dashboard/vagas/${notification.referenceId}`);
         } else if (notification.type === "equipment_match" && notification.referenceId) {
             router.push(`/equipamentos/${notification.referenceId}`);
+        } else if (notification.type === "review_received") {
+            router.push("/dashboard/perfil");
         }
     };
 

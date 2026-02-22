@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserNav } from "@/components/user-nav";
+import { NotificationBell } from "@/components/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Menu,
@@ -136,6 +137,7 @@ export function Header() {
             </span>
           )}
           <ThemeToggle />
+          {isAuthenticated && <NotificationBell />}
           <UserNav />
         </div>
 

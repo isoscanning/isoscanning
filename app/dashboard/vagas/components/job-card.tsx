@@ -238,7 +238,7 @@ export function JobCard({
                                             {vaga.budgetMin && vaga.budgetMax && " - "}
                                             {vaga.budgetMax && `R$ ${vaga.budgetMax}`}
                                         </>
-                                    ) : "A combinar"}
+                                    ) : "Valor não informado"}
                                 </span>
                             </div>
                         </div>

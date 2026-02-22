@@ -79,6 +79,9 @@ export default function NovaVagaPage() {
         requiresInvoice: false,
     });
 
+    // Checkbox custom para não informar orçamento
+    const [noBudget, setNoBudget] = useState(false);
+
     const [locationIds, setLocationIds] = useState({
         countryId: 0,
         stateId: 0,
@@ -143,8 +146,8 @@ export default function NovaVagaPage() {
                 category: categoryName,
                 jobType: formData.jobType as any,
                 locationType: formData.locationType as any,
-                budgetMin: formData.budgetMin ? Number.parseFloat(formData.budgetMin) : undefined,
-                budgetMax: formData.budgetMax ? Number.parseFloat(formData.budgetMax) : undefined,
+                budgetMin: noBudget ? undefined : (formData.budgetMin ? Number.parseFloat(formData.budgetMin) : undefined),
+                budgetMax: noBudget ? undefined : (formData.budgetMax ? Number.parseFloat(formData.budgetMax) : undefined),
                 startDate: formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
                 endDate: formData.endDate ? new Date(formData.endDate).toISOString() : undefined,
                 isActive: true,
@@ -397,6 +400,7 @@ export default function NovaVagaPage() {
                                                                 }
                                                                 setFormData({ ...formData, budgetMin: val })
                                                             }}
+                                                            disabled={noBudget}
                                                         />
                                                     </div>
                                                     <div className="relative flex-1">
@@ -415,7 +419,26 @@ export default function NovaVagaPage() {
                                                                 }
                                                                 setFormData({ ...formData, budgetMax: val })
                                                             }}
+                                                            disabled={noBudget}
                                                         />
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-3 p-3 rounded-lg border bg-muted/30">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="noBudget"
+                                                        checked={noBudget}
+                                                        onChange={(e) => {
+                                                            setNoBudget(e.target.checked);
+                                                            if (e.target.checked) {
+                                                                setFormData({ ...formData, budgetMin: "", budgetMax: "" });
+                                                            }
+                                                        }}
+                                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                    />
+                                                    <div className="flex flex-col">
+                                                        <Label htmlFor="noBudget" className="cursor-pointer font-medium">Não informar valor</Label>
+                                                        <span className="text-xs text-muted-foreground">O orçamento estimado não será exibido na vaga.</span>
                                                     </div>
                                                 </div>
                                             </div>

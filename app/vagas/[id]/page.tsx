@@ -467,7 +467,7 @@ export default function DetalhesVagaPage() {
                                                     {vaga.budgetMax !== null && vaga.budgetMax !== undefined && `R$ ${vaga.budgetMax}`}
                                                 </>
                                             ) : (
-                                                "A combinar"
+                                                "Valor não informado"
                                             )}
                                         </div>
                                         {appliedDetails?.counterProposal && (

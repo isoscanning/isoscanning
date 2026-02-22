@@ -128,6 +128,17 @@ export interface CreateJobOfferData {
   status?: 'open' | 'paused' | 'closed';
 }
 
+export interface AppNotification {
+  id: string;
+  profileId: string;
+  title: string;
+  message: string;
+  type: "job_match" | "equipment_match" | "system";
+  referenceId?: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
 /**
  * Fetch all available equipments (for public marketplace)
  */
@@ -926,3 +937,23 @@ export const updateJobApplicationStatus = async (applicationId: string, status: 
     throw error;
   }
 };
+
+export async function fetchNotifications(): Promise<{ data: AppNotification[], total: number, unreadCount: number }> {
+  try {
+    const response = await apiClient.get('/notifications?limit=20');
+    return response.data;
+  } catch (error) {
+    console.error("[data-service] Error fetching notifications:", error);
+    return { data: [], total: 0, unreadCount: 0 };
+  }
+}
+
+export async function markNotificationAsRead(id: string): Promise<boolean> {
+  try {
+    await apiClient.patch(`/notifications/${id}/read`);
+    return true;
+  } catch (error) {
+    console.error("[data-service] Error marking notification as read:", error);
+    return false;
+  }
+}

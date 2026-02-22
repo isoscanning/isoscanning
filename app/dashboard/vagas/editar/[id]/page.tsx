@@ -81,6 +81,9 @@ export default function EditarVagaPage() {
         requiresInvoice: false,
     });
 
+    // Checkbox custom para não informar orçamento
+    const [noBudget, setNoBudget] = useState(false);
+
     const [locationIds, setLocationIds] = useState({
         countryId: 0,
         stateId: 0,
@@ -136,6 +139,9 @@ export default function EditarVagaPage() {
                     endDate: vaga.endDate ? new Date(vaga.endDate).toISOString().split('T')[0] : "",
                     requiresInvoice: vaga.requiresInvoice || false,
                 });
+
+                // Set the no budget checkbox depending on whether there's a budget value
+                setNoBudget(vaga.budgetMin == null && vaga.budgetMax == null);
             } catch (err) {
                 console.error("Erro ao carregar dados:", err);
                 setError("Erro ao carregar os dados da vaga.");
@@ -165,8 +171,8 @@ export default function EditarVagaPage() {
                 specialtyId: formData.specialtyId,
                 jobType: formData.jobType as any,
                 locationType: formData.locationType as any,
-                budgetMin: formData.budgetMin ? Number.parseFloat(formData.budgetMin) : undefined,
-                budgetMax: formData.budgetMax ? Number.parseFloat(formData.budgetMax) : undefined,
+                budgetMin: noBudget ? undefined : (formData.budgetMin ? Number.parseFloat(formData.budgetMin) : undefined),
+                budgetMax: noBudget ? undefined : (formData.budgetMax ? Number.parseFloat(formData.budgetMax) : undefined),
                 startDate: formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
                 endDate: formData.endDate ? new Date(formData.endDate).toISOString() : undefined,
             });
@@ -399,6 +405,7 @@ export default function EditarVagaPage() {
                                                                 className="pl-12"
                                                                 value={formData.budgetMin}
                                                                 onChange={(e) => setFormData({ ...formData, budgetMin: e.target.value })}
+                                                                disabled={noBudget}
                                                             />
                                                         </div>
                                                         <div className="relative flex-1">
@@ -409,7 +416,26 @@ export default function EditarVagaPage() {
                                                                 className="pl-12"
                                                                 value={formData.budgetMax}
                                                                 onChange={(e) => setFormData({ ...formData, budgetMax: e.target.value })}
+                                                                disabled={noBudget}
                                                             />
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mt-3 p-3 rounded-lg border bg-muted/30">
+                                                        <input
+                                                            type="checkbox"
+                                                            id="noBudget"
+                                                            checked={noBudget}
+                                                            onChange={(e) => {
+                                                                setNoBudget(e.target.checked);
+                                                                if (e.target.checked) {
+                                                                    setFormData({ ...formData, budgetMin: "", budgetMax: "" });
+                                                                }
+                                                            }}
+                                                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                        />
+                                                        <div className="flex flex-col">
+                                                            <Label htmlFor="noBudget" className="cursor-pointer font-medium">Não informar valor</Label>
+                                                            <span className="text-xs text-muted-foreground">O orçamento estimado não será exibido na vaga.</span>
                                                         </div>
                                                     </div>
                                                 </div>

@@ -227,7 +227,7 @@ export function PersonalDataForm({
                             setFormData({ ...formData, city: name, phone: newPhone });
                         }}
 
-                        className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                        className="md:grid-cols-3"
                     />
                 </div>
 

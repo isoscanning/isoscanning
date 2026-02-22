@@ -349,7 +349,7 @@ export default function NovaVagaPage() {
                                             </div>
 
                                             <LocationSelector
-                                                className="col-span-1 md:col-span-3 grid-cols-1 md:grid-cols-3"
+                                                className="grid-cols-1 md:col-span-3 md:grid-cols-3"
                                                 isDisabled={formData.locationType === "remote"}
                                                 selectedCountryId={locationIds.countryId}
                                                 selectedStateId={locationIds.stateId}

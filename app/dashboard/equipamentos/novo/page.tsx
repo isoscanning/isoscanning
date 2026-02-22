@@ -59,6 +59,7 @@ export default function NovoEquipamentoPage() {
     rentPeriod: "day",
     city: "",
     state: "",
+    country: "",
     additionalConditions: "",
   });
 
@@ -132,6 +133,23 @@ export default function NovoEquipamentoPage() {
     setSaving(true);
 
     try {
+      // Validation
+      const missingFields = [];
+      if (selectedImages.length === 0) missingFields.push("pelo menos uma foto");
+      if (!formData.description?.trim()) missingFields.push("descrição");
+      if (!formData.brand?.trim()) missingFields.push("marca");
+      if (!formData.model?.trim()) missingFields.push("modelo");
+      if (!formData.country?.trim()) missingFields.push("país");
+      if (!formData.state?.trim()) missingFields.push("estado");
+      if (!formData.city?.trim()) missingFields.push("cidade");
+      if (formData.negotiationType !== "free" && !formData.price) missingFields.push("preço");
+
+      if (missingFields.length > 0) {
+        setError(`Os seguintes campos são obrigatórios: ${missingFields.join(", ")}.`);
+        setSaving(false);
+        return;
+      }
+
       let imageUrls: string[] = [];
 
       // Upload images if selected
@@ -157,9 +175,10 @@ export default function NovoEquipamentoPage() {
           condition: formData.condition as "new" | "refurbished" | "used",
           rentPeriod: formData.rentPeriod as "day" | "week" | "month",
           price: formData.price ? Number.parseFloat(formData.price) : undefined,
-          imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+          imageUrls: imageUrls,
           ownerId: userProfile?.id || "",
           ownerName: userProfile?.displayName || "",
+          country: formData.country,
           isAvailable: true,
         });
         console.log("Equipamento criado com sucesso!");
@@ -524,11 +543,17 @@ export default function NovoEquipamentoPage() {
                         <div className="grid grid-cols-1 gap-2">
                           <Label>Localização *</Label>
                           <LocationSelector
-                            className="grid-cols-1 sm:grid-cols-2"
+                            className="grid-cols-1"
+                            selectedCountryId={locationIds.countryId}
                             selectedStateId={locationIds.stateId}
                             selectedCityId={locationIds.cityId}
+                            initialCountryName={formData.country}
                             initialStateUf={formData.state}
                             initialCityName={formData.city}
+                            onCountryChange={(id, name) => {
+                              setLocationIds(prev => ({ ...prev, countryId: id, stateId: 0, cityId: 0 }));
+                              setFormData(prev => ({ ...prev, country: name, state: '', city: '' }));
+                            }}
                             onStateChange={(id, name, uf) => {
                               setLocationIds(prev => ({ ...prev, stateId: id, cityId: 0 }));
                               setFormData(prev => ({ ...prev, state: uf, city: '' }));

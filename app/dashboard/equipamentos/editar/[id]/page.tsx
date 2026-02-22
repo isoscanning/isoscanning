@@ -30,6 +30,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { updateEquipment, fetchUserEquipments, uploadEquipmentImages, deleteEquipmentImages } from "@/lib/data-service";
 import { ScrollReveal } from "@/components/scroll-reveal";
 
+import { LocationSelector } from "@/components/location-selector";
+
 const CATEGORIAS = [
   "Câmeras",
   "Lentes",
@@ -39,36 +41,6 @@ const CATEGORIAS = [
   "Tripés e Suportes",
   "Acessórios",
   "Edição",
-];
-
-const ESTADOS = [
-  "AC",
-  "AL",
-  "AP",
-  "AM",
-  "BA",
-  "CE",
-  "DF",
-  "ES",
-  "GO",
-  "MA",
-  "MT",
-  "MS",
-  "MG",
-  "PA",
-  "PB",
-  "PR",
-  "PE",
-  "PI",
-  "RJ",
-  "RN",
-  "RS",
-  "RO",
-  "RR",
-  "SC",
-  "SP",
-  "SE",
-  "TO",
 ];
 
 export default function EditarEquipamentoPage() {
@@ -89,7 +61,14 @@ export default function EditarEquipamentoPage() {
     rentPeriod: "day",
     city: "",
     state: "",
+    country: "",
     additionalConditions: "",
+  });
+
+  const [locationIds, setLocationIds] = useState({
+    countryId: 0,
+    stateId: 0,
+    cityId: 0
   });
 
   // Image State Management
@@ -202,6 +181,7 @@ export default function EditarEquipamentoPage() {
         rentPeriod: equipment.rentPeriod || "day",
         city: equipment.city,
         state: equipment.state,
+        country: (equipment as any).country || "",
         additionalConditions: equipment.additionalConditions || "",
       });
 
@@ -228,6 +208,22 @@ export default function EditarEquipamentoPage() {
     setSaving(true);
 
     try {
+      // Validation
+      const missingFields = [];
+      if (items.length === 0) missingFields.push("pelo menos uma foto");
+      if (!formData.description?.trim()) missingFields.push("descrição");
+      if (!formData.brand?.trim()) missingFields.push("marca");
+      if (!formData.model?.trim()) missingFields.push("modelo");
+      if (!formData.country?.trim()) missingFields.push("país");
+      if (!formData.state?.trim()) missingFields.push("estado");
+      if (!formData.city?.trim()) missingFields.push("cidade");
+      if (formData.negotiationType !== "free" && !formData.price) missingFields.push("preço");
+
+      if (missingFields.length > 0) {
+        setError(`Os seguintes campos são obrigatórios: ${missingFields.join(", ")}.`);
+        setSaving(false);
+        return;
+      }
       // 1. Separate items needing upload vs existing
       const existingUrls = items.filter(i => i.isExisting).map(i => i.preview);
       const newFiles = items.filter(i => !i.isExisting && i.file).map(i => i.file as File);
@@ -279,8 +275,9 @@ export default function EditarEquipamentoPage() {
             formData.negotiationType === "rent" ? (formData.rentPeriod as "day" | "week" | "month") : undefined,
           city: formData.city,
           state: formData.state,
+          country: formData.country,
           additionalConditions: formData.additionalConditions,
-          imageUrls: finalImageUrls.length > 0 ? finalImageUrls : undefined,
+          imageUrls: finalImageUrls,
         });
         console.log("Equipamento atualizado com sucesso!");
 
@@ -629,40 +626,29 @@ export default function EditarEquipamentoPage() {
                       )}
 
                       <div className="pt-4 border-t space-y-4">
-                        <div className="grid grid-cols-3 gap-2">
-                          <div className="col-span-2 space-y-2">
-                            <Label>Cidade *</Label>
-                            <Input
-                              id="city"
-                              value={formData.city}
-                              onChange={(e) =>
-                                setFormData({ ...formData, city: e.target.value })
-                              }
-                              required
-                              placeholder="Cidade"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>UF *</Label>
-                            <Select
-                              value={formData.state}
-                              onValueChange={(value) =>
-                                setFormData({ ...formData, state: value })
-                              }
-                              required
-                            >
-                              <SelectTrigger id="state">
-                                <SelectValue placeholder="UF" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {ESTADOS.map((estado) => (
-                                  <SelectItem key={estado} value={estado}>
-                                    {estado}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                        <div className="grid grid-cols-1 gap-2">
+                          <Label>Localização *</Label>
+                          <LocationSelector
+                            className="grid-cols-1"
+                            selectedCountryId={locationIds.countryId}
+                            selectedStateId={locationIds.stateId}
+                            selectedCityId={locationIds.cityId}
+                            initialCountryName={formData.country}
+                            initialStateUf={formData.state}
+                            initialCityName={formData.city}
+                            onCountryChange={(id, name) => {
+                              setLocationIds(prev => ({ ...prev, countryId: id, stateId: 0, cityId: 0 }));
+                              setFormData(prev => ({ ...prev, country: name, state: '', city: '' }));
+                            }}
+                            onStateChange={(id, name, uf) => {
+                              setLocationIds(prev => ({ ...prev, stateId: id, cityId: 0 }));
+                              setFormData(prev => ({ ...prev, state: uf, city: '' }));
+                            }}
+                            onCityChange={(id, name) => {
+                              setLocationIds(prev => ({ ...prev, cityId: id }));
+                              setFormData(prev => ({ ...prev, city: name }));
+                            }}
+                          />
                         </div>
                       </div>
 

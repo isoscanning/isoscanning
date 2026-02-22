@@ -12,6 +12,7 @@ export interface Equipment {
   model?: string;
   price?: number;
   rentPeriod?: "day" | "week" | "month";
+  country?: string;
   city: string;
   state: string;
   additionalConditions?: string;
@@ -99,6 +100,7 @@ export interface CreateEquipmentData {
   model?: string;
   price?: number;
   rentPeriod?: "day" | "week" | "month";
+  country?: string;
   city: string;
   state: string;
   additionalConditions?: string;

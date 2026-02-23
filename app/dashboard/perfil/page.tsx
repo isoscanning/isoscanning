@@ -72,8 +72,9 @@ export default function PerfilPage() {
     state: "",
     phone: "",
     portfolioLink: "",
-    instagram: "", // UI only for now
-    linkedin: "",  // UI only for now
+    portfolioLink: "",
+    instagram: "",
+    otherLinks: "",
     isPublished: false,
     avatarUrl: "",
   })
@@ -276,8 +277,8 @@ export default function PerfilPage() {
             state: freshProfile.state || "",
             phone: initialPhone, // Use cleaned phone
             portfolioLink: freshProfile.portfolioLink || "",
-            instagram: "",
-            linkedin: "",
+            instagram: freshProfile.instagram || "",
+            otherLinks: freshProfile.otherLinks || "",
             isPublished: freshProfile.isPublished || false,
             avatarUrl: freshProfile.avatarUrl || userProfile.avatarUrl || "",
           })
@@ -305,8 +306,8 @@ export default function PerfilPage() {
             state: userProfile.state || "",
             phone: userProfile.phone || "",
             portfolioLink: userProfile.portfolioLink || "",
-            instagram: "",
-            linkedin: "",
+            instagram: (userProfile as any).instagram || "",
+            otherLinks: (userProfile as any).otherLinks || "",
             isPublished: userProfile.isPublished || false,
             avatarUrl: userProfile.avatarUrl || "",
           })
@@ -396,6 +397,8 @@ export default function PerfilPage() {
         phone: cleanPhone,
         phoneCountryCode: selectedCountryCode,
         portfolioLink: formData.portfolioLink,
+        instagram: formData.instagram,
+        otherLinks: formData.otherLinks,
         isPublished: formData.isPublished,
       })
       setShowSaveSuccessModal(true)

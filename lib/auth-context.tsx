@@ -35,6 +35,8 @@ export interface UserProfile {
   description?: string;
   portfolioLink?: string;
   avatarUrl?: string;
+  instagram?: string;
+  otherLinks?: string;
   averageRating?: number;
   totalReviews?: number;
   isActive: boolean;

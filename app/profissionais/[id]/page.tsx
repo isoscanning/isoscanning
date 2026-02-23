@@ -343,30 +343,35 @@ export default function ProfessionalProfilePage() {
             <div className="flex flex-col items-center gap-4">
               {/* Social Icons */}
               <div className="flex gap-4">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="rounded-full h-11 w-11 border-border bg-background/50 hover:bg-primary/10 hover:text-primary hover:scale-110 hover:border-primary/50 transition-all duration-300 shadow-sm"
-                  onClick={() => trackEvent({ action: 'click_social', category: 'Professionals', label: 'Instagram', value: 0 })}
-                >
-                  <Instagram className="h-5 w-5" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="rounded-full h-11 w-11 border-border bg-background/50 hover:bg-primary/10 hover:text-primary hover:scale-110 hover:border-primary/50 transition-all duration-300 shadow-sm"
-                  onClick={() => trackEvent({ action: 'click_social', category: 'Professionals', label: 'LinkedIn', value: 0 })}
-                >
-                  <Linkedin className="h-5 w-5" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="rounded-full h-11 w-11 border-border bg-background/50 hover:bg-primary/10 hover:text-primary hover:scale-110 hover:border-primary/50 transition-all duration-300 shadow-sm"
-                  onClick={() => trackEvent({ action: 'click_social', category: 'Professionals', label: 'Website', value: 0 })}
-                >
-                  <Globe className="h-5 w-5" />
-                </Button>
+                {professional.instagram && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="rounded-full h-11 w-11 border-border bg-background/50 hover:bg-primary/10 hover:text-primary hover:scale-110 hover:border-primary/50 transition-all duration-300 shadow-sm"
+                    onClick={() => {
+                      trackEvent({ action: 'click_social', category: 'Professionals', label: 'Instagram', value: 0 });
+                      const link = professional.instagram?.startsWith('http') ? professional.instagram : `https://instagram.com/${professional.instagram?.replace('@', '')}`;
+                      window.open(link, '_blank');
+                    }}
+                  >
+                    <Instagram className="h-5 w-5" />
+                  </Button>
+                )}
+
+                {professional.otherLinks && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="rounded-full h-11 w-11 border-border bg-background/50 hover:bg-primary/10 hover:text-primary hover:scale-110 hover:border-primary/50 transition-all duration-300 shadow-sm"
+                    onClick={() => {
+                      trackEvent({ action: 'click_social', category: 'Professionals', label: 'Website', value: 0 });
+                      const link = professional.otherLinks?.startsWith('http') ? professional.otherLinks : `https://${professional.otherLinks}`;
+                      window.open(link, '_blank');
+                    }}
+                  >
+                    <Globe className="h-5 w-5" />
+                  </Button>
+                )}
               </div>
 
               {/* WhatsApp Button */}

@@ -41,6 +41,8 @@ export interface Professional {
   phone?: string;
   phoneCountryCode?: string;
   portfolioLink?: string;
+  instagram?: string;
+  otherLinks?: string;
   isActive?: boolean;
   subscriptionTier?: 'free' | 'standard' | 'pro' | 'vip';
 }

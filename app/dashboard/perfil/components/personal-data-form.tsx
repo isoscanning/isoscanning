@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, CheckCircle2, X } from "lucide-react";
+import { Camera, CheckCircle2, X, Instagram, Globe } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -190,6 +190,33 @@ export function PersonalDataForm({
                         className={cn(validationErrors.includes("description") && "border-destructive focus-visible:ring-destructive")}
                         required
                     />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="instagram" className="flex items-center gap-1.5">
+                            <Instagram className="w-4 h-4 text-muted-foreground" />
+                            Instagram
+                        </Label>
+                        <Input
+                            id="instagram"
+                            value={formData.instagram}
+                            onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
+                            placeholder="@seu_usuario ou link"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="otherLinks" className="flex items-center gap-1.5">
+                            <Globe className="w-4 h-4 text-muted-foreground" />
+                            Outros Links
+                        </Label>
+                        <Input
+                            id="otherLinks"
+                            value={formData.otherLinks}
+                            onChange={(e) => setFormData({ ...formData, otherLinks: e.target.value })}
+                            placeholder="Site, Linktree, etc."
+                        />
+                    </div>
                 </div>
 
                 <div className="space-y-2">

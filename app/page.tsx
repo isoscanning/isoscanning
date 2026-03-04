@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import { AuthAwareLink } from "@/components/auth-aware-link";
-import { Search, Calendar, Package, Users, Star, Zap, Shield, ArrowRight, CheckCircle2, Play, Camera, Video, Image as ImageIcon } from "lucide-react";
+import { Search, Calendar, Package, Users, Star, Zap, Shield, ArrowRight, CheckCircle2, Play, Camera, Video, Image as ImageIcon, SearchX, TrendingDown, Clock } from "lucide-react";
 import { ParticleBackground } from "@/components/particle-background";
 import { ScrollReveal, StaggerReveal } from "@/components/scroll-reveal";
 import { TypingText, CountUp, GlowText } from "@/components/typing-text";
@@ -141,7 +141,9 @@ export default function HomePage() {
                 <ScrollReveal delay={0.3}>
                   <Card className="border-2 border-dashed border-muted-foreground/20 bg-transparent">
                     <CardContent className="pt-6 text-center space-y-3">
-                      <div className="text-4xl">😤</div>
+                      <div className="h-16 w-16 mx-auto rounded-full bg-muted flex items-center justify-center mb-4">
+                        <SearchX className="h-8 w-8 text-muted-foreground" />
+                      </div>
                       <p className="text-muted-foreground">
                         Buscas intermináveis por profissionais qualificados
                       </p>
@@ -152,7 +154,9 @@ export default function HomePage() {
                 <ScrollReveal delay={0.4}>
                   <Card className="border-2 border-dashed border-muted-foreground/20 bg-transparent">
                     <CardContent className="pt-6 text-center space-y-3">
-                      <div className="text-4xl">📉</div>
+                      <div className="h-16 w-16 mx-auto rounded-full bg-muted flex items-center justify-center mb-4">
+                        <TrendingDown className="h-8 w-8 text-muted-foreground" />
+                      </div>
                       <p className="text-muted-foreground">
                         Talento incrível sem visibilidade no mercado
                       </p>
@@ -163,7 +167,9 @@ export default function HomePage() {
                 <ScrollReveal delay={0.5}>
                   <Card className="border-2 border-dashed border-muted-foreground/20 bg-transparent">
                     <CardContent className="pt-6 text-center space-y-3">
-                      <div className="text-4xl">⏰</div>
+                      <div className="h-16 w-16 mx-auto rounded-full bg-muted flex items-center justify-center mb-4">
+                        <Clock className="h-8 w-8 text-muted-foreground" />
+                      </div>
                       <p className="text-muted-foreground">
                         Tempo perdido com contatos que não dão retorno
                       </p>

@@ -21,6 +21,7 @@ import {
   Briefcase,
   Zap,
   MessageSquare,
+  Info,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { trackEvent } from "@/lib/analytics";
@@ -70,10 +71,20 @@ export function Header() {
 
   const isAuthenticated = !!userProfile && !loading;
 
+  const getShortName = (name?: string | null) => {
+    if (!name) return "";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length > 1) {
+      return `${parts[0]} ${parts[1]}`;
+    }
+    return parts[0] || "";
+  };
+  const displayName = getShortName(userProfile?.displayName || googleName);
+
   return (
     <header className="sticky top-0 z-[80] w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <div className="flex items-center gap-24">
+        <div className="flex items-center gap-8 lg:gap-12">
           <Link href="/" className="flex items-center gap-3">
             <Image
               src="/logo-cortada.png"
@@ -86,7 +97,7 @@ export function Header() {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-6 text-foreground/85">
+          <nav className="hidden md:flex items-center gap-4 lg:gap-6 text-foreground/85 whitespace-nowrap">
             <Link
               href="/profissionais"
               className={isActive("/profissionais") ? "text-primary font-medium" : "hover:text-primary transition-colors"}
@@ -122,6 +133,13 @@ export function Header() {
             >
               Comunidade
             </Link>
+            <Link
+              href="/como-funciona"
+              className="hover:text-primary transition-colors"
+              onClick={() => trackEvent({ action: "click_nav", category: "Navigation", label: "Desktop: Como Funciona" })}
+            >
+              Como Funciona
+            </Link>
             {isAuthenticated && (
               // Link removed - accessible via Dashboard
               null
@@ -130,10 +148,10 @@ export function Header() {
         </div>
 
         {/* Desktop Actions */}
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-3 whitespace-nowrap">
           {isAuthenticated && (
             <span className="text-sm font-medium mr-2">
-              Olá, {userProfile?.displayName || googleName}!
+              Olá, {displayName}!
             </span>
           )}
           <ThemeToggle />
@@ -211,6 +229,17 @@ export function Header() {
             >
               <MessageSquare className="h-4 w-4 text-orange-500" />
               Comunidade
+            </Link>
+            <Link
+              href="/como-funciona"
+              className="flex items-center gap-3 text-sm font-medium transition-colors p-3 rounded-lg hover:text-cyan-500 hover:bg-cyan-500/10"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                trackEvent({ action: "click_nav", category: "Navigation", label: "Mobile: Como Funciona" });
+              }}
+            >
+              <Info className="h-4 w-4 text-cyan-500" />
+              Como Funciona
             </Link>
             {isAuthenticated && (
               // Link removed as per redesign - accessible via Dashboard

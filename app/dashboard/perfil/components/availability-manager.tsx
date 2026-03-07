@@ -78,6 +78,7 @@ export function AvailabilityManager({
                                 selected={selectedDates}
                                 onSelect={handleDateSelect}
                                 onDayClick={handleDayClick}
+                                disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
                                 modifiers={{
                                     available: (date) => availabilitySlots.some(slot =>
                                         slot.date === format(date, 'yyyy-MM-dd')

@@ -175,10 +175,13 @@ export default function AgendaPage() {
   };
 
   const handleSelectAll = () => {
-    if (selectedSlotsToDelete.length === availabilitySlots.length) {
+    const todayStr = format(new Date(), 'yyyy-MM-dd')
+    const futureSlots = availabilitySlots.filter(slot => slot.date >= todayStr)
+
+    if (selectedSlotsToDelete.length === futureSlots.length && futureSlots.length > 0) {
       setSelectedSlotsToDelete([]);
     } else {
-      setSelectedSlotsToDelete(availabilitySlots.map(slot => slot.id));
+      setSelectedSlotsToDelete(futureSlots.map(slot => slot.id));
     }
   };
 
@@ -242,7 +245,7 @@ export default function AgendaPage() {
               selectedDates={selectedDates}
               handleDateSelect={handleDateSelect}
               handleDayClick={handleDayClick}
-              availabilitySlots={availabilitySlots}
+              availabilitySlots={availabilitySlots.filter(slot => slot.date >= format(new Date(), 'yyyy-MM-dd'))}
               isAllDay={isAllDay}
               setIsAllDay={setIsAllDay}
               newSlot={newSlot}

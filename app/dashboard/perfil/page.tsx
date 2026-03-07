@@ -72,7 +72,6 @@ export default function PerfilPage() {
     state: "",
     phone: "",
     portfolioLink: "",
-    portfolioLink: "",
     instagram: "",
     otherLinks: "",
     isPublished: false,
@@ -621,8 +620,7 @@ export default function PerfilPage() {
       // Create portfolio item with the uploaded URL
       await createPortfolioItem({
         title: newPortfolioItem.title,
-        mediaUrl: mediaUrl,
-        mediaType: newPortfolioItem.mediaType,
+        media: [{ url: mediaUrl, type: newPortfolioItem.mediaType as 'image' | 'video' }],
         professionalId: userProfile.id
       })
 
@@ -766,10 +764,13 @@ export default function PerfilPage() {
 
   // Select all slots
   const handleSelectAll = () => {
-    if (selectedSlotsToDelete.length === availabilitySlots.length) {
+    const todayStr = format(new Date(), 'yyyy-MM-dd')
+    const futureSlots = availabilitySlots.filter(slot => slot.date >= todayStr)
+
+    if (selectedSlotsToDelete.length === futureSlots.length && futureSlots.length > 0) {
       setSelectedSlotsToDelete([])
     } else {
-      setSelectedSlotsToDelete(availabilitySlots.map(slot => slot.id))
+      setSelectedSlotsToDelete(futureSlots.map(slot => slot.id))
     }
   }
 
@@ -919,7 +920,7 @@ export default function PerfilPage() {
                 selectedDates={selectedDates}
                 handleDateSelect={handleDateSelect}
                 handleDayClick={handleDayClick}
-                availabilitySlots={availabilitySlots}
+                availabilitySlots={availabilitySlots.filter(slot => slot.date >= format(new Date(), 'yyyy-MM-dd'))}
                 isAllDay={isAllDay}
                 setIsAllDay={setIsAllDay}
                 newSlot={newSlot}

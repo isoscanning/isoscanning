@@ -21,7 +21,9 @@ import {
   ImageIcon,
   AlertCircle,
   Camera,
-  Layers
+  Layers,
+  ImagePlus,
+  Pencil
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -35,8 +37,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   fetchPortfolio,
   createPortfolioItem,
+  updatePortfolioItem,
   deletePortfolioItem,
   uploadPortfolioItemImage,
   type PortfolioItem
@@ -54,18 +65,27 @@ export default function PortfolioPage() {
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [newPortfolioItem, setNewPortfolioItem] = useState({
     title: "",
-    mediaUrl: "",
-    mediaType: "image" as "image" | "video"
   });
-  const [portfolioFile, setPortfolioFile] = useState<File | null>(null);
-  const [portfolioPreview, setPortfolioPreview] = useState<string | null>(null);
+  const [portfolioFiles, setPortfolioFiles] = useState<File[]>([]);
+  const [portfolioPreviews, setPortfolioPreviews] = useState<{ url: string, type: 'image' | 'video' }[]>([]);
+  const [selectedAlbum, setSelectedAlbum] = useState<PortfolioItem | null>(null);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+
+  // Edit State
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [existingMedia, setExistingMedia] = useState<{ url: string, type: 'image' | 'video' }[]>([]);
 
   // Status State
   const [loadingPortfolio, setLoadingPortfolio] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
+  // Album Edit Modal State
+  const [editAlbumModalOpen, setEditAlbumModalOpen] = useState(false);
+  const [albumToEdit, setAlbumToEdit] = useState<PortfolioItem | null>(null);
+  const [mediaToDelete, setMediaToDelete] = useState<string[]>([]);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -110,67 +130,101 @@ export default function PortfolioPage() {
   };
 
   // Limits definition
-  const limits = {
-    free: 4,
-    standard: 10,
-    pro: 20,
-    vip: 20,
-  };
+  const MAX_MEDIA = 100;
+  const MAX_VIDEOS = 10;
 
-  const currentLimit = userProfile?.subscriptionTier ? limits[userProfile.subscriptionTier as keyof typeof limits] || 4 : 4;
-  const isLimitReached = portfolioItems.length >= currentLimit;
+  const currentTotalMedia = portfolioItems.reduce((acc, item) => acc + (item.media?.length || 0), 0);
+  const currentTotalVideos = portfolioItems.reduce((acc, item) => acc + (item.media?.filter(m => m.type === 'video').length || 0), 0);
+
+  const isLimitReached = currentTotalMedia >= MAX_MEDIA;
 
   // Percentage for progress bar
-  const usagePercentage = Math.min(100, (portfolioItems.length / currentLimit) * 100);
+  const usagePercentage = Math.min(100, (currentTotalMedia / MAX_MEDIA) * 100);
 
   const handlePortfolioFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
 
     setFileError(null);
 
-    // Auto-detect media type from file MIME type
-    const isVideo = file.type.startsWith('video/');
-    const isImage = file.type.startsWith('image/');
+    const newFiles: File[] = [];
+    const newPreviews: { url: string, type: 'image' | 'video' }[] = [];
+    let videoCount = currentTotalVideos + portfolioFiles.filter(f => f.type.startsWith('video/')).length;
 
-    if (!isImage && !isVideo) {
-      setFileError("Por favor, selecione uma imagem ou vídeo.");
+    // Ignore existing items size in total calculation if editing
+    const totalMediaConsidered = editingItemId
+      ? currentTotalMedia - existingMedia.length
+      : currentTotalMedia;
+
+    if (totalMediaConsidered + existingMedia.length + portfolioFiles.length + files.length > MAX_MEDIA) {
+      setFileError(`Você só pode ter no máximo ${MAX_MEDIA} arquivos ao todo no seu portfólio.`);
       return;
     }
 
-    // Validate based on detected type
-    if (isImage) {
-      if (file.size > 15 * 1024 * 1024) {
-        setFileError("Fotos devem ter no máximo 15MB.");
-        return;
+    let hasSkippedImageSize = false;
+    let hasReachedVideoLimit = false;
+    let hasSkippedVideoSize = false;
+    let hasSkippedVideoDuration = false;
+
+    for (const file of files) {
+      const isVideo = file.type.startsWith('video/');
+      const isImage = file.type.startsWith('image/');
+
+      if (!isImage && !isVideo) continue;
+
+      if (isImage) {
+        if (file.size > 15 * 1024 * 1024) {
+          hasSkippedImageSize = true;
+          continue;
+        }
+        newFiles.push(file);
+        newPreviews.push({ url: URL.createObjectURL(file), type: 'image' });
+      } else if (isVideo) {
+        if (videoCount >= MAX_VIDEOS) {
+          hasReachedVideoLimit = true;
+          continue;
+        }
+        if (file.size > 150 * 1024 * 1024) {
+          hasSkippedVideoSize = true;
+          continue;
+        }
+        const duration = await validateVideoDuration(file);
+        if (duration > 90) { // 1m30s
+          hasSkippedVideoDuration = true;
+          continue;
+        }
+        newFiles.push(file);
+        newPreviews.push({ url: URL.createObjectURL(file), type: 'video' });
+        videoCount++;
       }
-      setNewPortfolioItem(prev => ({ ...prev, mediaType: 'image' }));
-    } else if (isVideo) {
-      if (file.size > 150 * 1024 * 1024) {
-        setFileError("Vídeos devem ter no máximo 150MB.");
-        return;
-      }
-      const duration = await validateVideoDuration(file);
-      if (duration > 90) { // 1m30s
-        setFileError("Vídeos devem ter no máximo 1 minuto e 30 segundos.");
-        return;
-      }
-      setNewPortfolioItem(prev => ({ ...prev, mediaType: 'video' }));
     }
 
-    const previewUrl = URL.createObjectURL(file);
-    setPortfolioFile(file);
-    setPortfolioPreview(previewUrl);
+    const errorReasons: string[] = [];
+    if (hasSkippedImageSize) errorReasons.push("algumas fotos possuem mais de 15MB");
+    if (hasSkippedVideoSize) errorReasons.push("alguns vídeos possuem mais de 150MB");
+    if (hasSkippedVideoDuration) errorReasons.push("alguns vídeos têm mais de 1m30s");
+    if (hasReachedVideoLimit) errorReasons.push(`limite de ${MAX_VIDEOS} vídeos por profissional atingido`);
+
+    if (errorReasons.length > 0) {
+      if (hasSkippedImageSize && errorReasons.length === 1) {
+        setFileError("Não foi possível carregar todas as fotos pois algumas possuem mais de 15 megas.");
+      } else {
+        setFileError(`Não foi possível carregar todos os itens pois ${errorReasons.join(", ")}.`);
+      }
+    }
+
+    setPortfolioFiles(prev => [...prev, ...newFiles]);
+    setPortfolioPreviews(prev => [...prev, ...newPreviews]);
   };
 
   const handleAddPortfolioItem = async () => {
-    if (!userProfile?.id || !newPortfolioItem.title || !portfolioFile) {
-      setErrorMsg("Preencha o título e selecione um arquivo.");
+    if (!userProfile?.id || !newPortfolioItem.title || portfolioFiles.length === 0) {
+      setErrorMsg("Preencha o título e selecione pelo menos um arquivo.");
       return;
     }
 
     if (isLimitReached) {
-      setErrorMsg(`Você já atingiu o limite de ${currentLimit} itens no portfólio do seu plano.`);
+      setErrorMsg(`Você já atingiu o limite de ${MAX_MEDIA} itens no portfólio.`);
       return;
     }
 
@@ -179,26 +233,37 @@ export default function PortfolioPage() {
       setErrorMsg("");
       setSuccessMsg("");
 
-      // Upload file to Supabase Storage
-      const mediaUrl = await uploadPortfolioItemImage(portfolioFile, userProfile.id);
+      // Upload files
+      const newMediaList = await Promise.all(
+        portfolioFiles.map(async (file, index) => {
+          const url = await uploadPortfolioItemImage(file, userProfile.id);
+          return { url, type: portfolioPreviews[index].type };
+        })
+      );
 
-      // Create portfolio item
-      await createPortfolioItem({
-        title: newPortfolioItem.title,
-        mediaUrl: mediaUrl,
-        mediaType: newPortfolioItem.mediaType,
-        professionalId: userProfile.id
-      });
+      const finalMediaPayload = [...existingMedia, ...newMediaList];
+
+      if (editingItemId) {
+        // Update portfolio item
+        await updatePortfolioItem(editingItemId, {
+          title: newPortfolioItem.title,
+          media: finalMediaPayload
+        });
+        setSuccessMsg("Álbum atualizado com sucesso!");
+      } else {
+        // Create portfolio item
+        await createPortfolioItem({
+          title: newPortfolioItem.title,
+          media: finalMediaPayload,
+          professionalId: userProfile.id
+        });
+        setSuccessMsg("Item adicionado ao portfólio!");
+      }
 
       await loadPortfolio();
 
       // Reset form
-      setNewPortfolioItem({ title: "", mediaUrl: "", mediaType: "image" });
-      setPortfolioFile(null);
-      setPortfolioPreview(null);
-      setFileError(null);
-
-      setSuccessMsg("Item adicionado ao portfólio!");
+      cancelEdit();
       setTimeout(() => setSuccessMsg(""), 5000);
     } catch (err: any) {
       console.error("Error adding portfolio item:", err);
@@ -224,6 +289,11 @@ export default function PortfolioPage() {
       setLoadingPortfolio(true);
       await deletePortfolioItem(itemToDelete);
       await loadPortfolio();
+
+      if (itemToDelete === editingItemId) {
+        cancelEdit();
+      }
+
       setSuccessMsg("Item excluído com sucesso.");
       setTimeout(() => setSuccessMsg(""), 5000);
     } catch (err) {
@@ -231,6 +301,72 @@ export default function PortfolioPage() {
     } finally {
       setLoadingPortfolio(false);
       setItemToDelete(null);
+    }
+  };
+
+  const handleAppendPhotos = (item: PortfolioItem) => {
+    setEditingItemId(item.id);
+    setExistingMedia(item.media || []);
+    setNewPortfolioItem({ title: item.title });
+    setPortfolioFiles([]);
+    setPortfolioPreviews([]);
+    setFileError(null);
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    // Auto-scroll to form top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Open file dialog automatically if needed
+    const fileInput = document.getElementById("file-upload") as HTMLInputElement;
+    if (fileInput) {
+      fileInput.click();
+    }
+  };
+
+  const cancelEdit = () => {
+    setEditingItemId(null);
+    setExistingMedia([]);
+    setNewPortfolioItem({ title: "" });
+    setPortfolioFiles([]);
+    setPortfolioPreviews([]);
+    setFileError(null);
+  };
+
+  const openEditAlbumModal = (item: PortfolioItem) => {
+    setAlbumToEdit(item);
+    setMediaToDelete([]);
+    setEditAlbumModalOpen(true);
+  };
+
+  const toggleMediaDeletion = (url: string) => {
+    setMediaToDelete(prev =>
+      prev.includes(url) ? prev.filter(u => u !== url) : [...prev, url]
+    );
+  };
+
+  const handleSaveAlbumEdit = async () => {
+    if (!albumToEdit) return;
+    try {
+      setIsSavingEdit(true);
+
+      const finalMedia = albumToEdit.media?.filter(m => !mediaToDelete.includes(m.url)) || [];
+
+      await updatePortfolioItem(albumToEdit.id, {
+        title: albumToEdit.title,
+        media: finalMedia
+      });
+
+      await loadPortfolio();
+      setSuccessMsg("Álbum atualizado com sucesso.");
+      setTimeout(() => setSuccessMsg(""), 5000);
+      setEditAlbumModalOpen(false);
+    } catch (err) {
+      setErrorMsg("Erro ao atualizar álbum.");
+    } finally {
+      setIsSavingEdit(false);
+      setAlbumToEdit(null);
+      setMediaToDelete([]);
     }
   };
 
@@ -267,7 +403,7 @@ export default function PortfolioPage() {
                 Meu Portfólio
               </h1>
               <p className="text-muted-foreground text-lg max-w-2xl">
-                Adicione suas melhores fotos e vídeos. Seu plano atual ({userProfile.subscriptionTier || 'Free'}) permite até {currentLimit} itens.
+                Adicione suas melhores fotos e vídeos. Seu portfólio permite até {MAX_MEDIA} arquivos no total.
               </p>
             </div>
           </ScrollReveal>
@@ -310,7 +446,7 @@ export default function PortfolioPage() {
                       Adicionar Novo Item
                     </CardTitle>
                     <CardDescription>
-                      Você pode adicionar até {currentLimit} itens em seu plano atual.
+                      Você pode adicionar até {MAX_MEDIA} arquivos no total.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
@@ -320,7 +456,7 @@ export default function PortfolioPage() {
                         <div className="flex items-center gap-2">
                           <AlertCircle className="h-4 w-4" />
                           <AlertDescription>
-                            Limite de {currentLimit} itens atingido.
+                            Limite de {MAX_MEDIA} itens atingido.
                           </AlertDescription>
                         </div>
                         <Button variant="outline" size="sm" className="w-full mt-1 border-yellow-500/30 text-yellow-600 hover:bg-yellow-500/10" onClick={() => router.push('/precos')}>
@@ -357,19 +493,24 @@ export default function PortfolioPage() {
                           className="hidden"
                           onChange={handlePortfolioFileChange}
                           accept="image/*,video/*"
+                          multiple
                           disabled={loadingPortfolio || isLimitReached}
                         />
                         <label htmlFor="file-upload" className={`cursor-pointer w-full h-full block relative z-10 ${isLimitReached ? "pointer-events-none" : ""}`}>
-                          {portfolioPreview ? (
-                            <div className="relative aspect-video w-full rounded-lg overflow-hidden shadow-sm">
-                              {newPortfolioItem.mediaType === "video" ? (
-                                <video src={portfolioPreview} className="w-full h-full object-cover" controls />
-                              ) : (
-                                <img src={portfolioPreview} alt="Preview" className="w-full h-full object-contain bg-black/5" />
-                              )}
-                              <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 hover:opacity-100 transition-opacity backdrop-blur-[2px]">
+                          {portfolioPreviews.length > 0 ? (
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-2">
+                              {portfolioPreviews.map((preview, idx) => (
+                                <div key={idx} className="relative aspect-square rounded-md overflow-hidden shadow-sm bg-black/5">
+                                  {preview.type === "video" ? (
+                                    <video src={preview.url} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <img src={preview.url} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                                  )}
+                                </div>
+                              ))}
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 hover:opacity-100 transition-opacity backdrop-blur-[2px] rounded-xl">
                                 <p className="text-white font-medium flex items-center gap-2">
-                                  <Upload className="h-4 w-4" /> Alterar arquivo
+                                  <Upload className="h-4 w-4" /> Adicionar / Alterar
                                 </p>
                               </div>
                             </div>
@@ -394,7 +535,7 @@ export default function PortfolioPage() {
                     <Button
                       onClick={handleAddPortfolioItem}
                       className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all"
-                      disabled={loadingPortfolio || !portfolioFile || !newPortfolioItem.title || isLimitReached}
+                      disabled={loadingPortfolio || portfolioFiles.length === 0 || !newPortfolioItem.title || isLimitReached}
                     >
                       {loadingPortfolio ? (
                         <>
@@ -420,7 +561,7 @@ export default function PortfolioPage() {
                   </h2>
                   <div className="flex flex-col items-end">
                     <span className="text-xs font-medium text-muted-foreground bg-secondary px-3 py-1 rounded-full border border-border">
-                      {portfolioItems.length} de {currentLimit} itens usados
+                      {currentTotalMedia} de {MAX_MEDIA} arquivos
                     </span>
                     {/* Progress bar */}
                     <div className="w-32 h-1.5 bg-secondary rounded-full mt-1.5 overflow-hidden">
@@ -452,7 +593,25 @@ export default function PortfolioPage() {
                   {portfolioItems.map((item, index) => (
                     <ScrollReveal key={item.id} delay={0.1 * index}>
                       <Card className="overflow-hidden group border-0 shadow-lg hover:shadow-xl transition-all duration-300 relative bg-card h-full flex flex-col">
-                        <div className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-9 w-9 rounded-full shadow-lg backdrop-blur-md bg-white/90 hover:bg-white text-primary"
+                            onClick={() => openEditAlbumModal(item)}
+                            title="Editar mídias do álbum"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-9 w-9 rounded-full shadow-lg backdrop-blur-md bg-white/90 hover:bg-white text-primary"
+                            onClick={() => handleAppendPhotos(item)}
+                            title="Adicionar fotos a este álbum"
+                          >
+                            <ImagePlus className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="destructive"
                             size="icon"
@@ -465,14 +624,14 @@ export default function PortfolioPage() {
                         </div>
 
                         <div className="aspect-[4/3] relative overflow-hidden bg-black/10">
-                          {item.mediaType === 'video' ? (
+                          {item.media?.[0]?.type === 'video' ? (
                             <video
-                              src={item.mediaUrl || ""}
+                              src={item.media?.[0]?.url || ""}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                             />
                           ) : (
                             <img
-                              src={item.mediaUrl || "/placeholder.svg"}
+                              src={item.media?.[0]?.url || "/placeholder.svg"}
                               alt={item.title}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                             />
@@ -481,8 +640,8 @@ export default function PortfolioPage() {
 
                           <div className="absolute bottom-0 left-0 p-4 w-full">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full text-white/90 backdrop-blur-sm ${item.mediaType === 'video' ? 'bg-blue-500/50' : 'bg-primary/50'}`}>
-                                {item.mediaType === 'video' ? 'Vídeo' : 'Imagem'}
+                              <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full text-white/90 backdrop-blur-sm ${(item.media?.length || 0) > 1 ? 'bg-purple-500/50' : item.media?.[0]?.type === 'video' ? 'bg-blue-500/50' : 'bg-primary/50'}`}>
+                                {(item.media?.length || 0) > 1 ? `Álbum (${item.media?.length})` : item.media?.[0]?.type === 'video' ? 'Vídeo' : 'Imagem'}
                               </span>
                             </div>
                             <h3 className="font-bold text-lg text-white line-clamp-1 drop-shadow-md">{item.title}</h3>
@@ -499,6 +658,60 @@ export default function PortfolioPage() {
       </main>
 
       <Footer />
+
+      <Dialog open={editAlbumModalOpen} onOpenChange={setEditAlbumModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Álbum: {albumToEdit?.title}</DialogTitle>
+            <DialogDescription>
+              Selecione as mídias (fotos ou vídeos) que você deseja EXCLUIR do portfólio. Mídias selecionadas ficarão avermelhadas.
+            </DialogDescription>
+          </DialogHeader>
+
+          {albumToEdit?.media && albumToEdit.media.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-4">
+              {albumToEdit.media.map((mediaItem, idx) => {
+                const isSelected = mediaToDelete.includes(mediaItem.url);
+                return (
+                  <div
+                    key={idx}
+                    className={`relative aspect-square rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${isSelected ? 'border-destructive opacity-80 scale-95' : 'border-transparent hover:border-primary/50'}`}
+                    onClick={() => toggleMediaDeletion(mediaItem.url)}
+                  >
+                    {mediaItem.type === 'video' ? (
+                      <video src={mediaItem.url} className="w-full h-full object-cover" />
+                    ) : (
+                      <img src={mediaItem.url} alt={`Media ${idx}`} className="w-full h-full object-cover" />
+                    )}
+                    {isSelected && (
+                      <div className="absolute inset-0 bg-destructive/20 flex items-center justify-center backdrop-blur-[1px]">
+                        <Trash2 className="w-6 h-6 text-white drop-shadow-md" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="py-8 text-center text-muted-foreground">Este álbum não possui mídias.</p>
+          )}
+
+          <DialogFooter className="mt-6 flex flex-col sm:flex-row sm:justify-between items-center gap-4">
+            <div className="text-sm font-medium text-destructive">
+              {mediaToDelete.length > 0 ? `${mediaToDelete.length} item(s) selecionado(s) para exclusão` : ''}
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button variant="outline" onClick={() => setEditAlbumModalOpen(false)} disabled={isSavingEdit}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={handleSaveAlbumEdit} disabled={mediaToDelete.length === 0 || isSavingEdit}>
+                {isSavingEdit ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                Confirmar Exclusão
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!itemToDelete} onOpenChange={(open) => !open && setItemToDelete(null)}>
         <AlertDialogContent>

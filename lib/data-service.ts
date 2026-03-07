@@ -350,8 +350,7 @@ export async function fetchSpecialties(): Promise<Specialty[]> {
 export interface CreatePortfolioItemData {
   title: string;
   description?: string;
-  mediaUrl: string;
-  mediaType: "image" | "video";
+  media: { url: string; type: "image" | "video" }[];
   professionalId: string;
 }
 
@@ -359,8 +358,7 @@ export interface PortfolioItem {
   id: string;
   title: string;
   description?: string;
-  mediaUrl: string;
-  mediaType: "image" | "video";
+  media: { url: string; type: "image" | "video" }[];
   professionalId: string;
   createdAt: Date;
 }
@@ -379,9 +377,29 @@ export async function createPortfolioItem(data: CreatePortfolioItemData): Promis
   try {
     const response = await apiClient.post("/portfolio", data);
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
     console.error("[data-service] Error creating portfolio item:", error);
+    // Preservar a mensagem de erro do backend caso venha o 'Portfolio limit reached'
+    if (error.response?.data?.message) {
+      throw new Error(error.response.data.message);
+    }
     throw new Error("Erro ao adicionar item ao portfólio");
+  }
+}
+
+export async function updatePortfolioItem(
+  id: string,
+  itemData: Partial<CreatePortfolioItemData>
+): Promise<PortfolioItem> {
+  try {
+    const response = await apiClient.put(`/portfolio/${id}`, itemData);
+    return response.data;
+  } catch (error: any) {
+    console.error("[data-service] Error updating portfolio item:", error);
+    if (error.response?.data?.message) {
+      throw new Error(error.response.data.message);
+    }
+    throw new Error("Erro ao atualizar item do portfólio");
   }
 }
 

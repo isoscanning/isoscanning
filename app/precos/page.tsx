@@ -147,7 +147,7 @@ export default function PricingPage() {
                                 </div>
                                 <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-4">
                                     Escolha o plano ideal para <br />
-                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400">
+                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 dark:from-blue-400 dark:via-indigo-400 dark:to-cyan-400">
                                         escalar sua carreira
                                     </span>
                                 </h1>
@@ -186,7 +186,7 @@ export default function PricingPage() {
                             <div className="max-w-4xl mx-auto mb-20">
                                 <Card className="relative overflow-hidden border-2 border-primary shadow-2xl shadow-primary/20 bg-background/60 backdrop-blur-xl">
                                     <div className="absolute top-0 right-0 p-4">
-                                        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold px-4 py-1 rounded-full shadow-lg animate-pulse">
+                                        <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-sm font-bold px-4 py-1 rounded-full shadow-lg animate-pulse">
                                             Oferta de Lançamento
                                         </div>
                                     </div>
@@ -202,7 +202,7 @@ export default function PricingPage() {
                                             </div>
 
                                             <div className="flex items-baseline gap-2">
-                                                <span className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600">
+                                                <span className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-cyan-600">
                                                     R$ 0,00
                                                 </span>
                                                 <span className="text-xl text-muted-foreground line-through">R$ 99,90</span>
@@ -210,7 +210,7 @@ export default function PricingPage() {
 
                                             <Button
                                                 size="lg"
-                                                className="w-full text-lg h-14 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 shadow-lg shadow-primary/25"
+                                                className="w-full text-lg h-14 bg-gradient-to-r from-primary to-cyan-600 hover:from-primary/90 hover:to-purple-600/90 shadow-lg shadow-primary/25"
                                                 onClick={() => handleSubscribe('vip')}
                                                 disabled={loadingTier === 'vip' || userProfile?.subscriptionTier === 'vip'}
                                             >

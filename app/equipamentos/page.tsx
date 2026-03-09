@@ -162,12 +162,12 @@ export default function EquipamentosPage() {
         {/* Hero Section */}
         <section className="relative py-20 md:py-28 overflow-hidden">
           {/* Gradient Background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-pink-50/50 to-orange-50 dark:from-purple-950/30 dark:via-pink-950/20 dark:to-orange-950/30" />
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50/50 to-cyan-50 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-cyan-950/30" />
 
           {/* Animated gradient orbs */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute top-0 right-1/4 w-96 h-96 bg-purple-400/20 dark:bg-purple-500/10 rounded-full blur-3xl" />
-            <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-pink-400/20 dark:bg-pink-500/10 rounded-full blur-3xl" />
+            <div className="absolute top-0 right-1/4 w-96 h-96 bg-blue-400/20 dark:bg-blue-500/10 rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-cyan-400/20 dark:bg-cyan-500/10 rounded-full blur-3xl" />
           </div>
 
           <div className="container mx-auto px-4 max-w-5xl relative z-10">
@@ -180,7 +180,7 @@ export default function EquipamentosPage() {
 
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-tight mb-6">
                   <span className="text-foreground">Equipamentos </span>
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-600 to-orange-600 dark:from-purple-400 dark:via-pink-400 dark:to-orange-400">
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 dark:from-blue-400 dark:via-indigo-400 dark:to-cyan-400">
                     profissionais
                   </span>
                   <br />
@@ -498,7 +498,7 @@ export default function EquipamentosPage() {
         </section>
 
         {/* CTA Section */}
-        <section className="py-20 bg-gradient-to-r from-purple-600 via-pink-600 to-orange-600 dark:from-purple-700 dark:via-pink-700 dark:to-orange-700">
+        <section className="py-20 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 dark:from-blue-700 dark:via-indigo-700 dark:to-cyan-700">
           <div className="container mx-auto px-4">
             <ScrollReveal>
               <div className="max-w-3xl mx-auto text-center text-white">

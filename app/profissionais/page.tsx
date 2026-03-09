@@ -52,7 +52,7 @@ export default function ProfissionaisPage() {
 
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-tight mb-6">
                   <span className="text-foreground">Encontre o </span>
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400">
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 dark:from-blue-400 dark:via-indigo-400 dark:to-cyan-400">
                     talento perfeito
                   </span>
                   <br />
@@ -198,7 +198,7 @@ export default function ProfissionaisPage() {
         </section>
 
         {/* --- CTA Section --- */}
-        <section className="py-20 bg-gradient-to-r from-primary via-purple-600 to-pink-600 dark:from-primary/90 dark:via-purple-700 dark:to-pink-700">
+        <section className="py-20 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 dark:from-blue-700 dark:via-indigo-700 dark:to-cyan-700">
           <div className="container mx-auto px-4">
             <ScrollReveal>
               <div className="max-w-3xl mx-auto text-center text-white">

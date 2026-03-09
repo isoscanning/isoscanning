@@ -41,12 +41,12 @@ export default function HomePage() {
               <ScrollReveal delay={0.4}>
                 <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-tight">
                   <span className="text-foreground">Onde a </span>
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400">
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 dark:from-blue-400 dark:via-indigo-400 dark:to-cyan-400">
                     criatividade
                   </span>
                   <br className="hidden sm:block" />
                   <span className="text-foreground"> encontra </span>
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400">
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-cyan-600 dark:from-indigo-400 dark:to-cyan-400">
                     oportunidade
                   </span>
                 </h1>
@@ -199,7 +199,7 @@ export default function HomePage() {
                 </span>
                 <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mt-4 mb-6">
                   Tudo que você precisa.{" "}
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400">
                     Em um só lugar.
                   </span>
                 </h2>
@@ -291,7 +291,7 @@ export default function HomePage() {
                   </span>
                   <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight">
                     Mostre seu talento.{" "}
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-400 dark:to-pink-400">
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-cyan-600 dark:from-indigo-400 dark:to-cyan-400">
                       Conquiste clientes.
                     </span>
                   </h2>
@@ -449,7 +449,7 @@ export default function HomePage() {
         </section>
 
         {/* ===== LAUNCH CTA SECTION ===== */}
-        <section className="py-20 md:py-24 bg-gradient-to-r from-primary via-purple-600 to-pink-600 dark:from-primary dark:via-purple-700 dark:to-pink-700 relative overflow-hidden">
+        <section className="py-20 md:py-24 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 dark:from-blue-700 dark:via-indigo-700 dark:to-cyan-700 relative overflow-hidden">
           <div className="absolute inset-0 bg-white/5 mix-blend-overlay"></div>
           <div className="container mx-auto px-4 relative z-10">
             <div className="max-w-4xl mx-auto text-center text-white space-y-8">
@@ -554,7 +554,7 @@ export default function HomePage() {
 
         {/* ===== FINAL CTA ===== */}
         <section className="py-24 md:py-32 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary via-purple-600 to-pink-600 dark:from-primary/90 dark:via-purple-700 dark:to-pink-700" />
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-600 dark:from-blue-700 dark:via-indigo-700 dark:to-cyan-700" />
           <FloatingParticles count={25} />
 
           <div className="container mx-auto px-4 relative z-10">

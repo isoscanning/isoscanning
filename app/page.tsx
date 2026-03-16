@@ -506,22 +506,22 @@ export default function HomePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
               {[
                 {
-                  quote: "Encontrei o fotógrafo perfeito para meu casamento em menos de uma hora. Recomendo demais!",
-                  name: "Mariana Silva",
-                  role: "Noiva",
-                  avatar: "M",
-                },
-                {
                   quote: "Como fotógrafo, minha visibilidade aumentou muito. Já fechei 5 contratos pela plataforma.",
-                  name: "Lucas Mendes",
+                  name: "Anderson Larcher Franco",
                   role: "Fotógrafo",
-                  avatar: "L",
+                  avatar: "/testimonials/anderson_larcher_franco.jpg",
                 },
                 {
-                  quote: "O marketplace de equipamentos me salvou! Aluguei uma lente profissional por um preço justo.",
-                  name: "Ana Costa",
-                  role: "Videomaker",
-                  avatar: "A",
+                  quote: "A plataforma me ajudou a encontrar os melhores profissionais para criar conteúdo audiovisual para os meus clientes.",
+                  name: "Sophia Lima",
+                  role: "Social Media",
+                  avatar: "https://lh3.googleusercontent.com/a/ACg8ocKA830QyjWL8_NFaZx4Zp0iZ8OFypHFz2iEw8t2LZKgN6MhOIbFEA=s96-c",
+                },
+                {
+                  quote: "Como fotógrafo, consegui alugar os equipamentos que faltavam para um grande ensaio por um preço excelente.",
+                  name: "Gutemberg Silva",
+                  role: "Fotógrafo",
+                  avatar: "https://lh3.googleusercontent.com/a/ACg8ocLwBB-pvML3a6yiJh-HnB_V4fQF22Q26YZugESkqIF2PDc4Jz88=s96-c",
                 },
               ].map((testimonial, i) => (
                 <ScrollReveal key={i} delay={i * 0.15}>
@@ -536,8 +536,12 @@ export default function HomePage() {
                         "{testimonial.quote}"
                       </p>
                       <div className="flex items-center gap-3 pt-4 border-t">
-                        <div className="h-12 w-12 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-white font-bold text-lg">
-                          {testimonial.avatar}
+                        <div className="h-12 w-12 shrink-0 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-white font-bold text-lg overflow-hidden">
+                          {testimonial.avatar.length > 2 ? (
+                            <img src={testimonial.avatar} alt={testimonial.name} className="w-full h-full object-cover" />
+                          ) : (
+                            testimonial.avatar
+                          )}
                         </div>
                         <div>
                           <p className="font-semibold">{testimonial.name}</p>

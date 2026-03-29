@@ -23,7 +23,8 @@ import {
   Camera,
   Layers,
   ImagePlus,
-  Pencil
+  Pencil,
+  X
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -80,6 +81,7 @@ export default function PortfolioPage() {
   const [fileError, setFileError] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
 
   // Album Edit Modal State
   const [editAlbumModalOpen, setEditAlbumModalOpen] = useState(false);
@@ -141,8 +143,7 @@ export default function PortfolioPage() {
   // Percentage for progress bar
   const usagePercentage = Math.min(100, (currentTotalMedia / MAX_MEDIA) * 100);
 
-  const handlePortfolioFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+  const processFiles = async (files: File[]) => {
     if (!files.length) return;
 
     setFileError(null);
@@ -215,6 +216,41 @@ export default function PortfolioPage() {
 
     setPortfolioFiles(prev => [...prev, ...newFiles]);
     setPortfolioPreviews(prev => [...prev, ...newPreviews]);
+  };
+
+  const handlePortfolioFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    await processFiles(files);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isLimitReached && !loadingPortfolio) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (isLimitReached || loadingPortfolio) return;
+    const files = Array.from(e.dataTransfer.files || []);
+    await processFiles(files);
+  };
+
+  const handleRemoveMedia = (index: number) => {
+    setPortfolioFiles(prev => prev.filter((_, i) => i !== index));
+    setPortfolioPreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleAddPortfolioItem = async () => {
@@ -380,7 +416,25 @@ export default function PortfolioPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background relative overflow-hidden">
+    <div 
+      className="min-h-screen flex flex-col bg-background relative overflow-hidden"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDragging && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm pointer-events-none">
+          <div className="bg-background p-10 rounded-3xl shadow-2xl flex flex-col items-center gap-6 animate-in fade-in zoom-in duration-300 border-2 border-primary/50">
+            <div className="h-24 w-24 rounded-full bg-primary/20 flex items-center justify-center animate-bounce shadow-[0_0_30px_rgba(var(--primary),0.3)]">
+              <Upload className="h-12 w-12 text-primary" />
+            </div>
+            <div className="text-center space-y-2">
+              <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-500">Solte as imagens</h2>
+              <p className="text-xl text-muted-foreground">para carregar elas no portfólio</p>
+            </div>
+          </div>
+        </div>
+      )}
       <Header />
 
       {/* Background Effects */}
@@ -498,19 +552,31 @@ export default function PortfolioPage() {
                         />
                         <label htmlFor="file-upload" className={`cursor-pointer w-full h-full block relative z-10 ${isLimitReached ? "pointer-events-none" : ""}`}>
                           {portfolioPreviews.length > 0 ? (
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-2">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-2 relative z-20">
                               {portfolioPreviews.map((preview, idx) => (
-                                <div key={idx} className="relative aspect-square rounded-md overflow-hidden shadow-sm bg-black/5">
+                                <div key={idx} className="relative aspect-square rounded-md overflow-hidden shadow-sm bg-black/5 group/preview">
                                   {preview.type === "video" ? (
                                     <video src={preview.url} className="w-full h-full object-cover" />
                                   ) : (
                                     <img src={preview.url} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
                                   )}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleRemoveMedia(idx);
+                                    }}
+                                    className="absolute top-1.5 right-1.5 bg-black/60 hover:bg-black/90 text-white rounded-full p-1.5 opacity-0 group-hover/preview:opacity-100 transition-opacity z-30"
+                                    title="Remover"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
                                 </div>
                               ))}
-                              <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 hover:opacity-100 transition-opacity backdrop-blur-[2px] rounded-xl">
-                                <p className="text-white font-medium flex items-center gap-2">
-                                  <Upload className="h-4 w-4" /> Adicionar / Alterar
+                              <div className="absolute inset-x-0 bottom-0 p-3 flex justify-center pointer-events-none opacity-0 hover:opacity-100 group-hover/upload:opacity-100 transition-opacity bg-gradient-to-t from-black/60 to-transparent rounded-b-xl z-10">
+                                <p className="text-white font-medium flex items-center gap-2 drop-shadow-md">
+                                  <Upload className="h-4 w-4" /> Adicionar mais
                                 </p>
                               </div>
                             </div>

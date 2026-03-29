@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { Search, MapPin, Filter, X, Package, Camera, Sparkles, ArrowRight, ShoppingBag, Tag, Zap } from "lucide-react"
 import Link from "next/link"
 import { fetchEquipments } from "@/lib/data-service"
+import { ParticleBackground } from "@/components/particle-background"
 import { ScrollReveal } from "@/components/scroll-reveal"
 import { CountUp } from "@/components/typing-text"
 import { motion, AnimatePresence } from "framer-motion"
@@ -161,8 +162,8 @@ export default function EquipamentosPage() {
       <main className="flex-1">
         {/* Hero Section */}
         <section className="relative py-20 md:py-28 overflow-hidden">
-          {/* Gradient Background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50/50 to-cyan-50 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-cyan-950/30" />
+          {/* Particle Background */}
+          <ParticleBackground />
 
           {/* Animated gradient orbs */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">

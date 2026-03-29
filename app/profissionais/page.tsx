@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { MapPin, Star, Search, Users, Filter, ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { SearchBar } from "@/components/search-bar";
+import { ParticleBackground } from "@/components/particle-background";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { CountUp } from "@/components/typing-text";
 import { useProfessionals } from "./hooks/use-professionals";
@@ -33,8 +34,8 @@ export default function ProfissionaisPage() {
       <main className="flex-1">
         {/* --- Hero Section --- */}
         <section className="relative py-20 md:py-28 overflow-hidden">
-          {/* Gradient Background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50/50 to-pink-50 dark:from-blue-950/30 dark:via-purple-950/20 dark:to-pink-950/30" />
+          {/* Particle Background */}
+          <ParticleBackground />
 
           {/* Animated gradient orbs */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">

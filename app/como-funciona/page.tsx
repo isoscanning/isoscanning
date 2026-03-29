@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { AuthAwareLink } from "@/components/auth-aware-link";
+import { useAuth } from "@/lib/auth-context";
 import {
   Search,
   Package,
@@ -31,6 +32,9 @@ import { GradientBackground, FloatingParticles } from "@/components/video-backgr
 import { motion } from "framer-motion";
 
 export default function ComoFuncionaPage() {
+  const { userProfile, loading } = useAuth();
+  const isAuthenticated = !!userProfile && !loading;
+
   const steps = [
     {
       step: 1,
@@ -410,11 +414,13 @@ export default function ComoFuncionaPage() {
 
               <ScrollReveal delay={0.2}>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <AuthAwareLink href="/cadastro">
-                    <Button size="lg" className="w-full sm:w-auto px-8 h-12 text-lg rounded-full shadow-xl">
-                      Criar Conta Gratuita
-                    </Button>
-                  </AuthAwareLink>
+                  {!isAuthenticated && (
+                    <AuthAwareLink href="/cadastro">
+                      <Button size="lg" className="w-full sm:w-auto px-8 h-12 text-lg rounded-full shadow-xl">
+                        Criar Conta Gratuita
+                      </Button>
+                    </AuthAwareLink>
+                  )}
                   <Link href="/vagas">
                     <Button size="lg" variant="outline" className="w-full sm:w-auto px-8 h-12 text-lg rounded-full border-2">
                       Ver Vagas Disponíveis

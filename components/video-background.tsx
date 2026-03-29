@@ -72,7 +72,7 @@ export function VideoBackground({
 interface GradientBackgroundProps {
     children?: React.ReactNode
     className?: string
-    variant?: "subtle" | "vibrant" | "dark"
+    variant?: "subtle" | "vibrant" | "dark" | "blue"
 }
 
 export function GradientBackground({
@@ -95,6 +95,11 @@ export function GradientBackground({
       bg-gradient-to-br 
       from-slate-900 via-purple-900/50 to-slate-900
       dark:from-black dark:via-purple-950/30 dark:to-black
+    `,
+        blue: `
+      bg-gradient-to-br 
+      from-blue-700 via-blue-600 to-cyan-600
+      dark:from-blue-950 dark:via-blue-900 dark:to-cyan-900
     `,
     }
 

@@ -317,7 +317,7 @@ export default function PricingPage() {
 
                 {/* Feature Comparison Section could go here for more detail */}
 
-                <GradientBackground variant="vibrant" className="py-20">
+                <GradientBackground variant="blue" className="py-20">
                     <FloatingParticles count={10} />
                     <div className="container mx-auto px-4 text-center">
                         <h2 className="text-3xl font-bold mb-8 text-white">Dúvidas Frequentes</h2>

@@ -24,7 +24,8 @@ import {
   X,
   MessageCircle,
   Plus,
-  BadgeCheck
+  BadgeCheck,
+  Loader2
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -140,6 +141,7 @@ export default function ProfessionalProfilePage() {
   // Lightbox state
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [imageLoading, setImageLoading] = useState(true);
 
   useEffect(() => {
     fetchProfessionalData();
@@ -261,6 +263,7 @@ export default function ProfessionalProfilePage() {
     for (let i = 0; i < itemIndex; i++) {
       globalIndex += portfolio[i].media?.length || 0;
     }
+    setImageLoading(true);
     setLightboxIndex(globalIndex);
     setLightboxOpen(true);
     trackEvent({ action: 'open_lightbox', category: 'Professionals', label: `Item: ${itemIndex}` });
@@ -271,10 +274,12 @@ export default function ProfessionalProfilePage() {
   };
 
   const goToPrevious = () => {
+    setImageLoading(true);
     setLightboxIndex((prev) => (prev === 0 ? flattenedMedia.length - 1 : prev - 1));
   };
 
   const goToNext = () => {
+    setImageLoading(true);
     setLightboxIndex((prev) => (prev === flattenedMedia.length - 1 ? 0 : prev + 1));
   };
 
@@ -738,20 +743,29 @@ export default function ProfessionalProfilePage() {
             className="max-w-[90vw] max-h-[90vh] flex flex-col items-center"
             onClick={(e) => e.stopPropagation()}
           >
-            {flattenedMedia[lightboxIndex].type === 'video' ? (
-              <video
-                src={flattenedMedia[lightboxIndex].url}
-                className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
-                controls
-                autoPlay
-              />
-            ) : (
-              <img
-                src={flattenedMedia[lightboxIndex].url || "/placeholder.svg"}
-                alt={flattenedMedia[lightboxIndex].title}
-                className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
-              />
-            )}
+            <div className="relative flex items-center justify-center max-h-[80vh]">
+              {imageLoading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 rounded-lg backdrop-blur-sm">
+                  <Loader2 className="h-12 w-12 text-white animate-spin drop-shadow-lg" />
+                </div>
+              )}
+              {flattenedMedia[lightboxIndex].type === 'video' ? (
+                <video
+                  src={flattenedMedia[lightboxIndex].url}
+                  className={`max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl transition-opacity duration-300 ${imageLoading ? 'opacity-50' : 'opacity-100'}`}
+                  controls
+                  autoPlay
+                  onLoadedData={() => setImageLoading(false)}
+                />
+              ) : (
+                <img
+                  src={flattenedMedia[lightboxIndex].url || "/placeholder.svg"}
+                  alt={flattenedMedia[lightboxIndex].title}
+                  className={`max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl transition-opacity duration-300 ${imageLoading ? 'opacity-50' : 'opacity-100'}`}
+                  onLoad={() => setImageLoading(false)}
+                />
+              )}
+            </div>
 
             {/* Title and Counter */}
             <div className="mt-4 text-center">

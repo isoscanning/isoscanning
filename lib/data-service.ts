@@ -1,5 +1,6 @@
 import apiClient from "./api-service";
 import { supabase } from "./supabase";
+import imageCompression from "browser-image-compression";
 
 export interface Equipment {
   id: string;
@@ -260,14 +261,28 @@ export async function uploadEquipmentImages(
     }
 
     const uploadPromises = files.map(async (file) => {
-      const fileExt = file.name.split('.').pop();
+      let fileToUpload = file;
+      if (file.type.startsWith('image/')) {
+        try {
+          fileToUpload = await imageCompression(file, {
+            maxSizeMB: 1.5,
+            maxWidthOrHeight: 2048,
+            useWebWorker: true,
+            initialQuality: 0.85,
+          });
+        } catch (err) {
+          console.warn('Image compression failed for equipment, using original', err);
+        }
+      }
+
+      const fileExt = fileToUpload.name.split('.').pop() || 'jpg';
       // Sanitize filename
-      const safeName = file.name.replace(/[^a-zA-Z0-9]/g, '');
+      const safeName = fileToUpload.name.replace(/[^a-zA-Z0-9]/g, '');
       const fileName = `${userId}/${Date.now()}-${safeName}.${fileExt}`;
 
       const { error } = await supabase.storage
         .from('equipments')
-        .upload(fileName, file);
+        .upload(fileName, fileToUpload);
 
       if (error) throw error;
 
@@ -428,13 +443,27 @@ export async function uploadPortfolioItemImage(
       });
     }
 
-    const fileExt = file.name.split('.').pop();
-    const safeName = file.name.replace(/[^a-zA-Z0-9]/g, '');
+    let fileToUpload = file;
+    if (file.type.startsWith('image/')) {
+      try {
+        fileToUpload = await imageCompression(file, {
+          maxSizeMB: 1.5,
+          maxWidthOrHeight: 2048,
+          useWebWorker: true,
+          initialQuality: 0.85,
+        });
+      } catch (err) {
+        console.warn('Image compression failed for portfolio item, using original', err);
+      }
+    }
+
+    const fileExt = fileToUpload.name.split('.').pop() || 'jpg';
+    const safeName = fileToUpload.name.replace(/[^a-zA-Z0-9]/g, '');
     const fileName = `${userId}/${Date.now()}-${safeName}.${fileExt}`;
 
     const { error } = await supabase.storage
       .from('portfolio')
-      .upload(fileName, file);
+      .upload(fileName, fileToUpload);
 
     if (error) throw error;
 

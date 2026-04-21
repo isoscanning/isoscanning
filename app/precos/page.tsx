@@ -113,7 +113,7 @@ export default function PricingPage() {
                 "Publique vagas ILIMITADAS",
                 "Contrapropostas livres",
                 "Equipamentos ILIMITADOS",
-                "Envie até 20 arquivos no portfólio",
+                "Envie até 150 arquivos no portfólio",
                 "Selo de Perfil Verificado",
                 "Destaque máximo nas buscas",
                 "Suporte VIP Prioritário"
@@ -233,7 +233,7 @@ export default function PricingPage() {
                                                     "Visualizações de perfil ILIMITADAS",
                                                     "Publique vagas ILIMITADAS",
                                                     "Contrapropostas livres",
-                                                    "Envie até 20 arquivos no portfólio",
+                                                    "Envie até 150 arquivos no portfólio",
                                                     "Selo de Perfil Verificado",
                                                     "Destaque máximo nas buscas",
                                                     "Suporte VIP Prioritário"

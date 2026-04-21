@@ -132,8 +132,8 @@ export default function PortfolioPage() {
   };
 
   // Limits definition
-  const MAX_MEDIA = 100;
-  const MAX_VIDEOS = 10;
+  const MAX_MEDIA = 150;
+  const MAX_VIDEOS = 20;
 
   const currentTotalMedia = portfolioItems.reduce((acc, item) => acc + (item.media?.length || 0), 0);
   const currentTotalVideos = portfolioItems.reduce((acc, item) => acc + (item.media?.filter(m => m.type === 'video').length || 0), 0);

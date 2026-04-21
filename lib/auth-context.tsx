@@ -315,8 +315,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       console.log("[auth-context] Initiating Google login with Supabase...", options);
 
-      // Use NEXT_PUBLIC_SITE_URL for production, fallback to window.location.origin for dev
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== "undefined" ? window.location.origin : "");
+      // Use window.location.origin as priority to support localhost, previews, and production correctly
+      const siteUrl = typeof window !== "undefined" 
+        ? window.location.origin 
+        : (process.env.NEXT_PUBLIC_SITE_URL || "");
 
       // Force sign out before starting new login to ensure clean state
       // await supabase.auth.signOut(); // Commented out as it might be breaking PKCE flow

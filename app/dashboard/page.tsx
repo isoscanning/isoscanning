@@ -24,7 +24,8 @@ import {
   ArrowRight,
   UserPlus,
   Briefcase,
-  BadgeCheck
+  BadgeCheck,
+  PieChart
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
@@ -367,6 +368,31 @@ export default function DashboardPage() {
                 </Link>
               </ScrollReveal>
               {/* END: Profile Card */}
+
+              {/* START: Finances Card (Only Professional) */}
+              {isProfessional && (
+                <ScrollReveal delay={0.55}>
+                  <Link href="/dashboard/financeiro" className="block h-full group" id="quick-finances">
+                    <Card className="h-full border-border hover:border-emerald-500/50 transition-all duration-300 hover:shadow-lg bg-card">
+                      <CardHeader>
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                          <PieChart className="h-6 w-6" />
+                        </div>
+                        <CardTitle className="group-hover:text-emerald-500 transition-colors">Gestão Financeira</CardTitle>
+                        <CardDescription>
+                          Acompanhe seu faturamento, cadastre trabalhos e controle notas fiscais.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex justify-end">
+                        <div className="w-8 h-8 rounded-full bg-background border flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white group-hover:border-emerald-500 transition-colors">
+                          <ArrowRight className="h-4 w-4" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </ScrollReveal>
+              )}
+              {/* END: Finances Card */}
 
               {/* START: Agenda Card */}
               <ScrollReveal delay={0.65}>

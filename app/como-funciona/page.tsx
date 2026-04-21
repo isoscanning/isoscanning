@@ -23,7 +23,9 @@ import {
   ThumbsDown,
   Camera,
   Video,
-  PenTool
+  PenTool,
+  DollarSign,
+  AlertCircle
 } from "lucide-react";
 import { ParticleBackground } from "@/components/particle-background";
 import { ScrollReveal, StaggerReveal } from "@/components/scroll-reveal";
@@ -396,6 +398,121 @@ export default function ComoFuncionaPage() {
               </div>
             </div>
           </GradientBackground>
+
+          {/* Feature 4: Financial Management */}
+          <div className="py-24 overflow-hidden border-t bg-background">
+            <div className="container mx-auto px-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                <ScrollReveal direction="left" className="order-2 lg:order-1">
+                  <div className="relative rounded-2xl border border-muted-foreground/20 bg-card shadow-2xl overflow-hidden p-6 lg:p-8 transform -rotate-1 hover:rotate-0 transition-transform duration-500">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-3xl rounded-full" />
+                    <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-teal-500/5 blur-3xl rounded-full" />
+                    
+                    <div className="relative z-10 space-y-6 select-none pointer-events-none">
+                      {/* Header */}
+                      <div className="flex justify-between items-center border-b border-muted pb-4">
+                          <div>
+                              <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">Painel Financeiro</h3>
+                              <p className="text-xs text-muted-foreground mt-0.5">Gestão Inteligente</p>
+                          </div>
+                      </div>
+                      
+                      {/* Top Stats */}
+                      <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-background/80 backdrop-blur rounded-xl p-4 border border-emerald-500/10 shadow-sm">
+                              <p className="text-xs font-medium text-emerald-400 mb-1">Total Entradas</p>
+                              <h4 className="text-2xl font-bold tracking-tight">R$ 5.320,00</h4>
+                          </div>
+                          <div className="bg-background/80 backdrop-blur rounded-xl p-4 border border-amber-500/10 shadow-sm">
+                              <p className="text-xs font-medium text-amber-500 mb-1">Próximos Dias</p>
+                              <h4 className="text-2xl font-bold tracking-tight">R$ 1.550,00</h4>
+                          </div>
+                      </div>
+                      
+                      {/* MEI Limit */}
+                      <div className="bg-gradient-to-br from-emerald-950/40 to-teal-950/40 rounded-xl p-5 border border-emerald-500/20 relative overflow-hidden shadow-inner">
+                          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-5 mix-blend-overlay"></div>
+                          <div className="relative z-10 flex justify-between items-end">
+                              <div>
+                                  <p className="text-xs font-medium text-teal-400 mb-1.5 flex items-center gap-1.5">
+                                      <AlertCircle className="h-3 w-3" />
+                                      Teto MEI (Saldo Anual)
+                                  </p>
+                                  <h4 className="text-2xl font-bold text-white tracking-tight">R$ 68.450,00</h4>
+                              </div>
+                          </div>
+                          <div className="relative z-10 w-full bg-black/60 rounded-full h-2 mt-5 overflow-hidden shadow-inner border border-white/5">
+                              <div className="bg-gradient-to-r from-teal-500 to-emerald-400 h-full rounded-full w-[15%] relative">
+                                  <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* Lançamentos Mock */}
+                      <div className="space-y-3 pt-2">
+                          <div className="flex justify-between items-center text-[10px] text-muted-foreground uppercase tracking-widest px-1 font-semibold">
+                              <span>Atividade Recente</span>
+                              <span>Valor</span>
+                          </div>
+                          {[
+                              { title: 'Pagamento Serviço A', status: 'Processado', val: 'R$ 2.500,00', color: 'emerald' },
+                              { title: 'Boleto Emissão NF', status: 'Aguardando', val: 'R$ 850,00', color: 'amber' },
+                          ].map((item, i) => (
+                              <div key={i} className="flex justify-between items-center bg-muted/40 rounded-xl p-3 border border-transparent hover:border-muted transition-colors shadow-sm">
+                                  <div className="flex items-center gap-3.5">
+                                      <div className={`h-9 w-9 rounded-full bg-${item.color}-500/10 flex items-center justify-center shrink-0 border border-${item.color}-500/20`}>
+                                          <DollarSign className={`h-4 w-4 text-${item.color}-500`} />
+                                      </div>
+                                      <div>
+                                          <p className="text-sm font-semibold text-foreground/90">{item.title}</p>
+                                          <p className={`text-[10px] font-medium text-${item.color}-500 uppercase tracking-wider mt-0.5`}>{item.status}</p>
+                                      </div>
+                                  </div>
+                                  <span className="text-sm font-bold tracking-tight">{item.val}</span>
+                              </div>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+                </ScrollReveal>
+
+                <ScrollReveal direction="right" className="order-1 lg:order-2">
+                  <div className="space-y-6">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-medium">
+                      <DollarSign className="h-4 w-4" /> Gestão Financeira
+                    </div>
+                    <h2 className="text-3xl md:text-5xl font-bold leading-tight">
+                      Administre tudo <span className="text-emerald-600 dark:text-emerald-400">em um só lugar</span>
+                    </h2>
+                    <p className="text-lg text-muted-foreground leading-relaxed">
+                      Sua visão de negócio não para na agenda. Oferecemos um módulo que permite acompanhar cada centavo que entra, facilitando também o controle do limite anual do MEI.
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-background shadow-sm p-2 rounded-lg border border-emerald-500/20">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                        </div>
+                        <div>
+                          <h5 className="font-bold text-sm">Controle Simplificado</h5>
+                          <p className="text-xs text-muted-foreground">Esqueça planilhas isoladas</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="bg-background shadow-sm p-2 rounded-lg border border-emerald-500/20">
+                          <AlertCircle className="w-5 h-5 text-emerald-500" />
+                        </div>
+                        <div>
+                          <h5 className="font-bold text-sm">Teto MEI Integrado</h5>
+                          <p className="text-xs text-muted-foreground">Controle limites tributários</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </ScrollReveal>
+              </div>
+            </div>
+          </div>
 
         </section>
 

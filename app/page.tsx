@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import { AuthAwareLink } from "@/components/auth-aware-link";
-import { Search, Calendar, Package, Users, Star, Zap, Shield, ArrowRight, CheckCircle2, Play, Camera, Video, Image as ImageIcon, SearchX, TrendingDown, Clock } from "lucide-react";
+import { Search, Calendar, Package, Users, Star, Zap, Shield, ArrowRight, CheckCircle2, Play, Camera, Video, Image as ImageIcon, SearchX, TrendingDown, Clock, DollarSign, AlertCircle } from "lucide-react";
 import { ParticleBackground } from "@/components/particle-background";
 import { ScrollReveal, StaggerReveal } from "@/components/scroll-reveal";
 import { TypingText, CountUp, GlowText } from "@/components/typing-text";
@@ -274,6 +274,138 @@ export default function HomePage() {
                     </Link>
                   </CardContent>
                 </Card>
+              </ScrollReveal>
+            </div>
+          </div>
+        </section>
+
+        {/* ===== FINANCIAL MANAGEMENT SECTION ===== */}
+        <section className="py-20 md:py-32 bg-background border-t border-b border-muted">
+          <div className="container mx-auto px-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center max-w-6xl mx-auto">
+              {/* Text Side */}
+              <ScrollReveal direction="left">
+                <div className="space-y-6">
+                  <span className="text-emerald-500 font-semibold text-sm uppercase tracking-wider flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Nova Funcionalidade
+                  </span>
+                  <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight">
+                    Gestão Financeira{" "}
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500">
+                      na palma da mão.
+                    </span>
+                  </h2>
+                  <p className="text-lg text-muted-foreground leading-relaxed">
+                    Diga adeus às planilhas e anotações avulsas. Controle seus ganhos, monitore valores a receber e gerencie o limite anual do seu MEI de forma inteligente.
+                  </p>
+
+                  <ul className="space-y-4 pt-2">
+                    {[
+                      "Dashboard de Receitas e Saldos em tempo real",
+                      "Alerta inteligente do teto anual do MEI",
+                      "Gestão centralizada de Notas Fiscais emitidas",
+                      "Acompanhamento e listagem detalhada de pagamentos",
+                    ].map((item, i) => (
+                      <li key={i} className="flex items-center gap-3">
+                        <div className="h-6 w-6 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        </div>
+                        <span className="text-foreground font-medium">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="pt-6">
+                    <AuthAwareLink href="/cadastro?tipo=profissional" authenticatedHref="/dashboard/financeiro">
+                      <Button size="lg" className="h-14 px-8 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20 hover:shadow-xl transition-all duration-300">
+                        Começar a Controlar Custo Zero
+                        <ArrowRight className="ml-2 h-5 w-5" />
+                      </Button>
+                    </AuthAwareLink>
+                  </div>
+                </div>
+              </ScrollReveal>
+
+              {/* Mockup Side */}
+              <ScrollReveal direction="right" delay={0.2}>
+                <div className="relative rounded-2xl border border-muted-foreground/20 bg-card shadow-2xl overflow-hidden p-6 lg:p-8 transform rotate-1 hover:rotate-0 transition-transform duration-500">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-3xl rounded-full" />
+                  <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-teal-500/5 blur-3xl rounded-full" />
+                  
+                  <div className="relative z-10 space-y-6 select-none pointer-events-none">
+                    {/* Header */}
+                    <div className="flex justify-between items-center border-b border-muted pb-4">
+                        <div>
+                            <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">Gestão Financeira</h3>
+                            <p className="text-xs text-muted-foreground mt-0.5">Abril de 2026</p>
+                        </div>
+                        <div className="bg-emerald-500/10 text-emerald-500 text-xs px-3 py-1 rounded-full font-medium border border-emerald-500/20 shadow-sm shadow-emerald-500/10">
+                            Ao Vivo
+                        </div>
+                    </div>
+                    
+                    {/* Top Stats */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-background/80 backdrop-blur rounded-xl p-4 border border-emerald-500/10 shadow-sm">
+                            <p className="text-xs font-medium text-emerald-400 mb-1">Receita no Mês</p>
+                            <h4 className="text-2xl font-bold tracking-tight">R$ 5.320,00</h4>
+                        </div>
+                        <div className="bg-background/80 backdrop-blur rounded-xl p-4 border border-amber-500/10 shadow-sm">
+                            <p className="text-xs font-medium text-amber-500 mb-1">A Receber</p>
+                            <h4 className="text-2xl font-bold tracking-tight">R$ 1.550,00</h4>
+                        </div>
+                    </div>
+                    
+                    {/* MEI Limit */}
+                    <div className="bg-gradient-to-br from-emerald-950/40 to-teal-950/40 rounded-xl p-5 border border-emerald-500/20 relative overflow-hidden shadow-inner">
+                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-5 mix-blend-overlay"></div>
+                        <div className="relative z-10 flex justify-between items-end">
+                            <div>
+                                <p className="text-xs font-medium text-teal-400 mb-1.5 flex items-center gap-1.5">
+                                    <AlertCircle className="h-3 w-3" />
+                                    Saldo Restante Teto MEI
+                                </p>
+                                <h4 className="text-2xl font-bold text-white tracking-tight">R$ 68.450,00</h4>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Teto Anual</p>
+                                <p className="text-sm font-semibold text-white/90">R$ 81.000</p>
+                            </div>
+                        </div>
+                        <div className="relative z-10 w-full bg-black/60 rounded-full h-2 mt-5 overflow-hidden shadow-inner border border-white/5">
+                            <div className="bg-gradient-to-r from-teal-500 to-emerald-400 h-full rounded-full w-[15%] relative">
+                                <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Lançamentos Mock */}
+                    <div className="space-y-3 pt-2">
+                        <div className="flex justify-between items-center text-[10px] text-muted-foreground uppercase tracking-widest px-1 font-semibold">
+                            <span>Principais Recebíveis</span>
+                            <span>Valor</span>
+                        </div>
+                        {[
+                            { title: 'Casamento Cliente VIP', status: 'Recebido', val: 'R$ 2.500,00', color: 'emerald' },
+                            { title: 'Ensaio Externo Corporativo', status: 'Pendente', val: 'R$ 850,00', color: 'amber' },
+                        ].map((item, i) => (
+                            <div key={i} className="flex justify-between items-center bg-muted/40 rounded-xl p-3 border border-transparent hover:border-muted transition-colors shadow-sm">
+                                <div className="flex items-center gap-3.5">
+                                    <div className={`h-9 w-9 rounded-full bg-${item.color}-500/10 flex items-center justify-center shrink-0 border border-${item.color}-500/20`}>
+                                        <DollarSign className={`h-4 w-4 text-${item.color}-500`} />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-semibold text-foreground/90">{item.title}</p>
+                                        <p className={`text-[10px] font-medium text-${item.color}-500 uppercase tracking-wider mt-0.5`}>{item.status}</p>
+                                    </div>
+                                </div>
+                                <span className="text-sm font-bold tracking-tight">{item.val}</span>
+                            </div>
+                        ))}
+                    </div>
+                  </div>
+                </div>
               </ScrollReveal>
             </div>
           </div>

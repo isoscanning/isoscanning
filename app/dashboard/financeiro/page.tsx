@@ -7,8 +7,8 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Plus, DollarSign, WalletCards, AlertCircle, Calendar, Pencil } from "lucide-react";
-import { fetchFinancialRecords, fetchFinancialSummary, fetchAnnualSummary, FinancialRecord, FinancialSummary, AnnualSummary } from "@/lib/finances-service";
+import { FileText, Plus, DollarSign, WalletCards, AlertCircle, Calendar, Pencil, Trash2 } from "lucide-react";
+import { fetchFinancialRecords, fetchFinancialSummary, fetchAnnualSummary, deleteFinancialRecord, FinancialRecord, FinancialSummary, AnnualSummary } from "@/lib/finances-service";
 import { useToast } from "@/components/ui/use-toast";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { FinanceModal } from "./components/finance-modal";
@@ -78,6 +78,27 @@ export default function FinancesDashboardPage() {
     const handleSaveRecord = (savedRecord: FinancialRecord) => {
         // Reload data to ensure summary updates correctly
         loadData();
+    };
+
+    const handleDeleteRecord = async (id: string) => {
+        if (!window.confirm("Certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita.")) {
+            return;
+        }
+        try {
+            await deleteFinancialRecord(id);
+            toast({
+                title: "Lançamento excluído",
+                description: "O registro foi apagado com sucesso.",
+            });
+            loadData();
+        } catch (error) {
+            console.error("Erro ao excluir lançamento:", error);
+            toast({
+                variant: "destructive",
+                title: "Erro",
+                description: "Não foi possível excluir o lançamento.",
+            });
+        }
     };
 
     if (loading || isLoadingData) {
@@ -331,7 +352,7 @@ export default function FinancesDashboardPage() {
                                                     <td className="px-4 py-3 text-right font-medium">
                                                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(r.amount)}
                                                     </td>
-                                                    <td className="px-2 py-3 text-right print:hidden">
+                                                    <td className="px-2 py-3 text-right print:hidden flex items-center justify-end gap-1">
                                                         <Button 
                                                             variant="ghost" 
                                                             size="icon" 
@@ -340,6 +361,15 @@ export default function FinancesDashboardPage() {
                                                             className="h-8 w-8 text-muted-foreground hover:text-emerald-600"
                                                         >
                                                             <Pencil className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            onClick={() => handleDeleteRecord(r.id)}
+                                                            title="Excluir"
+                                                            className="h-8 w-8 text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
                                                         </Button>
                                                     </td>
                                                 </tr>

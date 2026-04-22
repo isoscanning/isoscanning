@@ -23,6 +23,7 @@ export default function FinancesDashboardPage() {
     const [summary, setSummary] = useState<FinancialSummary | null>(null);
     const [annualSummary, setAnnualSummary] = useState<AnnualSummary | null>(null);
     const [isLoadingData, setIsLoadingData] = useState(true);
+    const [taxRegime, setTaxRegime] = useState<'MEI' | 'SIMPLES'>('MEI');
     
     // Modal states
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -139,49 +140,128 @@ export default function FinancesDashboardPage() {
 
                     {/* Annual Summary Highlights */}
                     {annualSummary && (
-                        <ScrollReveal delay={0.05}>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gradient-to-br from-emerald-900/20 to-teal-900/20 border border-emerald-500/20 rounded-2xl p-6 print:hidden shadow-lg shadow-emerald-500/5">
-                                <div>
-                                    <p className="text-sm font-medium text-emerald-400 mb-1">Faturamento Total Bruto ({year})</p>
-                                    <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-teal-400">
-                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(annualSummary.totalAnnualInvoiced)}
-                                    </h2>
-                                    <p className="text-xs text-muted-foreground mt-2">Soma absoluta de todos os valores registrados no ano.</p>
-                                </div>
-                                <div className="border-t md:border-t-0 md:border-l border-emerald-500/20 pt-4 md:pt-0 md:pl-6">
-                                     <div className="flex justify-between items-start">
-                                        <div>
-                                            <p className="text-sm font-medium text-teal-400 mb-1">Saldo Restante Teto MEI</p>
-                                            <h2 className="text-3xl font-bold text-white">
-                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(annualSummary.meiLimitRemaining)}
-                                            </h2>
-                                        </div>
-                                        <div className="text-right flex flex-col items-end">
-                                            <p className="text-xs text-muted-foreground mb-1">Limite Anual</p>
-                                            <span className="bg-emerald-500/10 text-emerald-500 text-xs px-2 py-1 rounded-full font-medium border border-emerald-500/20">
-                                                R$ 81.000,00
-                                            </span>
-                                        </div>
-                                     </div>
-                                     <div className="w-full bg-black/40 rounded-full h-2.5 mt-5 overflow-hidden border border-white/5">
-                                        <div 
-                                            className="bg-gradient-to-r from-teal-500 to-emerald-400 h-full rounded-full transition-all duration-1000 ease-out relative" 
-                                            style={{ width: `${Math.min(100, (annualSummary.meiNfIssuedAmount / 81000) * 100)}%` }}
-                                        >
-                                            <div className="absolute inset-0 bg-white/20 w-full h-full animate-pulse"></div>
-                                        </div>
-                                     </div>
-                                     <div className="flex justify-between items-center mt-2">
-                                         <p className="text-xs font-medium text-emerald-500/80">
-                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(annualSummary.meiNfIssuedAmount)} contabilizado
-                                         </p>
-                                         <p className="text-xs text-muted-foreground">
-                                            {((annualSummary.meiNfIssuedAmount / 81000) * 100).toFixed(1)}% atingido
-                                         </p>
-                                     </div>
+                        <div className="space-y-4 print:hidden">
+                            <div className="flex items-center gap-3 mb-2">
+                                <span className="text-sm font-medium text-muted-foreground">Regime Tributário:</span>
+                                <div className="flex bg-muted/50 p-1 rounded-full border border-muted">
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={() => setTaxRegime('MEI')}
+                                        className={`rounded-full h-8 px-5 text-sm font-medium transition-all ${taxRegime === 'MEI' ? 'bg-emerald-600 text-white shadow-md hover:bg-emerald-700' : 'text-muted-foreground hover:text-foreground'}`}
+                                    >
+                                        MEI
+                                    </Button>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={() => setTaxRegime('SIMPLES')}
+                                        className={`rounded-full h-8 px-5 text-sm font-medium transition-all ${taxRegime === 'SIMPLES' ? 'bg-indigo-600 text-white shadow-md hover:bg-indigo-700' : 'text-muted-foreground hover:text-foreground'}`}
+                                    >
+                                        Simples Nacional
+                                    </Button>
                                 </div>
                             </div>
-                        </ScrollReveal>
+                            
+                            {taxRegime === 'MEI' ? (
+                                <ScrollReveal delay={0.05}>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gradient-to-br from-emerald-900/20 to-teal-900/20 border border-emerald-500/20 rounded-2xl p-6 shadow-lg shadow-emerald-500/5">
+                                        <div>
+                                            <p className="text-sm font-medium text-emerald-400 mb-1">Faturamento Total Bruto ({year})</p>
+                                            <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-teal-400">
+                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(annualSummary.totalAnnualInvoiced)}
+                                            </h2>
+                                            <p className="text-xs text-muted-foreground mt-2">Soma absoluta de todos os valores registrados no ano.</p>
+                                        </div>
+                                        <div className="border-t md:border-t-0 md:border-l border-emerald-500/20 pt-4 md:pt-0 md:pl-6">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <p className="text-sm font-medium text-teal-400 mb-1">Saldo Restante Teto MEI</p>
+                                                    <h2 className="text-3xl font-bold text-white">
+                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(annualSummary.meiLimitRemaining)}
+                                                    </h2>
+                                                </div>
+                                                <div className="text-right flex flex-col items-end">
+                                                    <p className="text-xs text-muted-foreground mb-1">Limite Anual</p>
+                                                    <span className="bg-emerald-500/10 text-emerald-500 text-xs px-2 py-1 rounded-full font-medium border border-emerald-500/20">
+                                                        R$ 81.000,00
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="w-full bg-black/40 rounded-full h-2.5 mt-5 overflow-hidden border border-white/5">
+                                                <div 
+                                                    className="bg-gradient-to-r from-teal-500 to-emerald-400 h-full rounded-full transition-all duration-1000 ease-out relative" 
+                                                    style={{ width: `${Math.min(100, (annualSummary.meiNfIssuedAmount / 81000) * 100)}%` }}
+                                                >
+                                                    <div className="absolute inset-0 bg-white/20 w-full h-full animate-pulse"></div>
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between items-center mt-2">
+                                                <p className="text-xs font-medium text-emerald-500/80">
+                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(annualSummary.meiNfIssuedAmount)} contabilizado
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {((annualSummary.meiNfIssuedAmount / 81000) * 100).toFixed(1)}% atingido
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </ScrollReveal>
+                            ) : (
+                                <ScrollReveal delay={0.05}>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gradient-to-br from-indigo-900/20 to-blue-900/20 border border-indigo-500/30 rounded-2xl p-6 shadow-lg shadow-indigo-500/5">
+                                        <div>
+                                            <p className="text-sm font-medium text-indigo-400 mb-1">Notas Emitidas (Simples Nacional - {year})</p>
+                                            <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-blue-400">
+                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(annualSummary.meiNfIssuedAmount)}
+                                            </h2>
+                                            <p className="text-xs text-indigo-200/60 mt-2">Valor contabilizado como receita para tributação (NFs emitidas).</p>
+                                            <div className="mt-4 pt-4 border-t border-indigo-500/20">
+                                                <p className="text-xs font-medium text-muted-foreground mb-1">Faturamento Bruto Total do Ano</p>
+                                                <p className="text-sm font-semibold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(annualSummary.totalAnnualInvoiced)}</p>
+                                            </div>
+                                        </div>
+                                        <div className="border-t md:border-t-0 md:border-l border-indigo-500/20 pt-4 md:pt-0 md:pl-6">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <p className="text-sm font-medium text-blue-400 mb-1">Saldo Restante Teto Simples</p>
+                                                    <h2 className="text-3xl font-bold text-white">
+                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(4800000 - annualSummary.meiNfIssuedAmount)}
+                                                    </h2>
+                                                </div>
+                                                <div className="text-right flex flex-col items-end">
+                                                    <p className="text-xs text-indigo-200/60 mb-1">Teto Anual Global</p>
+                                                    <span className="bg-indigo-500/10 text-indigo-400 text-xs px-2 py-1 rounded-full font-medium border border-indigo-500/20">
+                                                        R$ 4.800.000,00
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="w-full bg-black/40 rounded-full h-2.5 mt-5 overflow-hidden border border-white/5">
+                                                <div 
+                                                    className="bg-gradient-to-r from-blue-500 to-indigo-400 h-full rounded-full transition-all duration-1000 ease-out relative" 
+                                                    style={{ width: `${Math.min(100, (annualSummary.meiNfIssuedAmount / 4800000) * 100)}%` }}
+                                                >
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between items-center mt-3">
+                                                <div className="flex flex-col">
+                                                    <p className="text-[11px] font-medium text-indigo-400 uppercase tracking-widest mb-0.5">
+                                                        Imposto Estimado (Anexo III - 6%)
+                                                    </p>
+                                                    <p className="text-lg font-bold text-rose-400 flex items-center gap-1">
+                                                        <DollarSign className="w-4 h-4" />
+                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(annualSummary.meiNfIssuedAmount * 0.06)}
+                                                    </p>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground mt-4">
+                                                    {((annualSummary.meiNfIssuedAmount / 4800000) * 100).toFixed(2)}% atingido
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </ScrollReveal>
+                            )}
+                        </div>
                     )}
 
                     {/* KPI Cards */}

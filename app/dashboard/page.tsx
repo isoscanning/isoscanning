@@ -25,7 +25,8 @@ import {
   UserPlus,
   Briefcase,
   BadgeCheck,
-  PieChart
+  PieChart,
+  Calculator
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
@@ -558,6 +559,29 @@ export default function DashboardPage() {
                 </Link>
               </ScrollReveal>
               {/* END: My Applications Card */}
+
+              {/* START: Budget Calculator Card */}
+              <ScrollReveal delay={1.1}>
+                <Link href="/dashboard/calculadora-orcamento" className="block h-full group" id="quick-budget-calculator">
+                  <Card className="h-full border-border hover:border-amber-500/50 transition-all duration-300 hover:shadow-lg bg-card">
+                    <CardHeader>
+                      <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                        <Calculator className="h-6 w-6" />
+                      </div>
+                      <CardTitle className="group-hover:text-amber-500 transition-colors">Calculadora de Orçamento</CardTitle>
+                      <CardDescription>
+                        Calcule o custo real por trabalho com base na depreciação dos seus equipamentos.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-end">
+                      <div className="w-8 h-8 rounded-full bg-background border flex items-center justify-center group-hover:bg-amber-500 group-hover:text-white group-hover:border-amber-500 transition-colors">
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </ScrollReveal>
+              {/* END: Budget Calculator Card */}
             </div>
           </div>
         </div>

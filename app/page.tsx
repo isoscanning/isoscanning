@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
@@ -467,20 +468,24 @@ export default function HomePage() {
                     <div className="space-y-4">
                       <Card className="overflow-hidden shadow-xl group">
                         <div className="aspect-[4/5] relative">
-                          <img
+                          <Image
                             src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=400&h=500&fit=crop"
                             alt="Fotógrafo profissional"
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            fill
+                            sizes="(max-width: 768px) 50vw, 20vw"
+                            className="object-cover transition-transform duration-500 group-hover:scale-110"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                       </Card>
                       <Card className="overflow-hidden shadow-xl group">
                         <div className="aspect-square relative">
-                          <img
+                          <Image
                             src="https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=400&h=400&fit=crop"
                             alt="Ensaio fotográfico"
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            fill
+                            sizes="(max-width: 768px) 50vw, 20vw"
+                            className="object-cover transition-transform duration-500 group-hover:scale-110"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
@@ -489,10 +494,12 @@ export default function HomePage() {
                     <div className="space-y-4 pt-8">
                       <Card className="overflow-hidden shadow-xl group">
                         <div className="aspect-square relative">
-                          <img
+                          <Image
                             src="https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=400&h=400&fit=crop"
                             alt="Videomaker trabalhando"
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            fill
+                            sizes="(max-width: 768px) 50vw, 20vw"
+                            className="object-cover transition-transform duration-500 group-hover:scale-110"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                           <div className="absolute bottom-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
@@ -503,10 +510,12 @@ export default function HomePage() {
                       </Card>
                       <Card className="overflow-hidden shadow-xl group">
                         <div className="aspect-[4/5] relative">
-                          <img
+                          <Image
                             src="https://images.unsplash.com/photo-1554048612-b6a482bc67e5?w=400&h=500&fit=crop"
                             alt="Casamento fotografia"
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            fill
+                            sizes="(max-width: 768px) 50vw, 20vw"
+                            className="object-cover transition-transform duration-500 group-hover:scale-110"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
@@ -668,9 +677,9 @@ export default function HomePage() {
                         "{testimonial.quote}"
                       </p>
                       <div className="flex items-center gap-3 pt-4 border-t">
-                        <div className="h-12 w-12 shrink-0 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-white font-bold text-lg overflow-hidden">
+                        <div className="h-12 w-12 shrink-0 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-white font-bold text-lg overflow-hidden relative">
                           {testimonial.avatar.length > 2 ? (
-                            <img src={testimonial.avatar} alt={testimonial.name} className="w-full h-full object-cover" />
+                            <Image src={testimonial.avatar} alt={testimonial.name} fill sizes="48px" className="object-cover" />
                           ) : (
                             testimonial.avatar
                           )}

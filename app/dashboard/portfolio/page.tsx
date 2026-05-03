@@ -26,6 +26,7 @@ import {
   Pencil,
   X
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 import {
   AlertDialog,
@@ -406,11 +407,35 @@ export default function PortfolioPage() {
     }
   };
 
-  // Don't render if not authenticated
   if (loading || !userProfile) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 py-12 px-4">
+          <div className="container mx-auto max-w-6xl space-y-8">
+            <div className="space-y-3">
+              <Skeleton className="h-6 w-40 rounded-full" />
+              <Skeleton className="h-10 w-56" />
+              <Skeleton className="h-5 w-96" />
+            </div>
+            <div className="grid gap-8 lg:grid-cols-12 lg:items-start">
+              <div className="lg:col-span-5 space-y-4">
+                <Skeleton className="h-8 w-48" />
+                <Skeleton className="h-40 w-full rounded-xl" />
+                <Skeleton className="h-10 w-full rounded-md" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </div>
+              <div className="lg:col-span-7">
+                <div className="grid grid-cols-2 gap-4">
+                  {[...Array(6)].map((_, i) => (
+                    <Skeleton key={i} className="aspect-square w-full rounded-xl" />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+        <Footer />
       </div>
     );
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/header";
@@ -15,6 +15,7 @@ import {
 } from "@/lib/data-service";
 import { format } from "date-fns";
 import { ArrowLeft, Calendar } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { ScrollReveal } from "@/components/scroll-reveal";
 
@@ -39,6 +40,9 @@ export default function AgendaPage() {
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [deletingBulk, setDeletingBulk] = useState(false);
 
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   useEffect(() => {
     if (!loading && !userProfile) {
       router.push("/login");
@@ -49,7 +53,7 @@ export default function AgendaPage() {
     if (userProfile?.id) {
       loadAvailability();
     }
-  }, [userProfile]);
+  }, [userProfile?.id]);
 
   // Success message timeout management
   useEffect(() => {
@@ -64,12 +68,11 @@ export default function AgendaPage() {
     setLoadingAvailability(true);
     try {
       const slots = await fetchAvailability(userProfile.id);
-      setAvailabilitySlots(slots);
+      if (mountedRef.current) setAvailabilitySlots(slots);
     } catch (error) {
-      console.error("Error loading availability", error);
-      setErrorMsg("Erro ao carregar disponibilidade.");
+      if (mountedRef.current) setErrorMsg("Erro ao carregar disponibilidade.");
     } finally {
-      setLoadingAvailability(false);
+      if (mountedRef.current) setLoadingAvailability(false);
     }
   };
 
@@ -116,7 +119,7 @@ export default function AgendaPage() {
 
     if (e.shiftKey && lastClickedDate) {
       const start = lastClickedDate < day ? lastClickedDate : day;
-      const end = lastClickedDate < day ? day : start === day ? lastClickedDate : day;
+      const end = lastClickedDate < day ? day : lastClickedDate;
 
       const dateRange: Date[] = [];
       const current = new Date(start);
@@ -142,7 +145,7 @@ export default function AgendaPage() {
       );
 
       if (isAlreadySelected) {
-        setSelectedDates(selectedDates.filter(
+        setSelectedDates(prev => prev.filter(
           selected => selected.toDateString() !== day.toDateString()
         ));
       } else {
@@ -205,10 +208,31 @@ export default function AgendaPage() {
   };
 
 
-  if (loading) {
+  if (loading || !userProfile) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 container max-w-5xl mx-auto py-8 px-4">
+          <div className="mb-6 flex items-center gap-4">
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-4 w-80" />
+            </div>
+          </div>
+          <div className="border rounded-xl p-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <Skeleton className="h-72 rounded-xl" />
+              <div className="space-y-3">
+                <Skeleton className="h-6 w-40" />
+                {[...Array(4)].map((_, i) => (
+                  <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                ))}
+              </div>
+            </div>
+          </div>
+        </main>
+        <Footer />
       </div>
     );
   }

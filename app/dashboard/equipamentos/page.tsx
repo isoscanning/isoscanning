@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Edit, Trash2, Package, ImageIcon, MoreHorizontal, Camera, Loader2 } from "lucide-react";
@@ -126,19 +128,34 @@ export default function MeusEquipamentosPage() {
     }
   };
 
-  if (loading || loadingEquipments) {
+  if (loading || loadingEquipments || !userProfile) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground animate-pulse">Carregando seus equipamentos...</p>
-        </div>
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 py-12 px-4">
+          <div className="container mx-auto max-w-6xl space-y-8">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b">
+              <div className="space-y-2">
+                <Skeleton className="h-9 w-56" />
+                <Skeleton className="h-4 w-72" />
+              </div>
+              <Skeleton className="h-10 w-48 rounded-full" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="space-y-3">
+                  <Skeleton className="aspect-[4/3] w-full rounded-xl" />
+                  <Skeleton className="h-5 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                  <Skeleton className="h-4 w-1/3" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </main>
+        <Footer />
       </div>
     );
-  }
-
-  if (!userProfile) {
-    return null;
   }
 
   return (
@@ -197,10 +214,12 @@ export default function MeusEquipamentosPage() {
                     <div className="aspect-[4/3] bg-muted relative overflow-hidden">
                       {equip.imageUrls && equip.imageUrls.length > 0 ? (
                         <>
-                          <img
+                          <Image
                             src={equip.imageUrls[0]}
                             alt={equip.name}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                            fill
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                            className="object-cover group-hover:scale-110 transition-transform duration-700"
                           />
                           {/* Overlay Gradient */}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />

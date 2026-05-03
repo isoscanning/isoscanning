@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Image from "next/image"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { trackEvent } from "@/lib/analytics"
@@ -425,10 +426,12 @@ export default function EquipamentosPage() {
                         {/* Image Area */}
                         <div className="aspect-[4/3] bg-gradient-to-br from-muted to-muted/50 relative overflow-hidden">
                           {equip.imageUrl || (equip.imageUrls && equip.imageUrls.length > 0) ? (
-                            <img
+                            <Image
                               src={equip.imageUrl || equip.imageUrls?.[0] || "/placeholder.svg"}
                               alt={equip.name}
-                              className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700"
+                              fill
+                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                              className="object-cover group-hover:scale-110 transition-transform duration-700"
                             />
                           ) : (
                             <div className="h-full w-full flex items-center justify-center">

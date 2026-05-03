@@ -700,7 +700,7 @@ export default function PerfilPage() {
     // If Shift is pressed and we have a last clicked date
     if (e.shiftKey && lastClickedDate) {
       const start = lastClickedDate < day ? lastClickedDate : day
-      const end = lastClickedDate < day ? day : start === day ? lastClickedDate : day
+      const end = lastClickedDate < day ? day : lastClickedDate
 
       // Generate all dates in range
       const dateRange: Date[] = []
@@ -729,7 +729,7 @@ export default function PerfilPage() {
       )
 
       if (isAlreadySelected) {
-        setSelectedDates(selectedDates.filter(
+        setSelectedDates(prev => prev.filter(
           selected => selected.toDateString() !== day.toDateString()
         ))
       } else {

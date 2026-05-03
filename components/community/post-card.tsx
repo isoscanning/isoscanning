@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -142,10 +143,14 @@ export function PostCard({ post, showCommunity = true }: PostCardProps) {
                 </p>
                 {post.mediaType === 'image' && post.mediaUrl && (
                     <div className="mb-3 rounded-lg overflow-hidden max-h-96 bg-muted flex justify-center">
-                        <img
+                        <Image
                             src={post.mediaUrl}
                             alt={post.title}
-                            className="object-contain max-h-96 w-full"
+                            width={0}
+                            height={0}
+                            sizes="100vw"
+                            className="object-contain w-full"
+                            style={{ height: "auto", maxHeight: "24rem" }}
                         />
                     </div>
                 )}

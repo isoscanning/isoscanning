@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Image from "next/image"
 import { useParams, useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -205,10 +206,12 @@ export default function EquipmentDetailsPage() {
                       transition={{ duration: 0.3 }}
                       className="h-full w-full"
                     >
-                      <img
+                      <Image
                         src={displayImages[currentImageIndex] || "/placeholder.svg"}
                         alt={equipment.name}
-                        className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-700"
+                        fill
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                        className="object-cover group-hover:scale-105 transition-transform duration-700"
                       />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
                         <div className="scale-75 opacity-0 group-hover:opacity-100 group-hover:scale-100 bg-black/60 backdrop-blur-sm text-white px-4 py-2 rounded-full transition-all duration-300 flex items-center gap-2">
@@ -245,10 +248,12 @@ export default function EquipmentDetailsPage() {
                           : "border-transparent hover:border-primary/50 opacity-70 hover:opacity-100"
                           }`}
                       >
-                        <img
+                        <Image
                           src={img || "/placeholder.svg"}
                           alt={`${equipment.name} ${idx + 1}`}
-                          className="h-full w-full object-cover"
+                          fill
+                          sizes="120px"
+                          className="object-cover"
                         />
                       </button>
                     ))}

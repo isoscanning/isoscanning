@@ -10,6 +10,7 @@ import React, {
 import apiClient from "./api-service";
 import { supabase } from "./supabase";
 import { trackEvent } from "./analytics";
+import { tokenManager } from "./token-manager";
 
 /**
  * LocalStorage keys used by auth context:
@@ -92,7 +93,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // CRITICAL: If we are on the auth/callback page, let THAT page handle EVERYTHING.
         // We don't want to race for the session or call the API here.
         if (window.location.pathname === "/auth/callback") {
-          console.log("[auth-context] On callback page, skipping loadProfile...");
           return;
         }
 
@@ -101,14 +101,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const { data: { session } } = await supabase.auth.getSession();
 
         if (session?.access_token) {
-          console.log("[auth-context] Active Supabase session found, syncing tokens...");
-          localStorage.setItem("auth_token", session.access_token);
+          tokenManager.set(session.access_token);
           if (session.refresh_token) {
             localStorage.setItem("refresh_token", session.refresh_token);
           }
         }
 
-        const token = localStorage.getItem("auth_token");
+        const token = tokenManager.get();
 
         if (!token) {
           setLoading(false);
@@ -120,14 +119,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Always fetch fresh data from API when we have a token
         // This ensures we have the most up-to-date profile data
         try {
-          console.log("[auth-context] Token found, fetching profile from API...");
-          // We pass X-Skip-Auth-Redirect to prevent api network interceptor from redirecting to login on 401
           const response = await apiClient.get("/auth/me", {
             headers: { "X-Skip-Auth-Redirect": "true" }
           });
           profile = response.data;
           localStorage.setItem("user_profile", JSON.stringify(response.data));
-          console.log("[auth-context] Profile loaded from API successfully");
         } catch (apiError: any) {
           console.error("[auth-context] Error fetching from API:", apiError);
           if (apiError.response?.data) {
@@ -140,16 +136,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
             // The callback page might be trying to complete the signup, and signing out
             // here would invalidate the session it's trying to use.
             if (typeof window !== "undefined" && window.location.pathname === "/auth/callback") {
-              console.log("[auth-context] Unauthorized on callback page, letting the page handle it...");
               setLoading(false);
               return;
             }
 
-            console.log("[auth-context] Unauthorized session, clearing local and supabase state...");
             await supabase.auth.signOut();
-            localStorage.removeItem("auth_token");
-            localStorage.removeItem("refresh_token");
-            localStorage.removeItem("user_profile");
+            tokenManager.clear();
             setLoading(false);
             return;
           }
@@ -158,7 +150,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
           const savedProfile = localStorage.getItem("user_profile");
           if (savedProfile) {
             profile = JSON.parse(savedProfile);
-            console.log("[auth-context] Using cached profile from localStorage");
           }
         }
 
@@ -192,11 +183,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       } catch (error) {
         console.error("[auth-context] Error loading profile:", error);
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("auth_token");
-          localStorage.removeItem("refresh_token");
-          localStorage.removeItem("user_profile");
-        }
+        tokenManager.clear();
       } finally {
         setLoading(false);
       }
@@ -207,11 +194,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // 2. Setup Real-time Auth Listener
     // This handles auto-refresh when token expires while app is open
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`[auth-context] Auth event: ${event}`);
-
       if (session?.access_token) {
-        // Update local storage with fresh tokens
-        localStorage.setItem("auth_token", session.access_token);
+        tokenManager.set(session.access_token);
         if (session.refresh_token) {
           localStorage.setItem("refresh_token", session.refresh_token);
         }
@@ -222,18 +206,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const isCallbackPage = typeof window !== "undefined" && window.location.pathname === "/auth/callback";
 
         if (isCallbackPage) {
-          console.log("[auth-context] SIGNED_OUT event detected on callback page, ignoring side effects to prevent loops.");
           return;
         }
 
         setUserProfile(null);
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("auth_token");
-          localStorage.removeItem("refresh_token");
-          localStorage.removeItem("user_profile");
-        }
-      } else if (event === 'TOKEN_REFRESHED') {
-        console.log("[auth-context] Token automatically refreshed by Supabase");
+        tokenManager.clear();
       }
     });
 
@@ -244,27 +221,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      console.log("[auth-context] Attempting sign in...");
       const response = await apiClient.post("/auth/login", {
         email,
         password,
       });
 
       if (response.data.accessToken) {
-        if (typeof window !== "undefined") {
-          localStorage.setItem("auth_token", response.data.accessToken);
-          if (response.data.refreshToken) {
-            localStorage.setItem("refresh_token", response.data.refreshToken);
-          }
-          if (response.data.user) {
-            setUserProfile(response.data.user);
-            localStorage.setItem(
-              "user_profile",
-              JSON.stringify(response.data.user)
-            );
-          }
+        tokenManager.set(response.data.accessToken);
+        if (response.data.refreshToken) {
+          localStorage.setItem("refresh_token", response.data.refreshToken);
         }
-        console.log("[auth-context] Sign in successful");
+        if (response.data.user) {
+          setUserProfile(response.data.user);
+          localStorage.setItem("user_profile", JSON.stringify(response.data.user));
+        }
         trackEvent({ action: 'login', category: 'Auth', label: 'Email' });
       }
     } catch (error) {
@@ -279,7 +249,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     userData: Partial<UserProfile>
   ) => {
     try {
-      console.log("[auth-context] Attempting sign up...");
       const response = await apiClient.post("/auth/signup", {
         email,
         password,
@@ -289,20 +258,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
 
       if (response.data.accessToken) {
-        if (typeof window !== "undefined") {
-          localStorage.setItem("auth_token", response.data.accessToken);
-          if (response.data.refreshToken) {
-            localStorage.setItem("refresh_token", response.data.refreshToken);
-          }
-          if (response.data.user) {
-            setUserProfile(response.data.user);
-            localStorage.setItem(
-              "user_profile",
-              JSON.stringify(response.data.user)
-            );
-          }
+        tokenManager.set(response.data.accessToken);
+        if (response.data.refreshToken) {
+          localStorage.setItem("refresh_token", response.data.refreshToken);
         }
-        console.log("[auth-context] Sign up successful");
+        if (response.data.user) {
+          setUserProfile(response.data.user);
+          localStorage.setItem("user_profile", JSON.stringify(response.data.user));
+        }
         trackEvent({ action: 'sign_up', category: 'Auth', label: userData.userType });
       }
     } catch (error) {
@@ -313,8 +276,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signInWithGoogle = async (options?: { queryParams?: { [key: string]: string } }) => {
     try {
-      console.log("[auth-context] Initiating Google login with Supabase...", options);
-
       // Use window.location.origin as priority to support localhost, previews, and production correctly
       const siteUrl = typeof window !== "undefined" 
         ? window.location.origin 
@@ -343,14 +304,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signOut = async () => {
     try {
+      tokenManager.clear();
       if (typeof window !== "undefined") {
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("refresh_token");
         localStorage.removeItem("redirectAfterLogin");
-        localStorage.removeItem("user_profile");
       }
       setUserProfile(null);
-      console.log("[auth-context] Sign out successful");
       trackEvent({ action: 'sign_out', category: 'Auth' });
     } catch (error) {
       console.error("[auth-context] Sign out error:", error);
@@ -360,13 +318,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const resetPassword = async (email: string) => {
     try {
-      console.log("[auth-context] Requesting password reset...");
       await apiClient.post("/auth/reset-password", {
         email,
         redirectUrl: `${typeof window !== "undefined" ? window.location.origin : ""
           }/recuperar-senha`,
       });
-      console.log("[auth-context] Password reset email sent");
     } catch (error) {
       console.error("[auth-context] Password reset error:", error);
       throw error;
@@ -391,7 +347,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         updatedAt: new Date(),
       });
 
-      console.log("[auth-context] Profile updated successfully");
       trackEvent({ action: 'update_profile', category: 'User', label: userProfile.userType });
     } catch (error) {
       console.error("[auth-context] Update profile error:", error);
@@ -404,14 +359,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const { data, error } = await supabase.auth.updateUser(attributes);
       if (error) throw error;
 
-      // If we got a new session/token (e.g. after password change), update localStorage
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.access_token) {
-        localStorage.setItem("auth_token", session.access_token);
-        console.log("[auth-context] auth_token refreshed after user update");
+        tokenManager.set(session.access_token);
       }
-
-      console.log("[auth-context] User auth updated successfully");
     } catch (error) {
       console.error("[auth-context] Update user auth error:", error);
       throw error;
@@ -444,7 +395,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         updatedAt: new Date(),
       }));
 
-      console.log(`[auth-context] Subscription updated to ${tier}`);
     } catch (error) {
       console.error("[auth-context] Update subscription error:", error);
       throw error;

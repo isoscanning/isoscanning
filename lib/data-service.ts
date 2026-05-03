@@ -149,12 +149,10 @@ export interface AppNotification {
  */
 export async function fetchEquipments(): Promise<Equipment[]> {
   try {
-    console.log("[data-service] Fetching equipments from API...");
     const response = await apiClient.get(
       "/equipments?limit=100&availableOnly=true"
     );
     const equipments = response.data.data || response.data;
-    console.log(`[data-service] Found ${equipments.length} equipments`);
     return equipments;
   } catch (error) {
     console.error("[data-service] Error fetching equipments:", error);
@@ -293,10 +291,30 @@ export async function uploadEquipmentImages(
       return publicUrl;
     });
 
-    return await Promise.all(uploadPromises);
+    const results = await Promise.allSettled(uploadPromises);
+    const urls: string[] = [];
+    const failedNames: string[] = [];
+
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        urls.push(result.value);
+      } else {
+        failedNames.push(files[index].name);
+      }
+    });
+
+    if (urls.length === 0) {
+      throw new Error("Nenhuma imagem foi enviada com sucesso");
+    }
+
+    if (failedNames.length > 0) {
+      console.warn(`[data-service] ${failedNames.length} imagem(ns) falharam: ${failedNames.join(", ")}`);
+    }
+
+    return urls;
   } catch (error) {
     console.error("[data-service] Error uploading equipment images:", error);
-    throw new Error("Erro ao fazer upload das imagens");
+    throw error instanceof Error ? error : new Error("Erro ao fazer upload das imagens");
   }
 }
 
@@ -329,12 +347,10 @@ export async function deleteEquipmentImages(
  */
 export async function fetchProfessionals(): Promise<Professional[]> {
   try {
-    console.log("[data-service] Fetching professionals from API...");
     const response = await apiClient.get(
       "/profiles?userType=professional&limit=100"
     );
     const professionals = response.data.data || response.data;
-    console.log(`[data-service] Found ${professionals.length} professionals`);
     return professionals;
   } catch (error) {
     console.error("[data-service] Error fetching professionals:", error);
@@ -344,15 +360,12 @@ export async function fetchProfessionals(): Promise<Professional[]> {
 
 export async function fetchSpecialties(): Promise<Specialty[]> {
   try {
-    console.log("[data-service] Fetching specialties...");
     const response = await apiClient.get("/specialties");
 
     if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-      console.log(`[data-service] Found ${response.data.length} specialties`);
       return response.data;
     }
 
-    console.log("[data-service] No specialties returned from API, using default list");
     return DEFAULT_SPECIALTIES;
   } catch (error) {
     console.error("[data-service] Error fetching specialties:", error);
@@ -959,7 +972,6 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
 
 export const updateJobApplicationStatus = async (applicationId: string, status: 'accepted' | 'rejected', agreedValue?: number): Promise<boolean> => {
   try {
-    console.log(`Updating application ${applicationId} to status ${status} with agreed value ${agreedValue}`);
     const updateData: any = { status };
     if (agreedValue !== undefined) {
       updateData.agreed_value = agreedValue;
@@ -981,7 +993,6 @@ export const updateJobApplicationStatus = async (applicationId: string, status: 
       return false;
     }
 
-    console.log("Application updated successfully:", data);
     return true;
   } catch (error) {
     console.error("Error updating application status:", error);

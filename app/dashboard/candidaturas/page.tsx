@@ -6,6 +6,7 @@ import { fetchUserApplications, type JobApplication } from "@/lib/data-service";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Briefcase, MapPin, Clock, Building2, ChevronRight, Loader2, MessageSquare, DollarSign } from "lucide-react";
@@ -50,12 +51,30 @@ export default function MinhasCandidaturasPage() {
         }
     };
 
-    if (authLoading || loading) {
+    if (authLoading || loading || !userProfile) {
         return (
             <div className="min-h-screen flex flex-col bg-background">
                 <Header />
-                <main className="flex-1 flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <main className="flex-1 container mx-auto px-4 py-8 max-w-5xl">
+                    <div className="flex items-center justify-between mb-8">
+                        <div className="space-y-2">
+                            <Skeleton className="h-9 w-56" />
+                            <Skeleton className="h-4 w-72" />
+                        </div>
+                        <Skeleton className="h-10 w-40 rounded-md" />
+                    </div>
+                    <div className="space-y-4">
+                        {[...Array(4)].map((_, i) => (
+                            <div key={i} className="flex flex-col md:flex-row md:items-center p-6 gap-6 border rounded-lg">
+                                <div className="flex-1 space-y-2">
+                                    <Skeleton className="h-5 w-2/3" />
+                                    <Skeleton className="h-4 w-1/2" />
+                                    <Skeleton className="h-4 w-1/3" />
+                                </div>
+                                <Skeleton className="h-6 w-24 rounded-full" />
+                            </div>
+                        ))}
+                    </div>
                 </main>
                 <Footer />
             </div>

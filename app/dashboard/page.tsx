@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Camera,
   Package,
@@ -160,16 +161,25 @@ export default function DashboardPage() {
     return () => window.removeEventListener("reset-dashboard-tour", handleResetEvent);
   }, [userProfile]);
 
-  if (loading) {
+  if (loading || !userProfile) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 py-12 px-4">
+          <div className="container mx-auto max-w-6xl space-y-8">
+            <Skeleton className="h-48 w-full rounded-2xl" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
+            </div>
+            <Skeleton className="h-8 w-40" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[...Array(9)].map((_, i) => <Skeleton key={i} className="h-40 rounded-xl" />)}
+            </div>
+          </div>
+        </main>
+        <Footer />
       </div>
     );
-  }
-
-  if (!userProfile) {
-    return null;
   }
 
   const isProfessional = userProfile.userType === "professional";

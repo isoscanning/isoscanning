@@ -27,7 +27,8 @@ import {
   Briefcase,
   BadgeCheck,
   PieChart,
-  Calculator
+  Calculator,
+  FileSignature
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
@@ -592,6 +593,29 @@ export default function DashboardPage() {
                 </Link>
               </ScrollReveal>
               {/* END: Budget Calculator Card */}
+
+              {/* START: Contract Management Card */}
+              <ScrollReveal delay={1.2}>
+                <Link href="/dashboard/contratos" className="block h-full group" id="quick-contracts">
+                  <Card className="h-full border-border hover:border-indigo-500/50 transition-all duration-300 hover:shadow-lg bg-card">
+                    <CardHeader>
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                        <FileSignature className="h-6 w-6" />
+                      </div>
+                      <CardTitle className="group-hover:text-indigo-500 transition-colors">Gestão de Contratos</CardTitle>
+                      <CardDescription>
+                        Crie, envie e assine contratos digitais com seus clientes de forma segura e profissional.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-end">
+                      <div className="w-8 h-8 rounded-full bg-background border flex items-center justify-center group-hover:bg-indigo-500 group-hover:text-white group-hover:border-indigo-500 transition-colors">
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </ScrollReveal>
+              {/* END: Contract Management Card */}
             </div>
           </div>
         </div>

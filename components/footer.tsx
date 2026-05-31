@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import { Camera, Mail, Instagram, Linkedin } from "lucide-react";
@@ -5,7 +7,7 @@ import { trackEvent } from "@/lib/analytics";
 
 export function Footer() {
   return (
-    <footer className="border-t bg-muted/50 mt-20 relative z-50">
+    <footer className="border-t bg-muted/50 relative z-50">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}

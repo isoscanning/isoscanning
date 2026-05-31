@@ -80,10 +80,10 @@ export default function PricingPage() {
             icon: Zap
         },
         {
-            name: "Standard",
+            name: "Pro",
             description: "Perfeito para profissionais ativos e demandas regulares",
-            price: 49.90,
-            annualPrice: 39.90,
+            price: 59.90,
+            annualPrice: 47.90,
             features: [
                 "10 candidaturas em vagas por mês",
                 "Até 30 visualizações de perfil por mês",
@@ -97,16 +97,16 @@ export default function PricingPage() {
                 "Candidaturas ilimitadas",
                 "Destaque ouro nas buscas"
             ],
-            cta: "Assinar Standard",
+            cta: "Assinar Pro",
             ctaVariant: "default" as const,
             popular: true,
             icon: Crown
         },
         {
-            name: "Pro",
+            name: "Ultra",
             description: "Sem limites para agências e power users",
-            price: 99.90,
-            annualPrice: 79.90,
+            price: 149.90,
+            annualPrice: 119.90,
             features: [
                 "Candidaturas ILIMITADAS",
                 "Visualizações de perfil ILIMITADAS",
@@ -119,7 +119,7 @@ export default function PricingPage() {
                 "Suporte VIP Prioritário"
             ],
             notIncluded: [],
-            cta: "Ser Profissional Pro",
+            cta: "Ser Profissional Ultra",
             ctaVariant: "outline" as const,
             popular: false,
             icon: Shield
@@ -181,118 +181,64 @@ export default function PricingPage() {
                         </div>
 
 
-                        {/* Launch Plan Section */}
-                        <ScrollReveal>
-                            <div className="max-w-4xl mx-auto mb-20">
-                                <Card className="relative overflow-hidden border-2 border-primary shadow-2xl shadow-primary/20 bg-background/60 backdrop-blur-xl">
-                                    <div className="absolute top-0 right-0 p-4">
-                                        <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-sm font-bold px-4 py-1 rounded-full shadow-lg animate-pulse">
-                                            Oferta de Lançamento
-                                        </div>
-                                    </div>
-                                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 pointer-events-none" />
+                        {/* Removed Launch Plan Section */}
 
-                                    <div className="grid md:grid-cols-2 gap-8 p-8 md:p-12">
-                                        <div className="space-y-6">
-                                            <div>
-                                                <h3 className="text-3xl font-bold mb-2">Plano VIP</h3>
-                                                <p className="text-muted-foreground text-lg">
-                                                    Acesso total a todas as funcionalidades do sistema durante o período de lançamento.
-                                                </p>
-                                            </div>
-
-                                            <div className="flex items-baseline gap-2">
-                                                <span className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-cyan-600">
-                                                    R$ 0,00
-                                                </span>
-                                                <span className="text-xl text-muted-foreground line-through">R$ 99,90</span>
-                                            </div>
-
-                                            <Button
-                                                size="lg"
-                                                className="w-full text-lg h-14 bg-gradient-to-r from-primary to-cyan-600 hover:from-primary/90 hover:to-purple-600/90 shadow-lg shadow-primary/25"
-                                                onClick={() => handleSubscribe('vip')}
-                                                disabled={loadingTier === 'vip' || userProfile?.subscriptionTier === 'vip'}
-                                            >
-                                                {loadingTier === 'vip' && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                                                {userProfile?.subscriptionTier === 'vip' ? "Plano Atual Ativo" : "Garantir Acesso Completo Grátis"}
-                                            </Button>
-
-                                            <p className="text-center text-sm text-muted-foreground">
-                                                *Válido por tempo limitado. Cancele quando quiser.
-                                            </p>
-                                        </div>
-
-                                        <div className="space-y-4">
-                                            <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
-                                                Tudo que você precisa:
-                                            </div>
-                                            <div className="grid gap-3">
-                                                {[
-                                                    "Candidaturas ILIMITADAS",
-                                                    "Visualizações de perfil ILIMITADAS",
-                                                    "Publique vagas ILIMITADAS",
-                                                    "Contrapropostas livres",
-                                                    "Envie até 150 arquivos no portfólio",
-                                                    "Selo de Perfil Verificado",
-                                                    "Destaque máximo nas buscas",
-                                                    "Suporte VIP Prioritário"
-                                                ].map((feature) => (
-                                                    <div key={feature} className="flex items-start gap-3">
-                                                        <div className="mt-1 p-1 rounded-full bg-green-500/10">
-                                                            <Check className="h-3 w-3 text-green-500" />
-                                                        </div>
-                                                        <span className="text-sm md:text-base">{feature}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </Card>
-                            </div>
-                        </ScrollReveal>
-
-                        {/* Existing Plans (Disabled) */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl mx-auto opacity-60 grayscale-[0.5] pointer-events-none select-none relative after:absolute after:inset-0 after:z-10">
+                        {/* Active Plans */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl mx-auto">
                             {plans.map((plan, index) => (
                                 <ScrollReveal key={plan.name} delay={index * 0.1}>
-                                    <Card className={`relative flex flex-col h-full overflow-hidden border-border bg-card/50`}>
-                                        <CardHeader>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <div className={`p-2 rounded-lg bg-muted text-foreground`}>
+                                    <Card className={`relative flex flex-col h-full overflow-hidden border-2 transition-all duration-300 hover:shadow-xl ${plan.popular ? "border-primary shadow-lg shadow-primary/10" : "border-border hover:border-primary/40"} bg-card/50`}>
+                                        {plan.popular && (
+                                            <div className="absolute top-0 inset-x-0 flex justify-center -mt-3.5">
+                                                <Badge className="bg-primary text-primary-foreground px-4 py-1 text-xs font-semibold shadow-md">
+                                                    Mais Popular
+                                                </Badge>
+                                            </div>
+                                        )}
+                                        <CardHeader className="pt-8">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <div className={`p-2.5 rounded-xl ${plan.popular ? "bg-primary/10 text-primary" : "bg-muted text-foreground"}`}>
                                                     <plan.icon className="h-6 w-6" />
                                                 </div>
+                                                <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
                                             </div>
-                                            <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
-                                            <CardDescription className="min-h-[40px]">{plan.description}</CardDescription>
+                                            <CardDescription className="min-h-[40px] text-sm">{plan.description}</CardDescription>
                                         </CardHeader>
 
-                                        <CardContent className="flex-1 space-y-6">
+                                        <CardContent className="flex-1 flex flex-col space-y-6">
                                             <div className="flex items-baseline gap-1">
                                                 <span className="text-4xl font-bold">
-                                                    R$ 0,00
+                                                    {plan.price === 0 ? "R$ 0" : `R$ ${(isAnnual ? plan.annualPrice : plan.price).toFixed(2).replace('.', ',')}`}
                                                 </span>
-                                                <span className="text-muted-foreground">/mês</span>
+                                                <span className="text-muted-foreground text-sm">/mês</span>
                                             </div>
 
-                                            <div className="space-y-3">
+                                            <div className="space-y-3 flex-1">
                                                 {plan.features.map((feature) => (
                                                     <div key={feature} className="flex items-start gap-2 text-sm">
-                                                        <Check className="h-4 w-4 text-primary/50 mt-0.5 shrink-0" />
+                                                        <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                                         <span>{feature}</span>
+                                                    </div>
+                                                ))}
+                                                {plan.notIncluded.map((feature) => (
+                                                    <div key={feature} className="flex items-start gap-2 text-sm opacity-50">
+                                                        <X className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+                                                        <span className="text-muted-foreground">{feature}</span>
                                                     </div>
                                                 ))}
                                             </div>
                                         </CardContent>
 
-                                        <CardFooter className="pt-6">
+                                        <CardFooter className="pt-6 pb-8">
                                             <Button
-                                                className="w-full h-11"
-                                                variant="outline"
+                                                className={`w-full h-12 text-base ${plan.popular ? "shadow-md hover:shadow-lg hover:shadow-primary/20" : ""}`}
+                                                variant={plan.ctaVariant}
                                                 size="lg"
-                                                disabled
+                                                onClick={() => handleSubscribe(plan.name)}
+                                                disabled={loadingTier === plan.name}
                                             >
-                                                Em breve
+                                                {loadingTier === plan.name && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                {plan.cta}
                                             </Button>
                                         </CardFooter>
                                     </Card>

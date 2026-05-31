@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useEffect, useState, ReactNode } from "react"
-import { motion, useInView, Variants } from "framer-motion"
+import { motion, useInView, useMotionValue, useSpring, Variants } from "framer-motion"
 
 interface ScrollRevealProps {
     children: ReactNode
@@ -58,6 +58,129 @@ export function ScrollReveal({
         >
             {children}
         </motion.div>
+    )
+}
+
+// ─── SplitWordReveal ──────────────────────────────────────────────
+// Words cascade in with a blur-to-sharp, slide-up animation on scroll
+interface SplitWordRevealProps {
+    text: string
+    className?: string
+    delay?: number
+    staggerDelay?: number
+}
+
+export function SplitWordReveal({
+    text,
+    className = "",
+    delay = 0,
+    staggerDelay = 0.07,
+}: SplitWordRevealProps) {
+    const ref = useRef<HTMLSpanElement>(null)
+    const isInView = useInView(ref, { once: true, amount: 0.5 })
+    const words = text.split(" ")
+
+    return (
+        <span ref={ref} className={className} aria-label={text}>
+            {words.map((word, i) => (
+                <motion.span
+                    key={i}
+                    className="inline-block mr-[0.28em] last:mr-0"
+                    initial={{ opacity: 0, y: 28, filter: "blur(8px)" }}
+                    animate={isInView ? { opacity: 1, y: 0, filter: "blur(0px)" } : {}}
+                    transition={{
+                        duration: 0.55,
+                        delay: delay + i * staggerDelay,
+                        ease: [0.25, 0.1, 0.25, 1],
+                    }}
+                >
+                    {word}
+                </motion.span>
+            ))}
+        </span>
+    )
+}
+
+// ─── BlurReveal ───────────────────────────────────────────────────
+// Single-unit blur-fade reveal — ideal for gradient or styled text
+interface BlurRevealProps {
+    children: ReactNode
+    className?: string
+    delay?: number
+    duration?: number
+}
+
+export function BlurReveal({
+    children,
+    className = "",
+    delay = 0,
+    duration = 0.65,
+}: BlurRevealProps) {
+    const ref = useRef<HTMLSpanElement>(null)
+    const isInView = useInView(ref, { once: true, amount: 0.5 })
+
+    return (
+        <motion.span
+            ref={ref}
+            className={`inline-block ${className}`}
+            initial={{ opacity: 0, y: 20, filter: "blur(12px)" }}
+            animate={isInView ? { opacity: 1, y: 0, filter: "blur(0px)" } : {}}
+            transition={{ duration, delay, ease: [0.25, 0.1, 0.25, 1] }}
+        >
+            {children}
+        </motion.span>
+    )
+}
+
+// ─── TiltCard ─────────────────────────────────────────────────────
+// 3-D perspective tilt that follows the cursor on hover
+interface TiltCardProps {
+    children: ReactNode
+    className?: string
+    intensity?: number
+}
+
+export function TiltCard({
+    children,
+    className = "",
+    intensity = 10,
+}: TiltCardProps) {
+    const ref = useRef<HTMLDivElement>(null)
+    const rotateX = useMotionValue(0)
+    const rotateY = useMotionValue(0)
+    const springX = useSpring(rotateX, { stiffness: 280, damping: 28 })
+    const springY = useSpring(rotateY, { stiffness: 280, damping: 28 })
+
+    function onMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+        if (!ref.current) return
+        const rect = ref.current.getBoundingClientRect()
+        const relX = (e.clientX - rect.left) / rect.width - 0.5
+        const relY = (e.clientY - rect.top) / rect.height - 0.5
+        rotateX.set(-relY * intensity)
+        rotateY.set(relX * intensity)
+    }
+
+    function onMouseLeave() {
+        rotateX.set(0)
+        rotateY.set(0)
+    }
+
+    return (
+        <div style={{ perspective: 900 }} className={`h-full ${className}`}>
+            <motion.div
+                ref={ref}
+                onMouseMove={onMouseMove}
+                onMouseLeave={onMouseLeave}
+                style={{
+                    rotateX: springX,
+                    rotateY: springY,
+                    transformStyle: "preserve-3d",
+                }}
+                className="h-full"
+            >
+                {children}
+            </motion.div>
+        </div>
     )
 }
 

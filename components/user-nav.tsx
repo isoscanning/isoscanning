@@ -135,7 +135,7 @@ export function UserNav() {
               className="flex items-center w-full text-foreground"
             >
               <User className="mr-2 h-4 w-4 text-primary" />
-              <span>Meu Perfil</span>
+              <span>Dashboard</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem

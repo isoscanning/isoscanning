@@ -287,7 +287,7 @@ export function Header() {
                       className="w-full justify-start bg-transparent border-accent/30 hover:bg-accent/10 hover:text-accent"
                     >
                       <User className="h-4 w-4 mr-2 text-blue-500 dark:text-blue-400" />
-                      <span className="font-medium">Meu Perfil</span>
+                      <span className="font-medium">Dashboard</span>
                     </Button>
                   </Link>
                   <Link

@@ -698,22 +698,27 @@ export default function HomePage() {
         </section>
 
         {/* ===== FINAL CTA ===== */}
-        <section className="py-24 md:py-32 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-600 dark:from-blue-700 dark:via-indigo-700 dark:to-cyan-700" />
-          <FloatingParticles count={25} />
+        <section className="py-24 md:py-32 relative overflow-hidden bg-slate-950">
+          <FloatingParticles count={15} />
+          
+          <div className="absolute inset-0 overflow-hidden pointer-events-none flex justify-center items-center">
+            <div className="w-[800px] h-[400px] bg-indigo-600/10 dark:bg-indigo-500/10 blur-[120px] rounded-[100%]" />
+          </div>
 
-          <div className="container mx-auto px-4 relative z-10">
+          <div className="container mx-auto px-4 relative z-10 flex-1 flex flex-col justify-center">
             <div className="max-w-4xl mx-auto text-center text-white space-y-8">
               <ScrollReveal>
-                <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
+                <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-tight tracking-tight">
                   Pronto para transformar{" "}
                   <br className="hidden sm:block" />
-                  sua carreira criativa?
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-cyan-400">
+                    sua carreira criativa?
+                  </span>
                 </h2>
               </ScrollReveal>
 
               <ScrollReveal delay={0.2}>
-                <p className="text-xl md:text-2xl text-white/90 max-w-2xl mx-auto">
+                <p className="text-lg md:text-xl text-white/60 max-w-2xl mx-auto font-light">
                   Junte-se a centenas de profissionais que já estão construindo
                   seu futuro na ISO Scanning.
                 </p>
@@ -724,18 +729,17 @@ export default function HomePage() {
                   <AuthAwareLink href="/cadastro">
                     <Button
                       size="lg"
-                      variant="secondary"
-                      className="w-full sm:w-auto h-14 px-10 text-lg rounded-full shadow-xl hover:shadow-2xl transition-all duration-300"
+                      className="w-full sm:w-auto h-14 px-8 text-base rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white shadow-xl transition-all duration-300 group"
                     >
                       Criar Conta Gratuita
-                      <ArrowRight className="ml-2 h-5 w-5" />
+                      <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                     </Button>
                   </AuthAwareLink>
                   <Link href="/login">
                     <Button
                       size="lg"
                       variant="outline"
-                      className="w-full sm:w-auto h-14 px-10 text-lg rounded-full bg-transparent border-2 border-white/50 text-white hover:bg-white/10 transition-all duration-300"
+                      className="w-full sm:w-auto h-14 px-8 text-base rounded-xl bg-black/40 border border-white/10 text-white hover:bg-white/10 hover:border-white/20 transition-all duration-300 backdrop-blur-sm"
                     >
                       Já tenho conta
                     </Button>
@@ -744,7 +748,7 @@ export default function HomePage() {
               </ScrollReveal>
 
               <ScrollReveal delay={0.6}>
-                <p className="text-white/70 text-sm pt-4">
+                <p className="text-white/40 text-xs pt-4">
                   Sem cartão de crédito • Configuração em 2 minutos • Cancele quando quiser
                 </p>
               </ScrollReveal>

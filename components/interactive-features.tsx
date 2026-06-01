@@ -73,8 +73,8 @@ export function InteractiveFeatures() {
   const ActiveComponent = features[activeIndex].component;
 
   return (
-    <section className="h-[100vh] md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-slate-950 relative overflow-hidden pt-6 pb-12 md:pt-8 md:pb-16 border-t border-white/5">
-      <div className="container mx-auto px-4 relative z-10 flex flex-col h-full max-h-[950px] justify-between md:justify-center">
+    <section className="min-h-[100vh] h-auto md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-slate-950 relative overflow-hidden pt-12 pb-20 md:pt-8 md:pb-16 border-t border-white/5">
+      <div className="container mx-auto px-4 relative z-10 flex flex-col h-full max-h-none md:max-h-[950px] justify-between md:justify-center">
         {/* Header Title */}
         <ScrollReveal>
           <div className="text-center mb-4 md:mb-6 lg:mb-8 space-y-2 md:space-y-3">

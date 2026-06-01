@@ -327,7 +327,7 @@ export default function LpProfissional() {
       <main className="flex-1 flex flex-col">
         <FullPageScroller sectionsCount={10}>
         {/* ===== HERO ===== */}
-        <section className="relative h-[100vh] md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex items-center justify-center overflow-hidden">
+        <section className="relative min-h-[100vh] h-auto py-20 md:py-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex items-center justify-center overflow-hidden">
           <HeroImageReveal src="/camera-exploded.png" radius={400} opacity={0.2} />
           <MouseGlow color="99, 102, 241" size={600} opacity={0.13} />
           <ParticleBackground />
@@ -415,7 +415,7 @@ export default function LpProfissional() {
         </section>
 
         {/* ===== QUAL A SUA ESPECIALIDADE ===== */}
-        <section className="h-[100vh] md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-slate-950 relative overflow-hidden py-10 md:py-0">
+        <section className="min-h-[100vh] h-auto py-20 md:py-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-slate-950 relative overflow-hidden">
           <LightRays />
           <div className="container mx-auto px-4 relative z-10">
             <ScrollReveal>
@@ -473,7 +473,7 @@ export default function LpProfissional() {
         <InteractiveFeatures />
 
         {/* ===== MÓDULOS (DEMO VISUAL) ===== */}
-        <section className="h-[100vh] md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center relative overflow-hidden py-10 md:py-0">
+        <section className="min-h-[100vh] h-auto py-20 md:py-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center relative overflow-hidden">
           {/* Ambient glow orbs */}
           <div className="absolute -top-32 -left-32 w-72 h-72 bg-blue-500/6 dark:bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-cyan-500/6 dark:bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -537,17 +537,15 @@ export default function LpProfissional() {
                     </CarouselItem>
                   ))}
                 </CarouselContent>
-                <div className="hidden lg:block">
-                  <CarouselPrevious className="-left-12" />
-                  <CarouselNext className="-right-12" />
-                </div>
+                <CarouselPrevious className="absolute -left-2 md:-left-12 border-border/50 bg-background/50 backdrop-blur-sm" />
+                <CarouselNext className="absolute -right-2 md:-right-12 border-border/50 bg-background/50 backdrop-blur-sm" />
               </Carousel>
             </div>
           </div>
         </section>
 
         {/* ===== COMPARATIVO VS CONCORRENTES ===== */}
-        <section className="h-[100vh] md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-muted/30 dark:bg-muted/10 border-y border-border/40 py-10 md:py-0">
+        <section className="min-h-[100vh] h-auto py-20 md:py-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-muted/30 dark:bg-muted/10 border-y border-border/40">
           <div className="container mx-auto px-4">
             <ScrollReveal>
               <div className="text-center mb-16 space-y-4 max-w-3xl mx-auto">
@@ -563,39 +561,78 @@ export default function LpProfissional() {
               </div>
             </ScrollReveal>
 
-            <div className="max-w-6xl mx-auto overflow-x-auto pb-4">
-              <table className="w-full min-w-[800px] border-collapse bg-background rounded-2xl overflow-hidden shadow-sm border border-border">
-                <thead>
-                  <tr className="bg-muted/50 border-b border-border text-left">
-                    <th className="p-4 font-semibold text-foreground">Plataforma</th>
-                    <th className="p-4 font-semibold text-foreground">Foco</th>
-                    <th className="p-4 font-semibold text-foreground">Comissão</th>
-                    <th className="p-4 font-semibold text-foreground">Portfolio</th>
-                    <th className="p-4 font-semibold text-foreground">Gestão Financeira</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {competitors.map((comp, i) => (
-                    <tr key={i} className={`border-b border-border/50 transition-colors ${comp.highlight ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-muted/30"}`}>
-                      <td className="p-4 font-medium">
-                        {comp.highlight ? (
-                          <span className="flex items-center gap-2 text-primary font-bold">
-                            <Zap className="h-4 w-4" /> {comp.platform}
-                          </span>
-                        ) : (
-                          comp.platform
-                        )}
-                      </td>
-                      <td className="p-4 text-muted-foreground text-sm">{comp.focus}</td>
-                      <td className={`p-4 font-semibold ${comp.highlight ? "text-green-500 text-lg" : "text-muted-foreground text-sm"}`}>
-                        {comp.comission}
-                      </td>
-                      <td className="p-4 text-muted-foreground text-sm">{comp.portfolio}</td>
-                      <td className="p-4 text-muted-foreground text-sm">{comp.fin}</td>
+            <div className="max-w-6xl mx-auto pb-4">
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full min-w-[800px] border-collapse bg-background rounded-2xl overflow-hidden shadow-sm border border-border">
+                  <thead>
+                    <tr className="bg-muted/50 border-b border-border text-left">
+                      <th className="p-4 font-semibold text-foreground">Plataforma</th>
+                      <th className="p-4 font-semibold text-foreground">Foco</th>
+                      <th className="p-4 font-semibold text-foreground">Comissão</th>
+                      <th className="p-4 font-semibold text-foreground">Portfolio</th>
+                      <th className="p-4 font-semibold text-foreground">Gestão Financeira</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {competitors.map((comp, i) => (
+                      <tr key={i} className={`border-b border-border/50 transition-colors ${comp.highlight ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-muted/30"}`}>
+                        <td className="p-4 font-medium">
+                          {comp.highlight ? (
+                            <span className="flex items-center gap-2 text-primary font-bold">
+                              <Zap className="h-4 w-4" /> {comp.platform}
+                            </span>
+                          ) : (
+                            comp.platform
+                          )}
+                        </td>
+                        <td className="p-4 text-muted-foreground text-sm">{comp.focus}</td>
+                        <td className={`p-4 font-semibold ${comp.highlight ? "text-green-500 text-lg" : "text-muted-foreground text-sm"}`}>
+                          {comp.comission}
+                        </td>
+                        <td className="p-4 text-muted-foreground text-sm">{comp.portfolio}</td>
+                        <td className="p-4 text-muted-foreground text-sm">{comp.fin}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="flex flex-col gap-4 md:hidden">
+                {competitors.map((comp, i) => (
+                  <Card key={i} className={`overflow-hidden border-2 ${comp.highlight ? "border-primary/50 shadow-lg shadow-primary/10 bg-primary/5" : "border-border/50"}`}>
+                    <CardContent className="p-5 flex flex-col gap-4">
+                      <div className="flex items-center justify-between border-b border-border/50 pb-3">
+                        <span className={`font-bold text-lg ${comp.highlight ? "text-primary flex items-center gap-2" : "text-foreground"}`}>
+                          {comp.highlight && <Zap className="h-4 w-4" />}
+                          {comp.platform}
+                        </span>
+                        <div className="flex flex-col items-end">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Comissão</span>
+                          <span className={`font-bold ${comp.highlight ? "text-green-500 text-xl" : "text-muted-foreground"}`}>
+                            {comp.comission}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="block text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Foco</span>
+                          <span className="text-sm font-medium leading-tight">{comp.focus}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Portfolio</span>
+                          <span className="text-sm font-medium">{comp.portfolio}</span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="block text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Gestão Financeira</span>
+                          <span className="text-sm font-medium">{comp.fin}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
             <ScrollReveal delay={0.2}>
               <div className="text-center mt-8">
@@ -609,7 +646,7 @@ export default function LpProfissional() {
         </section>
 
         {/* ===== HOW IT WORKS ===== */}
-        <section className="h-[100vh] md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-muted/30 dark:bg-muted/10 py-10 md:py-0">
+        <section className="min-h-[100vh] h-auto py-20 md:py-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-muted/30 dark:bg-muted/10">
           <div className="container mx-auto px-4">
             <ScrollReveal>
               <div className="text-center mb-16 space-y-4">
@@ -666,7 +703,7 @@ export default function LpProfissional() {
         </section>
 
         {/* ===== TESTIMONIALS ===== */}
-        <section className="h-[100vh] md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-slate-950 py-10 md:py-0">
+        <section className="min-h-[100vh] h-auto py-20 md:py-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-slate-950">
           <div className="container mx-auto px-4">
             <ScrollReveal>
               <div className="text-center mb-16 space-y-4">
@@ -733,14 +770,14 @@ export default function LpProfissional() {
         </section>
 
         {/* ===== PRICING ===== */}
-        <section className="h-[100vh] md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center py-10 md:py-0">
+        <section className="min-h-[100vh] h-auto py-20 md:py-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center">
           <div className="container mx-auto px-4">
             <ScrollReveal>
-              <div className="text-center mb-4 md:mb-6 space-y-1 md:space-y-2">
+              <div className="text-center mb-4 md:mb-4 space-y-1 md:space-y-1">
                 <span className="text-primary font-semibold text-xs md:text-sm uppercase tracking-wider">
                   Planos e Preços
                 </span>
-                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold">
+                <h2 className="text-2xl sm:text-3xl md:text-3xl font-bold">
                   Comece grátis.{" "}
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400">
                     Cresça no seu ritmo.
@@ -752,7 +789,7 @@ export default function LpProfissional() {
               </div>
             </ScrollReveal>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-6 max-w-5xl mx-auto">
               {[
                 {
                   name: "Free",
@@ -840,7 +877,7 @@ export default function LpProfissional() {
                         </Badge>
                       </div>
                     )}
-                    <CardContent className="p-4 md:p-5 flex flex-col gap-3 md:gap-4 h-full">
+                    <CardContent className="p-4 md:p-4 flex flex-col gap-3 md:gap-3 h-full">
                       <div className="flex items-center gap-2">
                         <div
                           className={`p-1.5 md:p-2 rounded-lg ${
@@ -863,7 +900,7 @@ export default function LpProfissional() {
                         <span className="text-[10px] md:text-xs text-muted-foreground">{plan.period}</span>
                       </div>
 
-                      <div className="flex-1 space-y-1.5 md:space-y-2 mt-1 md:mt-2">
+                      <div className="flex-1 space-y-1.5 md:space-y-1 mt-1 md:mt-2">
                         {plan.features.map((f) => (
                           <div key={f} className="flex items-start gap-2 text-[10px] md:text-xs">
                             <Check className="h-3.5 w-3.5 md:h-4 md:w-4 text-green-500 mt-0.5 shrink-0" />
@@ -897,7 +934,7 @@ export default function LpProfissional() {
             </div>
 
             <ScrollReveal delay={0.4}>
-              <p className="text-center text-xs md:text-sm text-muted-foreground mt-4 md:mt-6">
+              <p className="text-center text-xs md:text-sm text-muted-foreground mt-4 md:mt-4 pb-2 md:pb-4">
                 Quer ver todos os detalhes?{" "}
                 <Link href="/precos" className="text-primary font-semibold hover:underline">
                   Consulte a página completa de preços →
@@ -908,7 +945,7 @@ export default function LpProfissional() {
         </section>
 
         {/* ===== FAQ ===== */}
-        <section className="h-[100vh] md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-muted/30 dark:bg-muted/10 py-10 md:py-0">
+        <section className="min-h-[100vh] h-auto py-20 md:py-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-muted/30 dark:bg-muted/10">
           <div className="container mx-auto px-4">
             <div className="max-w-6xl mx-auto">
               <ScrollReveal>
@@ -957,7 +994,7 @@ export default function LpProfissional() {
         </section>
 
         {/* ===== FINAL CTA ===== */}
-        <section className="h-[100vh] md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center relative overflow-hidden bg-slate-950 py-10 md:py-0">
+        <section className="min-h-[100vh] h-auto pt-20 md:pt-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center relative overflow-hidden bg-slate-950">
           <FloatingParticles count={15} />
           
           <div className="absolute inset-0 overflow-hidden pointer-events-none flex justify-center items-center">

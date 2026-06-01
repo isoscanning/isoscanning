@@ -467,7 +467,7 @@ export default function LpCliente() {
         </section>
 
         {/* ===== PRICING ===== */}
-        <section className="h-[100vh] md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-muted/30 dark:bg-muted/10 py-10 md:py-0">
+        <section id="precos" className="scroll-mt-16 h-[100vh] md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-muted/30 dark:bg-muted/10 py-10 md:py-0">
           <div className="container mx-auto px-4">
             <ScrollReveal>
               <div className="text-center mb-6 md:mb-8 space-y-1 md:space-y-2">
@@ -638,7 +638,7 @@ export default function LpCliente() {
         </section>
 
         {/* ===== FAQ ===== */}
-        <section className="h-[100vh] md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-muted/30 dark:bg-muted/10 py-10 md:py-0">
+        <section id="faq" className="scroll-mt-16 h-[100vh] md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-muted/30 dark:bg-muted/10 py-10 md:py-0">
           <div className="container mx-auto px-4">
             <div className="max-w-3xl mx-auto">
               <ScrollReveal>

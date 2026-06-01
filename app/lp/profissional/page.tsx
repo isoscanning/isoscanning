@@ -770,14 +770,14 @@ export default function LpProfissional() {
         </section>
 
         {/* ===== PRICING ===== */}
-        <section className="min-h-[100vh] h-auto py-20 md:py-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center">
+        <section id="precos" className="scroll-mt-16 min-h-[100vh] h-auto py-20 md:py-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center">
           <div className="container mx-auto px-4">
             <ScrollReveal>
-              <div className="text-center mb-4 md:mb-4 space-y-1 md:space-y-1">
+              <div className="text-center mb-3 md:mb-3 space-y-1">
                 <span className="text-primary font-semibold text-xs md:text-sm uppercase tracking-wider">
                   Planos e Preços
                 </span>
-                <h2 className="text-2xl sm:text-3xl md:text-3xl font-bold">
+                <h2 className="text-2xl sm:text-3xl md:text-2xl lg:text-3xl font-bold">
                   Comece grátis.{" "}
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400">
                     Cresça no seu ritmo.
@@ -877,7 +877,7 @@ export default function LpProfissional() {
                         </Badge>
                       </div>
                     )}
-                    <CardContent className="p-4 md:p-4 flex flex-col gap-3 md:gap-3 h-full">
+                    <CardContent className="p-4 md:p-3 flex flex-col gap-2 md:gap-2 h-full">
                       <div className="flex items-center gap-2">
                         <div
                           className={`p-1.5 md:p-2 rounded-lg ${
@@ -896,11 +896,11 @@ export default function LpProfissional() {
                       </p>
 
                       <div className="flex items-baseline gap-1">
-                        <span className="text-2xl md:text-3xl font-bold">{plan.price}</span>
+                        <span className="text-2xl md:text-2xl lg:text-3xl font-bold">{plan.price}</span>
                         <span className="text-[10px] md:text-xs text-muted-foreground">{plan.period}</span>
                       </div>
 
-                      <div className="flex-1 space-y-1.5 md:space-y-1 mt-1 md:mt-2">
+                      <div className="flex-1 space-y-1.5 md:space-y-1 mt-1">
                         {plan.features.map((f) => (
                           <div key={f} className="flex items-start gap-2 text-[10px] md:text-xs">
                             <Check className="h-3.5 w-3.5 md:h-4 md:w-4 text-green-500 mt-0.5 shrink-0" />
@@ -945,7 +945,7 @@ export default function LpProfissional() {
         </section>
 
         {/* ===== FAQ ===== */}
-        <section className="min-h-[100vh] h-auto py-20 md:py-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-muted/30 dark:bg-muted/10">
+        <section id="faq" className="scroll-mt-16 min-h-[100vh] h-auto py-20 md:py-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-muted/30 dark:bg-muted/10">
           <div className="container mx-auto px-4">
             <div className="max-w-6xl mx-auto">
               <ScrollReveal>

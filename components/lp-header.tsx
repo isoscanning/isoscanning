@@ -39,10 +39,10 @@ export function LpHeader({
           <Link href={produtoHref} className="hover:text-primary transition-colors">
             Produto
           </Link>
-          <Link href="/precos" className="hover:text-primary transition-colors">
+          <Link href="#precos" className="hover:text-primary transition-colors">
             Preços
           </Link>
-          <Link href="/ajuda" className="hover:text-primary transition-colors">
+          <Link href="#faq" className="hover:text-primary transition-colors">
             Suporte
           </Link>
         </nav>
@@ -83,8 +83,8 @@ export function LpHeader({
           <nav className="container mx-auto flex flex-col gap-1 p-4">
             {[
               { href: produtoHref, label: "Produto" },
-              { href: "/precos", label: "Preços" },
-              { href: "/ajuda", label: "Suporte" },
+              { href: "#precos", label: "Preços" },
+              { href: "#faq", label: "Suporte" },
             ].map((item) => (
               <Link
                 key={item.href}

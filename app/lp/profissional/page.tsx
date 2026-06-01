@@ -26,6 +26,7 @@ import { ParticleBackground } from "@/components/particle-background";
 import { FloatingParticles } from "@/components/video-background";
 import { MouseGlow } from "@/components/mouse-glow";
 import { HeroImageReveal } from "@/components/hero-image-reveal";
+import { InteractiveFeatures } from "@/components/interactive-features";
 import {
   ArrowRight,
   CheckCircle2,
@@ -324,7 +325,7 @@ export default function LpProfissional() {
       <LpHeader ctaHref="/cadastro?tipo=profissional" ctaLabel="Criar Perfil Grátis" produtoHref="/lp/profissional" />
 
       <main className="flex-1 flex flex-col">
-        <FullPageScroller sectionsCount={9}>
+        <FullPageScroller sectionsCount={10}>
         {/* ===== HERO ===== */}
         <section className="relative h-[100vh] md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex items-center justify-center overflow-hidden">
           <HeroImageReveal src="/camera-exploded.png" radius={400} opacity={0.2} />
@@ -467,6 +468,9 @@ export default function LpProfissional() {
             </div>
           </div>
         </section>
+
+        {/* ===== FUNCIONALIDADES (INTERACTIVE SECTION) ===== */}
+        <InteractiveFeatures />
 
         {/* ===== MÓDULOS (DEMO VISUAL) ===== */}
         <section className="h-[100vh] md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center relative overflow-hidden py-10 md:py-0">

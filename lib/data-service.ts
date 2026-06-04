@@ -816,6 +816,11 @@ export interface JobApplication {
   message?: string;
   counterProposal?: number;
   agreedValue?: number;
+  agreementStatus?: 'none' | 'pending_candidate' | 'accepted' | 'rejected';
+  agreementText?: string;
+  agreementValue?: number;
+  agreementDeadline?: string;
+  agreementLocation?: string;
   createdAt: string;
   jobOffer: {
     id: string;
@@ -844,6 +849,11 @@ export const fetchUserApplications = async (userId: string): Promise<JobApplicat
         message,
         counter_proposal,
         agreed_value,
+        agreement_status,
+        agreement_text,
+        agreement_value,
+        agreement_deadline,
+        agreement_location,
         job_offers (
           id,
           title,
@@ -874,6 +884,11 @@ export const fetchUserApplications = async (userId: string): Promise<JobApplicat
       message: app.message,
       counterProposal: app.counter_proposal,
       agreedValue: app.agreed_value,
+      agreementStatus: app.agreement_status,
+      agreementText: app.agreement_text,
+      agreementValue: app.agreement_value,
+      agreementDeadline: app.agreement_deadline,
+      agreementLocation: app.agreement_location,
       jobOffer: {
         id: app.job_offers.id,
         title: app.job_offers.title,
@@ -901,6 +916,11 @@ export interface JobCandidate {
   message?: string;
   counterProposal?: number;
   agreedValue?: number;
+  agreementStatus?: 'none' | 'pending_candidate' | 'accepted' | 'rejected';
+  agreementText?: string;
+  agreementValue?: number;
+  agreementDeadline?: string;
+  agreementLocation?: string;
   profile: {
     id: string;
     displayName: string;
@@ -927,6 +947,11 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
         message,
         counter_proposal,
         agreed_value,
+        agreement_status,
+        agreement_text,
+        agreement_value,
+        agreement_deadline,
+        agreement_location,
         profiles (
           id,
           display_name,
@@ -955,6 +980,11 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
       message: app.message,
       counterProposal: app.counter_proposal,
       agreedValue: app.agreed_value,
+      agreementStatus: app.agreement_status,
+      agreementText: app.agreement_text,
+      agreementValue: app.agreement_value,
+      agreementDeadline: app.agreement_deadline,
+      agreementLocation: app.agreement_location,
       profile: {
         id: app.profiles.id,
         displayName: app.profiles.display_name,
@@ -1000,6 +1030,65 @@ export const updateJobApplicationStatus = async (applicationId: string, status: 
     return true;
   } catch (error) {
     console.error("Error updating application status:", error);
+    throw error;
+  }
+};
+
+export const sendJobAgreement = async (
+  applicationId: string, 
+  agreementData: {
+    agreementText: string;
+    agreementValue: number;
+    agreementDeadline: string;
+    agreementLocation: string;
+  }
+): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .from('job_applications')
+      .update({
+        agreement_text: agreementData.agreementText,
+        agreement_value: agreementData.agreementValue,
+        agreement_deadline: agreementData.agreementDeadline,
+        agreement_location: agreementData.agreementLocation,
+        agreement_status: 'pending_candidate'
+      })
+      .eq('id', applicationId)
+      .select();
+
+    if (error) throw error;
+    if (!data || data.length === 0) return false;
+    return true;
+  } catch (error) {
+    console.error("Error sending job agreement:", error);
+    throw error;
+  }
+};
+
+export const respondToJobAgreement = async (
+  applicationId: string, 
+  response: 'accepted' | 'rejected'
+): Promise<boolean> => {
+  try {
+    const updateData: any = { agreement_status: response };
+    if (response === 'accepted') {
+      updateData.status = 'accepted';
+      
+      // We should also set the agreed_value based on the agreement_value
+      // Let's just set status to accepted. The agreed_value is already stored in agreement_value.
+    }
+
+    const { data, error } = await supabase
+      .from('job_applications')
+      .update(updateData)
+      .eq('id', applicationId)
+      .select();
+
+    if (error) throw error;
+    if (!data || data.length === 0) return false;
+    return true;
+  } catch (error) {
+    console.error("Error responding to job agreement:", error);
     throw error;
   }
 };

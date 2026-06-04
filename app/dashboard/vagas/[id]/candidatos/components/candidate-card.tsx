@@ -2,6 +2,7 @@
 
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useParams, useRouter } from "next/navigation";
 import {
     MapPin,
     Star,
@@ -13,7 +14,9 @@ import {
     Mail,
     Phone,
     MessageCircle,
-    DollarSign
+    DollarSign,
+    FileText,
+    Download
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,8 +32,9 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { type JobCandidate } from "@/lib/data-service";
-import { ApprovalModal } from "./approval-modal";
 import { useState } from "react";
+import { downloadAgreementPdf } from "@/lib/pdf-generator";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 interface CandidateCardProps {
     candidate: JobCandidate;
@@ -45,9 +49,22 @@ export function CandidateCard({
     onStatusUpdate,
     jobBudgetValue
 }: CandidateCardProps) {
-    const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+    const router = useRouter();
+    const params = useParams();
+    const jobId = params.id as string;
+    const [isAgreementModalOpen, setIsAgreementModalOpen] = useState(false);
+
+    const handleDownloadPdf = () => {
+        if (candidate.agreementText) {
+            downloadAgreementPdf(candidate.profile.displayName, '', candidate.agreementText);
+        }
+    };
 
     const getStatusBadge = (status: string) => {
+        if (candidate.agreementStatus === 'pending_candidate') {
+            return <Badge className="bg-amber-500 hover:bg-amber-600 text-white">Aguardando Aceite</Badge>;
+        }
+        
         switch (status) {
             case "accepted":
                 return <Badge className="bg-emerald-500 hover:bg-emerald-600">Aprovado</Badge>;
@@ -59,18 +76,6 @@ export function CandidateCard({
                 return <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-300">Pendente</Badge>;
         }
     };
-
-    const handleApprovalClick = () => {
-        setIsApprovalModalOpen(true);
-    };
-
-    const handleConfirmApproval = (value: number) => {
-        onStatusUpdate(candidate.id, 'accepted', value);
-    };
-
-    const initialValue = (candidate.counterProposal && candidate.counterProposal > 0)
-        ? candidate.counterProposal
-        : jobBudgetValue;
 
     return (
         <>
@@ -147,12 +152,17 @@ export function CandidateCard({
                             )}
 
                             <div className="flex flex-col sm:flex-row items-center gap-3 pt-2 justify-between">
-                                <div className="flex gap-2 w-full sm:w-auto">
+                                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                                     <Button size="sm" variant="outline" asChild className="flex-1 sm:flex-none">
                                         <Link href={`/profissionais/${candidate.profile.id}`} target="_blank">
                                             Ver Perfil Completo
                                         </Link>
                                     </Button>
+                                    {candidate.agreementText && (
+                                        <Button size="sm" variant="outline" onClick={() => setIsAgreementModalOpen(true)} className="flex-1 sm:flex-none">
+                                            <FileText className="mr-2 h-4 w-4" /> Ver Contrato
+                                        </Button>
+                                    )}
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                             <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
@@ -197,13 +207,13 @@ export function CandidateCard({
                                         <Button
                                             size="sm"
                                             className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none"
-                                            onClick={handleApprovalClick}
+                                            onClick={() => router.push(`/dashboard/vagas/${jobId}/acordo/${candidate.id}`)}
                                             disabled={isProcessing}
                                         >
                                             {isProcessing ? (
                                                 <Loader2 className="h-4 w-4 animate-spin" />
                                             ) : (
-                                                <><Check className="mr-1 h-4 w-4" /> Aprovar</>
+                                                <><Check className="mr-1 h-4 w-4" /> Gerar Acordo</>
                                             )}
                                         </Button>
                                         <Button
@@ -226,14 +236,35 @@ export function CandidateCard({
                     </div>
                 </CardContent>
             </Card>
-
-            <ApprovalModal
-                isOpen={isApprovalModalOpen}
-                onClose={() => setIsApprovalModalOpen(false)}
-                onConfirm={handleConfirmApproval}
-                candidateName={candidate.profile.displayName}
-                initialValue={initialValue}
-            />
+            <Dialog open={isAgreementModalOpen} onOpenChange={setIsAgreementModalOpen}>
+                <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle>Termo de Prestação de Serviços</DialogTitle>
+                        <DialogDescription>
+                            Revise os termos do acordo.
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="flex-1 overflow-y-auto p-4 bg-muted/30 border rounded-md font-mono text-sm whitespace-pre-wrap max-h-[50vh]">
+                        {candidate.agreementText}
+                    </div>
+                    
+                    <DialogFooter className="gap-2 sm:gap-0 mt-4">
+                        <Button 
+                            variant="outline" 
+                            onClick={() => setIsAgreementModalOpen(false)}
+                        >
+                            Fechar
+                        </Button>
+                        <Button 
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground" 
+                            onClick={handleDownloadPdf}
+                        >
+                            <Download className="mr-2 h-4 w-4" /> Baixar PDF
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }

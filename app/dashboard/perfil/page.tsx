@@ -268,7 +268,7 @@ export default function PerfilPage() {
 
           setSelectedCountryCode(codeToSet);
 
-          setFormData({
+          let newFormData = {
             displayName: freshProfile.displayName || userProfile.displayName || "",
             artisticName: freshProfile.artisticName || "",
             specialties: freshProfile.specialties || [],
@@ -281,7 +281,50 @@ export default function PerfilPage() {
             otherLinks: freshProfile.otherLinks || "",
             isPublished: freshProfile.isPublished || false,
             avatarUrl: freshProfile.avatarUrl || userProfile.avatarUrl || "",
-          })
+          };
+
+          const onboardingDataStr = localStorage.getItem("onboardingData");
+          if (onboardingDataStr) {
+            try {
+              const onboardingData = JSON.parse(onboardingDataStr);
+              
+              if (onboardingData.specialties && Array.isArray(onboardingData.specialties)) {
+                newFormData.specialties = Array.from(new Set([...newFormData.specialties, ...onboardingData.specialties]));
+              }
+              if (onboardingData.state) {
+                newFormData.state = onboardingData.state;
+              }
+              
+              const descParts = [];
+              if (onboardingData.experience) descParts.push(`Experiência: ${onboardingData.experience}`);
+              if (onboardingData.financialGoal) descParts.push(`Objetivo Financeiro: ${onboardingData.financialGoal}`);
+              if (onboardingData.workFormat) descParts.push(`Formato de Trabalho: ${onboardingData.workFormat}`);
+              if (onboardingData.availability) descParts.push(`Disponibilidade: ${onboardingData.availability}`);
+              if (onboardingData.professionalLevel) descParts.push(`Nível Profissional: ${onboardingData.professionalLevel}`);
+              if (onboardingData.recentExperience) descParts.push(`Atuação Recente: ${onboardingData.recentExperience}`);
+              if (onboardingData.availableDays) descParts.push(`Dias Disponíveis: ${onboardingData.availableDays}`);
+              if (onboardingData.teamSize) descParts.push(`Tamanho de Equipe Ideal: ${onboardingData.teamSize}`);
+              if (onboardingData.idealEnvironment) descParts.push(`Ambiente Ideal: ${onboardingData.idealEnvironment}`);
+              if (onboardingData.paymentForm) descParts.push(`Preferência de Pagamento: ${onboardingData.paymentForm}`);
+              if (onboardingData.internationalProjects) descParts.push(`Projetos Internacionais: ${onboardingData.internationalProjects}`);
+              
+              if (descParts.length > 0) {
+                const onboardingDesc = `--- Informações do Perfil ---\n${descParts.join('\\n')}`;
+                newFormData.description = newFormData.description 
+                  ? `${newFormData.description}\n\n${onboardingDesc}`
+                  : onboardingDesc;
+              }
+              
+              newFormData.isPublished = true;
+              
+              localStorage.removeItem("onboardingData");
+              setSuccessMsg("Seu perfil foi pré-preenchido com as informações do formulário! Revise os dados e clique em 'Salvar Alterações'.");
+            } catch (e) {
+              console.error("Failed to parse onboardingData", e);
+            }
+          }
+
+          setFormData(newFormData);
 
           if (freshProfile.avatarUrl) {
             setAvatarPreview(freshProfile.avatarUrl)
@@ -297,7 +340,7 @@ export default function PerfilPage() {
         } catch (error: any) {
           console.error("[perfil] Error fetching fresh profile:", error?.response?.status, error?.response?.data || error.message)
           // Fallback to cached userProfile data
-          setFormData({
+          let newFallbackData = {
             displayName: userProfile.displayName || "",
             artisticName: userProfile.artisticName || "",
             specialties: userProfile.specialties || [],
@@ -310,7 +353,50 @@ export default function PerfilPage() {
             otherLinks: (userProfile as any).otherLinks || "",
             isPublished: userProfile.isPublished || false,
             avatarUrl: userProfile.avatarUrl || "",
-          })
+          };
+          
+          const onboardingDataStr = localStorage.getItem("onboardingData");
+          if (onboardingDataStr) {
+            try {
+              const onboardingData = JSON.parse(onboardingDataStr);
+              
+              if (onboardingData.specialties && Array.isArray(onboardingData.specialties)) {
+                newFallbackData.specialties = Array.from(new Set([...newFallbackData.specialties, ...onboardingData.specialties]));
+              }
+              if (onboardingData.state) {
+                newFallbackData.state = onboardingData.state;
+              }
+              
+              const descParts = [];
+              if (onboardingData.experience) descParts.push(`Experiência: ${onboardingData.experience}`);
+              if (onboardingData.financialGoal) descParts.push(`Objetivo Financeiro: ${onboardingData.financialGoal}`);
+              if (onboardingData.workFormat) descParts.push(`Formato de Trabalho: ${onboardingData.workFormat}`);
+              if (onboardingData.availability) descParts.push(`Disponibilidade: ${onboardingData.availability}`);
+              if (onboardingData.professionalLevel) descParts.push(`Nível Profissional: ${onboardingData.professionalLevel}`);
+              if (onboardingData.recentExperience) descParts.push(`Atuação Recente: ${onboardingData.recentExperience}`);
+              if (onboardingData.availableDays) descParts.push(`Dias Disponíveis: ${onboardingData.availableDays}`);
+              if (onboardingData.teamSize) descParts.push(`Tamanho de Equipe Ideal: ${onboardingData.teamSize}`);
+              if (onboardingData.idealEnvironment) descParts.push(`Ambiente Ideal: ${onboardingData.idealEnvironment}`);
+              if (onboardingData.paymentForm) descParts.push(`Preferência de Pagamento: ${onboardingData.paymentForm}`);
+              if (onboardingData.internationalProjects) descParts.push(`Projetos Internacionais: ${onboardingData.internationalProjects}`);
+              
+              if (descParts.length > 0) {
+                const onboardingDesc = `--- Informações do Perfil ---\n${descParts.join('\\n')}`;
+                newFallbackData.description = newFallbackData.description 
+                  ? `${newFallbackData.description}\n\n${onboardingDesc}`
+                  : onboardingDesc;
+              }
+              
+              newFallbackData.isPublished = true;
+              
+              localStorage.removeItem("onboardingData");
+              setSuccessMsg("Seu perfil foi pré-preenchido com as informações do formulário! Revise os dados e clique em 'Salvar Alterações'.");
+            } catch (e) {
+              console.error("Failed to parse onboardingData", e);
+            }
+          }
+
+          setFormData(newFallbackData);
 
 
           if (userProfile.avatarUrl) {

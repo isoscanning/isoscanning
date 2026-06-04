@@ -91,7 +91,7 @@ export default function DashboardPage() {
           rating = statsRes.data.averageRating || 0;
           reviews = statsRes.data.totalReviews || 0;
         } catch (e) {
-          console.error("Error fetching review stats", e);
+          console.warn("Error fetching review stats", e);
           // Fallback to profile data if endpoint fails
           rating = userProfile.averageRating || 0;
           reviews = userProfile.totalReviews || 0;
@@ -104,7 +104,7 @@ export default function DashboardPage() {
           const requestsData = requestsRes.data.data || requestsRes.data || [];
           requestsCount = requestsData.length;
         } catch (e) {
-          console.error("Error fetching requests count", e);
+          console.warn("Error fetching requests count", e);
         }
 
         // Fetch equipments count
@@ -114,7 +114,7 @@ export default function DashboardPage() {
           const equipData = equipRes.data.data || equipRes.data || [];
           equipmentsCount = equipData.length;
         } catch (e) {
-          console.error("Error fetching equipments count", e);
+          console.warn("Error fetching equipments count", e);
         }
 
         setStats({

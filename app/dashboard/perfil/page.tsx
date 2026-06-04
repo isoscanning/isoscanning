@@ -111,6 +111,7 @@ export default function PerfilPage() {
   // Loading States and Modals
   const [loadingPortfolio, setLoadingPortfolio] = useState(false)
   const [loadingAvailability, setLoadingAvailability] = useState(false)
+  const [fetchingAvailability, setFetchingAvailability] = useState(false)
   const [deletingBulk, setDeletingBulk] = useState(false) // Specific loader for bulk delete
   const [savingProfile, setSavingProfile] = useState(false)
   const [showSaveSuccessModal, setShowSaveSuccessModal] = useState(false)
@@ -346,21 +347,17 @@ export default function PerfilPage() {
     setLoadingPortfolio(false)
   }
 
-  const loadAvailability = async (preselectDates: boolean = true) => {
+  const loadAvailability = async () => {
     if (!userProfile?.id) return
-    setLoadingAvailability(true)
-    const slots = await fetchAvailability(userProfile.id)
-    setAvailabilitySlots(slots)
-
-    // We no longer pre-select dates automatically as the calendar now has a separate "available" state
-    /*
-    if (preselectDates) {
-      const existingDates = slots.map(slot => new Date(slot.date))
-      setSelectedDates(existingDates)
+    setFetchingAvailability(true)
+    try {
+      const slots = await fetchAvailability(userProfile.id)
+      const todayStr = format(new Date(), "yyyy-MM-dd")
+      const futureSlots = slots.filter(slot => slot.date >= todayStr)
+      setAvailabilitySlots(futureSlots)
+    } finally {
+      setFetchingAvailability(false)
     }
-    */
-
-    setLoadingAvailability(false)
   }
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
@@ -672,7 +669,7 @@ export default function PerfilPage() {
       })
 
       // Reload availability and synchronize selected dates to update calendar colors
-      await loadAvailability(true)
+      await loadAvailability()
       setSelectedDates([]) // Clear selection after successful add
       setLastClickedDate(null)
       setSuccessMsg(`${dates.length} disponibilidade(s) adicionada(s)!`)
@@ -744,7 +741,7 @@ export default function PerfilPage() {
     try {
       setLoadingAvailability(true)
       await deleteAvailability(id)
-      await loadAvailability(true) // Synchronize selected dates to update calendar colors
+      await loadAvailability()
       setSelectedSlotsToDelete(prev => prev.filter(slotId => slotId !== id)) // Remove from selection if deleted
     } catch (err) {
       setErrorMsg("Erro ao excluir disponibilidade.")
@@ -764,8 +761,7 @@ export default function PerfilPage() {
 
   // Select all slots
   const handleSelectAll = () => {
-    const todayStr = format(new Date(), 'yyyy-MM-dd')
-    const futureSlots = availabilitySlots.filter(slot => slot.date >= todayStr)
+    const futureSlots = availabilitySlots;
 
     if (selectedSlotsToDelete.length === futureSlots.length && futureSlots.length > 0) {
       setSelectedSlotsToDelete([])
@@ -785,7 +781,7 @@ export default function PerfilPage() {
       // Delete all selected slots using bulk endpoint
       await deleteAvailabilities(selectedSlotsToDelete)
 
-      await loadAvailability(true) // Synchronize selected dates to update calendar colors
+      await loadAvailability()
       setSelectedSlotsToDelete([])
       setSuccessMsg(`${selectedSlotsToDelete.length} disponibilidade(s) excluída(s)!`)
     } catch (err) {
@@ -920,13 +916,14 @@ export default function PerfilPage() {
                 selectedDates={selectedDates}
                 handleDateSelect={handleDateSelect}
                 handleDayClick={handleDayClick}
-                availabilitySlots={availabilitySlots.filter(slot => slot.date >= format(new Date(), 'yyyy-MM-dd'))}
+                availabilitySlots={availabilitySlots}
                 isAllDay={isAllDay}
                 setIsAllDay={setIsAllDay}
                 newSlot={newSlot}
                 setNewSlot={setNewSlot}
                 handleAddAvailability={handleAddAvailability}
                 loadingAvailability={loadingAvailability}
+                fetchingAvailability={fetchingAvailability}
                 handleSelectAll={handleSelectAll}
                 selectedSlotsToDelete={selectedSlotsToDelete}
                 toggleSlotSelection={toggleSlotSelection}

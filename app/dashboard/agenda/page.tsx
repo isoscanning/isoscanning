@@ -24,7 +24,8 @@ export default function AgendaPage() {
   const { userProfile, loading } = useAuth();
 
   const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
-  const [loadingAvailability, setLoadingAvailability] = useState(true);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [fetchingAvailability, setFetchingAvailability] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
@@ -40,8 +41,7 @@ export default function AgendaPage() {
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [deletingBulk, setDeletingBulk] = useState(false);
 
-  const mountedRef = useRef(true);
-  useEffect(() => () => { mountedRef.current = false; }, []);
+
 
   useEffect(() => {
     if (!loading && !userProfile) {
@@ -65,14 +65,16 @@ export default function AgendaPage() {
 
   const loadAvailability = async () => {
     if (!userProfile?.id) return;
-    setLoadingAvailability(true);
+    setFetchingAvailability(true);
     try {
       const slots = await fetchAvailability(userProfile.id);
-      if (mountedRef.current) setAvailabilitySlots(slots);
+      const todayStr = format(new Date(), "yyyy-MM-dd");
+      const futureSlots = slots.filter(slot => slot.date >= todayStr);
+      setAvailabilitySlots(futureSlots);
     } catch (error) {
-      if (mountedRef.current) setErrorMsg("Erro ao carregar disponibilidade.");
+      setErrorMsg("Erro ao carregar disponibilidade.");
     } finally {
-      if (mountedRef.current) setLoadingAvailability(false);
+      setFetchingAvailability(false);
     }
   };
 
@@ -178,8 +180,7 @@ export default function AgendaPage() {
   };
 
   const handleSelectAll = () => {
-    const todayStr = format(new Date(), 'yyyy-MM-dd')
-    const futureSlots = availabilitySlots.filter(slot => slot.date >= todayStr)
+    const futureSlots = availabilitySlots;
 
     if (selectedSlotsToDelete.length === futureSlots.length && futureSlots.length > 0) {
       setSelectedSlotsToDelete([]);
@@ -269,13 +270,14 @@ export default function AgendaPage() {
               selectedDates={selectedDates}
               handleDateSelect={handleDateSelect}
               handleDayClick={handleDayClick}
-              availabilitySlots={availabilitySlots.filter(slot => slot.date >= format(new Date(), 'yyyy-MM-dd'))}
+              availabilitySlots={availabilitySlots}
               isAllDay={isAllDay}
               setIsAllDay={setIsAllDay}
               newSlot={newSlot}
               setNewSlot={setNewSlot}
               handleAddAvailability={handleAddAvailability}
               loadingAvailability={loadingAvailability}
+              fetchingAvailability={fetchingAvailability}
               handleSelectAll={handleSelectAll}
               selectedSlotsToDelete={selectedSlotsToDelete}
               toggleSlotSelection={toggleSlotSelection}

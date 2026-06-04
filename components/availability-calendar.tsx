@@ -30,6 +30,10 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
         setCurrentMonth(addMonths(currentMonth, 1));
     };
 
+    const now = new Date();
+    const isPreviousDisabled = currentMonth.getFullYear() < now.getFullYear() || 
+                               (currentMonth.getFullYear() === now.getFullYear() && currentMonth.getMonth() <= now.getMonth());
+
     return (
         <Card className="w-full bg-card rounded-3xl p-8 shadow-2xl border-border/50">
             <div className="flex items-center justify-between mb-8">
@@ -37,7 +41,8 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
                     variant="outline"
                     size="icon"
                     onClick={handlePreviousMonth}
-                    className="h-9 w-9 rounded-full bg-background hover:bg-muted border-border text-foreground transition-colors"
+                    disabled={isPreviousDisabled}
+                    className="h-9 w-9 rounded-full bg-background hover:bg-muted border-border text-foreground transition-colors disabled:opacity-50"
                 >
                     <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -69,6 +74,7 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
                     onSelect={setDate}
                     month={currentMonth}
                     onMonthChange={setCurrentMonth}
+                    hideNavigation
                     locale={ptBR}
                     className="p-0"
                     modifiers={{
@@ -81,7 +87,7 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
                     }}
                     classNames={{
                         month: "space-y-4",
-                        caption: "hidden", // Hide default caption as we have custom header
+                        month_caption: "hidden", // Hide default caption as we have custom header
                         head_row: "flex w-full justify-between mb-4",
                         head_cell:
                             "text-muted-foreground/60 rounded-md w-9 font-medium text-[0.8rem] uppercase tracking-wider",
@@ -132,8 +138,7 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
                         selected={date}
                         onSelect={setDate}
                         month={nextMonth}
-                        // Disable navigation on second calendar
-                        disableNavigation
+                        hideNavigation
                         locale={ptBR}
                         className="p-0 grayscale-[0.5] hover:grayscale-0 transition-all"
                         modifiers={{
@@ -146,7 +151,7 @@ export function AvailabilityCalendar({ availabilitySlots = [] }: AvailabilityCal
                         }}
                         classNames={{
                             month: "space-y-4",
-                            caption: "hidden",
+                            month_caption: "hidden",
                             head_row: "flex w-full justify-between mb-4",
                             head_cell:
                                 "text-muted-foreground/40 rounded-md w-9 font-medium text-[0.8rem] uppercase tracking-wider",

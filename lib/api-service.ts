@@ -4,6 +4,10 @@ import { tokenManager } from "./token-manager";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 const API_TIMEOUT = parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || "30000");
 
+// Tracks when we're mid-redirect to /login so in-flight requests cancelled
+// by the browser don't produce noisy console errors.
+export let isNavigatingToLogin = false;
+
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_URL,
   timeout: API_TIMEOUT,
@@ -54,6 +58,7 @@ apiClient.interceptors.response.use(
         }
 
         tokenManager.clear();
+        isNavigatingToLogin = true;
         window.location.href = "/login";
       }
     }

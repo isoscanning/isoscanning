@@ -1,4 +1,4 @@
-import apiClient from "./api-service";
+import apiClient, { isNavigatingToLogin } from "./api-service";
 import { supabase } from "./supabase";
 import imageCompression from "browser-image-compression";
 
@@ -517,9 +517,13 @@ export interface AvailabilitySlot {
 export async function fetchAvailability(professionalId: string): Promise<AvailabilitySlot[]> {
   try {
     const response = await apiClient.get(`/availability?professionalId=${professionalId}`);
-    return response.data || [];
+    let data = response.data;
+    if (data && typeof data === 'object' && 'data' in data && Array.isArray(data.data)) {
+        data = data.data;
+    }
+    return Array.isArray(data) ? data : [];
   } catch (error) {
-    console.error("[data-service] Error fetching availability:", error);
+    if (!isNavigatingToLogin) console.warn("[data-service] Error fetching availability:", error);
     return [];
   }
 }
@@ -1005,7 +1009,7 @@ export async function fetchNotifications(): Promise<{ data: AppNotification[], t
     const response = await apiClient.get('/notifications?limit=20');
     return response.data;
   } catch (error) {
-    console.error("[data-service] Error fetching notifications:", error);
+    if (!isNavigatingToLogin) console.warn("[data-service] Error fetching notifications:", error);
     return { data: [], total: 0, unreadCount: 0 };
   }
 }

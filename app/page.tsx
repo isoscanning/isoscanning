@@ -679,7 +679,7 @@ export default function HomePage() {
                       <div className="flex items-center gap-3 pt-4 border-t">
                         <div className="h-12 w-12 shrink-0 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-white font-bold text-lg overflow-hidden relative">
                           {testimonial.avatar.length > 2 ? (
-                            <Image src={testimonial.avatar} alt={testimonial.name} fill sizes="48px" className="object-cover" />
+                            <Image src={testimonial.avatar} alt={testimonial.name} fill sizes="48px" className="object-cover" unoptimized />
                           ) : (
                             testimonial.avatar
                           )}

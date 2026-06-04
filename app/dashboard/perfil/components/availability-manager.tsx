@@ -33,6 +33,7 @@ interface AvailabilityManagerProps {
     setNewSlot: (slot: any) => void;
     handleAddAvailability: () => void;
     loadingAvailability: boolean;
+    fetchingAvailability: boolean;
     handleSelectAll: () => void;
     selectedSlotsToDelete: string[];
     toggleSlotSelection: (id: string) => void;
@@ -54,6 +55,7 @@ export function AvailabilityManager({
     setNewSlot,
     handleAddAvailability,
     loadingAvailability,
+    fetchingAvailability,
     handleSelectAll,
     selectedSlotsToDelete,
     toggleSlotSelection,
@@ -79,9 +81,10 @@ export function AvailabilityManager({
                                 onSelect={handleDateSelect}
                                 onDayClick={handleDayClick}
                                 disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
+                                startMonth={new Date()}
                                 modifiers={{
                                     available: (date) => availabilitySlots.some(slot =>
-                                        slot.date === format(date, 'yyyy-MM-dd')
+                                        slot.date && slot.date.substring(0, 10) === format(date, 'yyyy-MM-dd')
                                     )
                                 }}
                                 locale={ptBR}
@@ -168,7 +171,12 @@ export function AvailabilityManager({
                             )}
                         </div>
                         <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
-                            {availabilitySlots.length === 0 ? (
+                            {fetchingAvailability ? (
+                                <div className="flex items-center gap-2 text-muted-foreground py-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span className="text-sm italic">Carregando...</span>
+                                </div>
+                            ) : availabilitySlots.length === 0 ? (
                                 <p className="text-muted-foreground italic">Nenhuma disponibilidade cadastrada.</p>
                             ) : (
                                 availabilitySlots
@@ -183,9 +191,9 @@ export function AvailabilityManager({
                                                 <CalendarIcon className="h-5 w-5 text-primary" />
                                                 <div>
                                                     <p className="font-medium">
-                                                        {format(parseISO(slot.date + 'T12:00:00'), "dd 'de' MMMM, yyyy", { locale: ptBR })}
+                                                        {format(parseISO(slot.date && slot.date.length > 10 ? slot.date : slot.date + 'T12:00:00'), "dd 'de' MMMM, yyyy", { locale: ptBR })}
                                                     </p>
-                                                    {slot.startTime === "00:00" && slot.endTime === "23:59" ? (
+                                                    {(slot.startTime === "00:00" || slot.startTime === "00:00:00") && (slot.endTime === "23:59" || slot.endTime === "23:59:00") ? (
                                                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">⭐ Dia Inteiro</span>
                                                     ) : (
                                                         <p className="text-sm text-muted-foreground">{slot.startTime} - {slot.endTime}</p>

@@ -7,8 +7,8 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Plus, DollarSign, WalletCards, AlertCircle, Calendar, Pencil, Trash2 } from "lucide-react";
-import { fetchFinancialRecords, fetchFinancialSummary, fetchAnnualSummary, deleteFinancialRecord, FinancialRecord, FinancialSummary, AnnualSummary } from "@/lib/finances-service";
+import { FileText, Plus, DollarSign, WalletCards, AlertCircle, Calendar, Pencil, Trash2, Check } from "lucide-react";
+import { fetchFinancialRecords, fetchFinancialSummary, fetchAnnualSummary, deleteFinancialRecord, updateFinancialRecord, FinancialRecord, FinancialSummary, AnnualSummary } from "@/lib/finances-service";
 import { useToast } from "@/components/ui/use-toast";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { FinanceModal } from "./components/finance-modal";
@@ -98,6 +98,24 @@ export default function FinancesDashboardPage() {
                 variant: "destructive",
                 title: "Erro",
                 description: "Não foi possível excluir o lançamento.",
+            });
+        }
+    };
+
+    const handleConfirmPayment = async (id: string) => {
+        try {
+            await updateFinancialRecord(id, { status: 'received' });
+            toast({
+                title: "Pagamento confirmado",
+                description: "O status do lançamento foi alterado para Recebido.",
+            });
+            loadData();
+        } catch (error) {
+            console.error("Erro ao confirmar pagamento:", error);
+            toast({
+                variant: "destructive",
+                title: "Erro",
+                description: "Não foi possível confirmar o pagamento.",
             });
         }
     };
@@ -389,8 +407,8 @@ export default function FinancesDashboardPage() {
                                                 <th className="px-4 py-3">Origem</th>
                                                 <th className="px-4 py-3">Status</th>
                                                 <th className="px-4 py-3">NFe</th>
-                                                <th className="px-4 py-3 text-right">Valor</th>
-                                                <th className="px-2 py-3 text-right print:hidden">Ações</th>
+                                                <th className="px-4 py-3">Valor</th>
+                                                <th className="px-4 py-3 print:hidden">Ações</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -429,10 +447,21 @@ export default function FinancesDashboardPage() {
                                                             </span>
                                                         )}
                                                     </td>
-                                                    <td className="px-4 py-3 text-right font-medium">
+                                                    <td className="px-4 py-3 font-medium">
                                                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(r.amount)}
                                                     </td>
-                                                    <td className="px-2 py-3 text-right print:hidden flex items-center justify-end gap-1">
+                                                    <td className="px-4 py-3 print:hidden flex items-center justify-start gap-1">
+                                                        {r.status !== 'received' && (
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                size="icon" 
+                                                                onClick={() => handleConfirmPayment(r.id)}
+                                                                title="Confirmar Pagamento"
+                                                                className="h-8 w-8 text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10"
+                                                            >
+                                                                <Check className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
                                                         <Button 
                                                             variant="ghost" 
                                                             size="icon" 
@@ -458,7 +487,7 @@ export default function FinancesDashboardPage() {
                                         <tfoot className="font-bold text-base bg-muted/30">
                                             <tr>
                                                 <td colSpan={5} className="px-4 py-3 text-right">Total:</td>
-                                                <td className="px-4 py-3 text-right text-emerald-600">
+                                                <td className="px-4 py-3 text-emerald-600">
                                                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
                                                         records.reduce((acc, curr) => acc + curr.amount, 0)
                                                     )}

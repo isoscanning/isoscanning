@@ -10,6 +10,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 
 export function NotificationBell() {
     const { userProfile } = useAuth();
@@ -29,9 +31,46 @@ export function NotificationBell() {
 
         loadNotifications();
 
-        // Polling every minute for new matching notifications
-        const interval = setInterval(loadNotifications, 60000);
-        return () => clearInterval(interval);
+        // Subscribe to real-time notifications
+        const channel = supabase
+            .channel('realtime:notifications')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'notifications',
+                    filter: `profile_id=eq.${userProfile.id}`
+                },
+                (payload) => {
+                    const row = payload.new as any;
+                    const newNotification: AppNotification = {
+                        id: row.id,
+                        profileId: row.profile_id,
+                        title: row.title,
+                        message: row.message,
+                        type: row.type,
+                        referenceId: row.reference_id,
+                        isRead: row.is_read,
+                        createdAt: row.created_at,
+                    };
+                    
+                    // Show toast popup
+                    toast.success("Ei, uma vaga deu Match com você!", {
+                        description: newNotification.title,
+                        duration: 5000,
+                    });
+
+                    // Update state
+                    setNotifications((prev) => [newNotification, ...prev]);
+                    setUnreadCount((prev) => prev + 1);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [userProfile]);
 
     const handleNotificationClick = async (notification: AppNotification) => {
@@ -46,7 +85,7 @@ export function NotificationBell() {
         setIsOpen(false);
 
         if (notification.type === "job_match" && notification.referenceId) {
-            router.push(`/dashboard/vagas/${notification.referenceId}`);
+            router.push(`/vagas/${notification.referenceId}`);
         } else if (notification.type === "equipment_match" && notification.referenceId) {
             router.push(`/equipamentos/${notification.referenceId}`);
         } else if (notification.type === "review_received") {
@@ -75,12 +114,12 @@ export function NotificationBell() {
                         </span>
                     )}
                 </div>
-                <ScrollArea className="h-80 select-none">
-                    {notifications.length === 0 ? (
-                        <div className="p-4 text-center text-zinc-500 text-sm">
-                            Nenhuma notificação por enquanto.
-                        </div>
-                    ) : (
+                {notifications.length === 0 ? (
+                    <div className="p-8 text-center text-zinc-500 text-sm">
+                        Nenhuma notificação por enquanto.
+                    </div>
+                ) : (
+                    <ScrollArea className="max-h-[60vh] md:max-h-80 select-none">
                         <div className="flex flex-col py-2">
                             {notifications.map((notification) => (
                                 <button
@@ -107,8 +146,8 @@ export function NotificationBell() {
                                 </button>
                             ))}
                         </div>
-                    )}
-                </ScrollArea>
+                    </ScrollArea>
+                )}
             </PopoverContent>
         </Popover>
     );

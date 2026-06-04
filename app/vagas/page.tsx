@@ -32,6 +32,7 @@ import { CountUp } from "@/components/typing-text";
 import { motion, AnimatePresence } from "framer-motion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/lib/auth-context";
 
 const TIPOS_TRABALHO = [
     { value: "all", label: "Todos" },
@@ -46,6 +47,7 @@ const ESTADOS = [
 ];
 
 export default function VagasPublicasPage() {
+    const { userProfile } = useAuth();
     const [vagas, setVagas] = useState<JobOffer[]>([]);
     const [specialties, setSpecialties] = useState<Specialty[]>([]);
     const [loading, setLoading] = useState(true);
@@ -384,20 +386,40 @@ export default function VagasPublicasPage() {
                         ) : (
                             /* Job Cards Grid */
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {filteredVagas.map((vaga, index) => (
+                                {filteredVagas.map((vaga, index) => {
+                                    const isMatch = userProfile?.userType === "professional" &&
+                                        (userProfile.specialty === vaga.category || userProfile.specialties?.includes(vaga.category));
+                                    
+                                    return (
                                     <motion.div
                                         key={vaga.id}
                                         initial={{ opacity: 0, y: 20 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.4, delay: index * 0.1 }}
                                     >
-                                        <Card className="group hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 border-2 hover:border-primary/30 overflow-hidden bg-card h-full flex flex-col">
+                                        <Card className={`group hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 border-2 hover:border-primary/30 overflow-hidden bg-card h-full flex flex-col ${isMatch ? "border-green-500/50 shadow-lg shadow-green-500/10 ring-1 ring-green-500/20" : ""}`}>
                                             <CardContent className="p-6 flex flex-col flex-1">
                                                 <div className="flex justify-between items-start mb-4">
-                                                    <Badge variant="secondary" className="rounded-full">
-                                                        {vaga.category}
-                                                    </Badge>
-                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white ${getJobTypeColor(vaga.jobType)}`}>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        <Badge variant="secondary" className="rounded-full">
+                                                            {vaga.category}
+                                                        </Badge>
+                                                        {isMatch && (
+                                                            <motion.div
+                                                                initial={{ scale: 0, rotate: -180 }}
+                                                                animate={{ scale: [0, 1.3, 1], rotate: 0 }}
+                                                                transition={{ type: "spring", bounce: 0.7, duration: 0.8, delay: index * 0.1 + 0.3 }}
+                                                                className="relative"
+                                                            >
+                                                                <div className="absolute inset-0 bg-green-500 rounded-full animate-ping opacity-75" style={{ animationDuration: '1.5s', animationIterationCount: 2 }} />
+                                                                <Badge variant="default" className="relative rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/50 border-0 flex items-center gap-1 z-10 px-3 py-1">
+                                                                    <Sparkles className="w-3.5 h-3.5 text-yellow-300" /> 
+                                                                    <span className="font-bold tracking-wide">Match</span>
+                                                                </Badge>
+                                                            </motion.div>
+                                                        )}
+                                                    </div>
+                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white shrink-0 ${getJobTypeColor(vaga.jobType)}`}>
                                                         {getJobTypeLabel(vaga.jobType)}
                                                     </span>
                                                 </div>
@@ -456,7 +478,8 @@ export default function VagasPublicasPage() {
                                             </CardContent>
                                         </Card>
                                     </motion.div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

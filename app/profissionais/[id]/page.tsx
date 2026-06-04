@@ -140,6 +140,9 @@ export default function ProfessionalProfilePage() {
   const [reviewModalOpen, setReviewModalOpen] = useState(false); // Modal state
   const [hasUserReviewed, setHasUserReviewed] = useState(false); // Checking state
 
+  // Portfolio filter state
+  const [portfolioFilter, setPortfolioFilter] = useState<'all' | 'photo' | 'video'>('all');
+
   // Lightbox state
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -258,6 +261,13 @@ export default function ProfessionalProfilePage() {
       (item.media || []).map(m => ({ url: m.url, type: m.type, title: item.title }))
     );
   }, [portfolio]);
+
+  const filteredPortfolio = useMemo(() => {
+    if (portfolioFilter === 'all') return portfolio;
+    if (portfolioFilter === 'photo') return portfolio.filter(item => item.media?.some(m => m.type === 'image'));
+    if (portfolioFilter === 'video') return portfolio.filter(item => item.media?.some(m => m.type === 'video'));
+    return portfolio;
+  }, [portfolio, portfolioFilter]);
 
   // Lightbox functions
   const openLightbox = (itemIndex: number) => {
@@ -526,22 +536,57 @@ export default function ProfessionalProfilePage() {
               </TabsList>
             </div>
 
-            <TabsContent value="portfolio" className="mt-0 space-y-12">
+            <TabsContent value="portfolio" className="mt-0 space-y-8">
               {portfolio.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {portfolio.map((item, index) => (
-                    <PortfolioThumbnail
-                      key={item.id}
-                      item={item}
-                      onClick={() => openLightbox(index)}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div className="flex items-center gap-2 mb-8">
+                    <button
+                      onClick={() => setPortfolioFilter('all')}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors border ${portfolioFilter === 'all' ? 'bg-foreground text-background border-foreground shadow-sm' : 'bg-transparent text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground'}`}
+                    >
+                      Todos
+                    </button>
+                    <button
+                      onClick={() => setPortfolioFilter('photo')}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors border ${portfolioFilter === 'photo' ? 'bg-foreground text-background border-foreground shadow-sm' : 'bg-transparent text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground'}`}
+                    >
+                      Fotos
+                    </button>
+                    <button
+                      onClick={() => setPortfolioFilter('video')}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors border ${portfolioFilter === 'video' ? 'bg-foreground text-background border-foreground shadow-sm' : 'bg-transparent text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground'}`}
+                    >
+                      Vídeos
+                    </button>
+                  </div>
+
+                  {filteredPortfolio.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {filteredPortfolio.map((item) => (
+                        <PortfolioThumbnail
+                          key={item.id}
+                          item={item}
+                          onClick={() => openLightbox(portfolio.findIndex(p => p.id === item.id))}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 border-2 border-dashed border-border rounded-xl bg-muted/20">
+                      <div className="flex flex-col items-center justify-center text-muted-foreground space-y-3">
+                        <p className="text-muted-foreground">
+                          Nenhum item encontrado nesta categoria.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground">
-                    Nenhum item no portfólio.
-                  </p>
+                <div className="text-center py-12 border-2 border-dashed border-border rounded-xl bg-muted/20">
+                  <div className="flex flex-col items-center justify-center text-muted-foreground space-y-3">
+                    <p className="text-muted-foreground">
+                      Este profissional ainda não adicionou itens ao portfólio.
+                    </p>
+                  </div>
                 </div>
               )}
             </TabsContent>

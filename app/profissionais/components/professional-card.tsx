@@ -1,8 +1,8 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowRight, MapPin, Star } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useState } from "react";
 import { type Professional } from "@/lib/data-service";
 import { trackEvent } from "@/lib/analytics";
 
@@ -11,7 +11,20 @@ interface ProfessionalCardProps {
     index: number;
 }
 
+function enhanceAvatarUrl(url: string | undefined): string | undefined {
+    if (!url) return url;
+    if (url.includes('lh3.googleusercontent.com')) {
+        // Only modify if URL ends exactly with =sNNN or =sNNN-c (no query params)
+        if (url.match(/=s\d+(-c)?$/)) {
+            return url.replace(/=s\d+(-c)?$/, '=s400-c');
+        }
+    }
+    return url;
+}
+
 export function ProfessionalCard({ professional, index }: ProfessionalCardProps) {
+    const avatarUrl = enhanceAvatarUrl(professional.avatarUrl || undefined);
+    const [imgError, setImgError] = useState(false);
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -31,16 +44,18 @@ export function ProfessionalCard({ professional, index }: ProfessionalCardProps)
                     >
                         {/* Image Area */}
                         <div className="relative h-72 bg-gradient-to-br from-muted to-muted/50 overflow-hidden">
-                            <Avatar className="h-full w-full rounded-none">
-                                <AvatarImage
-                                    src={professional.avatarUrl || undefined}
+                            {avatarUrl && !imgError ? (
+                                <img
+                                    src={avatarUrl}
                                     alt={professional.displayName}
-                                    className="object-cover group-hover:scale-110 transition-transform duration-700"
+                                    className="h-full w-full object-cover object-top group-hover:scale-110 transition-transform duration-700"
+                                    onError={() => setImgError(true)}
                                 />
-                                <AvatarFallback className="text-4xl bg-gradient-to-br from-primary/20 to-purple-500/20 text-primary rounded-none h-full w-full flex items-center justify-center">
+                            ) : (
+                                <div className="h-full w-full flex items-center justify-center text-4xl bg-gradient-to-br from-primary/20 to-purple-500/20 text-primary">
                                     {professional.displayName?.charAt(0).toUpperCase() || "P"}
-                                </AvatarFallback>
-                            </Avatar>
+                                </div>
+                            )}
 
                             {/* Gradient Overlay */}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />

@@ -832,6 +832,8 @@ export default function LpProfissional() {
                     "Anuncie até 5 equipamentos",
                     "Envie até 10 arquivos no portfólio",
                     "Selo de Perfil Verificado",
+                    "Contato direto via WhatsApp",
+                    "Visualização do Instagram do profissional",
                   ],
                   notIncluded: [
                     "Candidaturas ilimitadas",
@@ -856,6 +858,8 @@ export default function LpProfissional() {
                     "Equipamentos ILIMITADOS",
                     "Envie até 150 arquivos no portfólio",
                     "Selo de Perfil Verificado",
+                    "Contato direto via WhatsApp",
+                    "Visualização do Instagram do profissional",
                     "Destaque máximo nas buscas",
                     "Suporte VIP Prioritário",
                   ],

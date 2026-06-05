@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, Settings, LogOut, LogIn, UserPlus, Briefcase, PlayCircle } from "lucide-react";
+import { User, Settings, LogOut, LogIn, UserPlus, Briefcase, PlayCircle, MessageSquare } from "lucide-react";
 
 export function UserNav() {
   const { userProfile, signOut, loading } = useAuth();
@@ -136,6 +136,18 @@ export function UserNav() {
             >
               <User className="mr-2 h-4 w-4 text-primary" />
               <span>Dashboard</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            asChild
+            className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
+          >
+            <Link
+              href="/dashboard/chat"
+              className="flex items-center w-full text-foreground"
+            >
+              <MessageSquare className="mr-2 h-4 w-4 text-primary" />
+              <span>Mensagens</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem

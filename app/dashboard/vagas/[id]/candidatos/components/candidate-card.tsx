@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { type JobCandidate } from "@/lib/data-service";
 import { useState } from "react";
+import apiClient from "@/lib/api-service";
 import { downloadAgreementPdf } from "@/lib/pdf-generator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
@@ -53,6 +54,17 @@ export function CandidateCard({
     const params = useParams();
     const jobId = params.id as string;
     const [isAgreementModalOpen, setIsAgreementModalOpen] = useState(false);
+    const [startingChat, setStartingChat] = useState(false);
+
+    const handleStartChat = async () => {
+        setStartingChat(true);
+        try {
+            const res = await apiClient.post("/chat/conversations", { participantId: candidate.profile.id });
+            router.push(`/dashboard/chat/${res.data.id}`);
+        } catch {
+            setStartingChat(false);
+        }
+    };
 
     const handleDownloadPdf = () => {
         if (candidate.agreementText) {
@@ -157,6 +169,20 @@ export function CandidateCard({
                                         <Link href={`/profissionais/${candidate.profile.id}`} target="_blank">
                                             Ver Perfil Completo
                                         </Link>
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="flex-1 sm:flex-none gap-1.5"
+                                        onClick={handleStartChat}
+                                        disabled={startingChat}
+                                    >
+                                        {startingChat ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                            <MessageSquare className="h-3.5 w-3.5" />
+                                        )}
+                                        Mensagem
                                     </Button>
                                     {candidate.agreementText && (
                                         <Button size="sm" variant="outline" onClick={() => setIsAgreementModalOpen(true)} className="flex-1 sm:flex-none">

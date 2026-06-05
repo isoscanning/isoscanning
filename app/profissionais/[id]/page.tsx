@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context"; // Import useAuth
 import { trackEvent } from "@/lib/analytics";
 import { Header } from "@/components/header";
@@ -15,9 +15,7 @@ import { ReviewModal } from "@/components/review-modal"; // Import ReviewModal
 import {
   MapPin,
   Star,
-  Instagram,
   Linkedin,
-  Globe,
   Play,
   ChevronLeft,
   ChevronRight,
@@ -129,6 +127,7 @@ function PortfolioThumbnail({ item, onClick }: { item: PortfolioItem; onClick: (
 
 export default function ProfessionalProfilePage() {
   const params = useParams();
+  const router = useRouter();
   const professionalId = params.id as string;
   const { userProfile: currentUser } = useAuth(); // Get currentUser
 
@@ -139,6 +138,18 @@ export default function ProfessionalProfilePage() {
   const [loading, setLoading] = useState(true);
   const [reviewModalOpen, setReviewModalOpen] = useState(false); // Modal state
   const [hasUserReviewed, setHasUserReviewed] = useState(false); // Checking state
+  const [startingChat, setStartingChat] = useState(false);
+
+  const handleStartChat = async () => {
+    if (!currentUser || !professional) return;
+    setStartingChat(true);
+    try {
+      const res = await apiClient.post("/chat/conversations", { participantId: professional.id });
+      router.push(`/dashboard/chat/${res.data.id}`);
+    } catch {
+      setStartingChat(false);
+    }
+  };
 
   // Portfolio filter state
   const [portfolioFilter, setPortfolioFilter] = useState<'all' | 'photo' | 'video'>('all');
@@ -424,87 +435,22 @@ export default function ProfessionalProfilePage() {
 
             {/* Actions */}
             <div className="flex flex-col items-center gap-4">
-              {/* Social Icons */}
-              <div className="flex gap-4">
-                {professional.instagram && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="rounded-full h-11 w-11 border-border bg-background/50 hover:bg-primary/10 hover:text-primary hover:scale-110 hover:border-primary/50 transition-all duration-300 shadow-sm"
-                    onClick={() => {
-                      trackEvent({ action: 'click_social', category: 'Professionals', label: 'Instagram', value: 0 });
-                      const link = professional.instagram?.startsWith('http') ? professional.instagram : `https://instagram.com/${professional.instagram?.replace('@', '')}`;
-                      window.open(link, '_blank');
-                    }}
-                  >
-                    <Instagram className="h-5 w-5" />
-                  </Button>
-                )}
-
-                {professional.otherLinks && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="rounded-full h-11 w-11 border-border bg-background/50 hover:bg-primary/10 hover:text-primary hover:scale-110 hover:border-primary/50 transition-all duration-300 shadow-sm"
-                    onClick={() => {
-                      trackEvent({ action: 'click_social', category: 'Professionals', label: 'Website', value: 0 });
-                      const link = professional.otherLinks?.startsWith('http') ? professional.otherLinks : `https://${professional.otherLinks}`;
-                      window.open(link, '_blank');
-                    }}
-                  >
-                    <Globe className="h-5 w-5" />
-                  </Button>
-                )}
-              </div>
-
-              {/* WhatsApp Button */}
-              {professional.phone && (
+              {/* Chat Button */}
+              {currentUser && currentUser.id !== professional.id && (
                 <Button
-                  className="bg-green-600 hover:bg-green-700 text-white rounded-full px-8 h-12 gap-2 shadow-lg shadow-green-900/20 hover:shadow-green-900/40 hover:-translate-y-0.5 transition-all duration-300"
-                  onClick={() => {
-                    let phone = professional.phone || '';
-                    // Remove non-digits and non-plus
-                    // Actually for wa.me we need clean digits.
-
-                    // Logic:
-                    // If phoneCountryCode exists, use it + phone.
-                    // Else fallback to legacy logic.
-
-                    let cleanNumber = '';
-
-                    if (professional.phoneCountryCode && professional.phone) {
-                      // New format: We have separate code and number.
-                      const code = professional.phoneCountryCode.replace(/\D/g, '');
-                      const num = professional.phone.replace(/\D/g, '');
-                      cleanNumber = `${code}${num}`;
-                    } else {
-                      // Legacy fallback
-                      const phone = professional.phone || '';
-                      const isInternational = phone.startsWith('+');
-                      let cleanPhone = phone.replace(/\D/g, '');
-
-                      if (!isInternational && cleanPhone.length <= 11) {
-                        // Likely a legacy Brazilian number without DDI
-                        cleanNumber = `55${cleanPhone}`;
-                      } else {
-                        cleanNumber = cleanPhone;
-                      }
-                    }
-
-                    if (cleanNumber) {
-                      trackEvent({
-                        action: 'contact_professional',
-                        category: 'Professionals',
-                        label: professional.displayName,
-                      });
-                      window.open(`https://wa.me/${cleanNumber}`, '_blank');
-                    }
-                  }}
+                  className="rounded-full px-8 h-12 gap-2 shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+                  onClick={handleStartChat}
+                  disabled={startingChat}
                 >
-                  <MessageCircle className="h-5 w-5" />
-                  <span className="font-bold">Entrar em contato</span>
+                  {startingChat ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <MessageCircle className="h-5 w-5" />
+                  )}
+                  <span className="font-bold">Enviar Mensagem</span>
                 </Button>
               )}
+
             </div>
           </div>
 

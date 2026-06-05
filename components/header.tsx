@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserNav } from "@/components/user-nav";
 import { NotificationBell } from "@/components/notification-bell";
+import { ChatBell } from "@/components/chat-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Menu,
@@ -155,6 +156,7 @@ export function Header() {
             </span>
           )}
           <ThemeToggle />
+          {isAuthenticated && <ChatBell />}
           {isAuthenticated && <NotificationBell />}
           <UserNav />
         </div>
@@ -288,6 +290,19 @@ export function Header() {
                     >
                       <User className="h-4 w-4 mr-2 text-blue-500 dark:text-blue-400" />
                       <span className="font-medium">Dashboard</span>
+                    </Button>
+                  </Link>
+                  <Link
+                    href="/dashboard/chat"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start bg-transparent border-primary/30 hover:bg-primary/10 hover:text-primary"
+                    >
+                      <MessageSquare className="h-4 w-4 mr-2 text-primary" />
+                      <span className="font-medium">Mensagens</span>
                     </Button>
                   </Link>
                   <Link

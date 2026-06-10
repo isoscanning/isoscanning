@@ -245,7 +245,9 @@ export default function ProfessionalProfilePage() {
       // Fetch availability
       try {
         const availabilityData = await fetchAvailability(professionalId);
-        setAvailability(availabilityData);
+        const todayStr = new Date().toISOString().split("T")[0];
+        const futureAvailability = availabilityData.filter((slot: any) => slot.date >= todayStr);
+        setAvailability(futureAvailability);
       } catch (error) {
         console.error("[profissional-detail] Error fetching availability:", error);
       }

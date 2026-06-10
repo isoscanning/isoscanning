@@ -50,9 +50,34 @@ export default function AgendaPage() {
   }, [userProfile, loading, router]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const loadAvailability = async () => {
+      if (!userProfile?.id) return;
+      setFetchingAvailability(true);
+      try {
+        const slots = await fetchAvailability(userProfile.id);
+        if (!isMounted) return;
+        const todayStr = format(new Date(), "yyyy-MM-dd");
+        const futureSlots = slots.filter(slot => slot.date >= todayStr);
+        setAvailabilitySlots(futureSlots);
+      } catch (error) {
+        if (!isMounted) return;
+        setErrorMsg("Erro ao carregar disponibilidade.");
+      } finally {
+        if (isMounted) {
+          setFetchingAvailability(false);
+        }
+      }
+    };
+
     if (userProfile?.id) {
       loadAvailability();
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [userProfile?.id]);
 
   // Success message timeout management
@@ -62,21 +87,6 @@ export default function AgendaPage() {
       return () => clearTimeout(timer);
     }
   }, [successMsg]);
-
-  const loadAvailability = async () => {
-    if (!userProfile?.id) return;
-    setFetchingAvailability(true);
-    try {
-      const slots = await fetchAvailability(userProfile.id);
-      const todayStr = format(new Date(), "yyyy-MM-dd");
-      const futureSlots = slots.filter(slot => slot.date >= todayStr);
-      setAvailabilitySlots(futureSlots);
-    } catch (error) {
-      setErrorMsg("Erro ao carregar disponibilidade.");
-    } finally {
-      setFetchingAvailability(false);
-    }
-  };
 
   const handleAddAvailability = async () => {
     if (!userProfile?.id || selectedDates.length === 0) {

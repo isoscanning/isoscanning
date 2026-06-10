@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, Settings, LogOut, LogIn, UserPlus, Briefcase, PlayCircle, MessageSquare } from "lucide-react";
+import { User, Settings, LogOut, LogIn, UserPlus, Briefcase, PlayCircle, MessageSquare, UserCircle } from "lucide-react";
 
 export function UserNav() {
   const { userProfile, signOut, loading } = useAuth();
@@ -155,11 +155,23 @@ export function UserNav() {
             className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
           >
             <Link
+              href={`/profissionais/${userProfile?.id}`}
+              className="flex items-center w-full text-foreground"
+            >
+              <UserCircle className="mr-2 h-4 w-4 text-primary" />
+              <span>Meu Perfil</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            asChild
+            className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
+          >
+            <Link
               href="/dashboard/perfil"
               className="flex items-center w-full text-foreground"
             >
               <Settings className="mr-2 h-4 w-4 text-primary" />
-              <span>Configurações</span>
+              <span>Meus Dados</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />

@@ -85,8 +85,10 @@ export default function DisponibilidadePage() {
         `/availability?professionalId=${userProfile?.id}`
       );
       const data = response.data.data || response.data || [];
-      setAvailabilities(data);
-      console.log("[disponibilidade] Availabilities loaded:", data);
+      const todayStr = new Date().toISOString().split("T")[0];
+      const futureData = data.filter((d: any) => d.date >= todayStr);
+      setAvailabilities(futureData);
+      console.log("[disponibilidade] Availabilities loaded:", futureData);
     } catch (err) {
       console.error("[disponibilidade] Error fetching availabilities:", err);
       setError("Erro ao carregar disponibilidades");

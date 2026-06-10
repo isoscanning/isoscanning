@@ -403,14 +403,17 @@ export default function PerfilPage() {
             setAvatarPreview(userProfile.avatarUrl)
           }
 
+          let isMounted = true;
           await Promise.all([
             loadPortfolio(),
-            loadAvailability()
+            loadAvailability(isMounted)
           ])
 
-          setHasFetchedProfile(true)
+          if (isMounted) {
+            setHasFetchedProfile(true)
+          }
         } finally {
-          setIsInitialLoading(false)
+            setIsInitialLoading(false)
         }
       }
       fetchFreshProfile()
@@ -433,16 +436,17 @@ export default function PerfilPage() {
     setLoadingPortfolio(false)
   }
 
-  const loadAvailability = async () => {
+  const loadAvailability = async (isMounted = true) => {
     if (!userProfile?.id) return
     setFetchingAvailability(true)
     try {
       const slots = await fetchAvailability(userProfile.id)
+      if (!isMounted) return
       const todayStr = format(new Date(), "yyyy-MM-dd")
       const futureSlots = slots.filter(slot => slot.date >= todayStr)
       setAvailabilitySlots(futureSlots)
     } finally {
-      setFetchingAvailability(false)
+      if (isMounted) setFetchingAvailability(false)
     }
   }
 

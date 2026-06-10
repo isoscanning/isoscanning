@@ -23,6 +23,7 @@ import {
   Zap,
   MessageSquare,
   Info,
+  UserCircle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { trackEvent } from "@/lib/analytics";
@@ -306,6 +307,19 @@ export function Header() {
                     </Button>
                   </Link>
                   <Link
+                    href={`/profissionais/${userProfile?.id}`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start bg-transparent border-primary/30 hover:bg-primary/10 hover:text-primary"
+                    >
+                      <UserCircle className="h-4 w-4 mr-2 text-primary" />
+                      <span className="font-medium">Meu Perfil</span>
+                    </Button>
+                  </Link>
+                  <Link
                     href="/dashboard/perfil"
                     onClick={() => setMobileMenuOpen(false)}
                   >
@@ -315,7 +329,7 @@ export function Header() {
                       className="w-full justify-start bg-transparent border-primary/30 hover:bg-primary/10 hover:text-primary"
                     >
                       <Settings className="h-4 w-4 mr-2 text-purple-500 dark:text-purple-400" />
-                      <span className="font-medium">Configurações</span>
+                      <span className="font-medium">Meus Dados</span>
                     </Button>
                   </Link>
                   <Button

@@ -138,7 +138,7 @@ export interface AppNotification {
   profileId: string;
   title: string;
   message: string;
-  type: "job_match" | "equipment_match" | "system";
+  type: "job_match" | "equipment_match" | "system" | "review_received";
   referenceId?: string | null;
   isRead: boolean;
   createdAt: string;

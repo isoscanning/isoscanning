@@ -28,7 +28,8 @@ import {
   BadgeCheck,
   PieChart,
   Calculator,
-  FileSignature
+  FileSignature,
+  Share2
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
@@ -616,6 +617,29 @@ export default function DashboardPage() {
                 </Link>
               </ScrollReveal>
               {/* END: Contract Management Card */}
+
+              {/* START: Social Media Card */}
+              <ScrollReveal delay={1.3}>
+                <Link href="/dashboard/social-media" className="block h-full group" id="quick-social-media">
+                  <Card className="h-full border-border hover:border-violet-500/50 transition-all duration-300 hover:shadow-lg bg-card">
+                    <CardHeader>
+                      <div className="w-12 h-12 rounded-2xl bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                        <Share2 className="h-6 w-6" />
+                      </div>
+                      <CardTitle className="group-hover:text-violet-500 transition-colors">Gestão Social Media</CardTitle>
+                      <CardDescription>
+                        Gere cronogramas com IA, gerencie conteúdos, copys e hashtags, e colabore com sua equipe.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-end">
+                      <div className="w-8 h-8 rounded-full bg-background border flex items-center justify-center group-hover:bg-violet-500 group-hover:text-white group-hover:border-violet-500 transition-colors">
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </ScrollReveal>
+              {/* END: Social Media Card */}
             </div>
           </div>
         </div>

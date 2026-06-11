@@ -807,6 +807,8 @@ export default function LpProfissional() {
                     "Publique até 1 vaga por mês",
                     "Anuncie 1 equipamento",
                     "Envie até 4 arquivos no portfólio",
+                    "Gestão de 1 conta de social media",
+                    "1 calendário com IA por mês",
                   ],
                   notIncluded: [
                     "Envio de contrapropostas",
@@ -834,6 +836,8 @@ export default function LpProfissional() {
                     "Selo de Perfil Verificado",
                     "Contato direto via WhatsApp",
                     "Visualização do Instagram do profissional",
+                    "Gestão de até 5 contas de social media",
+                    "Calendários com IA ilimitados",
                   ],
                   notIncluded: [
                     "Candidaturas ilimitadas",
@@ -843,7 +847,7 @@ export default function LpProfissional() {
                 {
                   name: "Ultra",
                   description: "Sem limites para agências e power users",
-                  price: "R$ 149,90",
+                  price: "R$ 159,90",
                   period: "/mês",
                   cta: "Ser Profissional Ultra",
                   ctaVariant: "outline" as const,
@@ -862,6 +866,9 @@ export default function LpProfissional() {
                     "Visualização do Instagram do profissional",
                     "Destaque máximo nas buscas",
                     "Suporte VIP Prioritário",
+                    "Contas de social media ILIMITADAS",
+                    "Calendários com IA ilimitados",
+                    "Até 5 membros de equipe por conta para gestão de social media",
                   ],
                   notIncluded: [],
                 },

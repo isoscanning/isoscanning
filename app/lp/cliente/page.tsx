@@ -504,6 +504,8 @@ export default function LpCliente() {
                     "Publique até 1 vaga por mês",
                     "Anuncie 1 equipamento",
                     "Envie até 4 arquivos no portfólio",
+                    "Gestão de 1 conta de social media",
+                    "1 calendário com IA por mês",
                   ],
                   notIncluded: [
                     "Envio de contrapropostas",
@@ -531,6 +533,8 @@ export default function LpCliente() {
                     "Selo de Perfil Verificado",
                     "Contato direto via WhatsApp",
                     "Visualização do Instagram do profissional",
+                    "Gestão de até 5 contas de social media",
+                    "Calendários com IA ilimitados",
                   ],
                   notIncluded: [
                     "Candidaturas ilimitadas",
@@ -559,6 +563,9 @@ export default function LpCliente() {
                     "Visualização do Instagram do profissional",
                     "Destaque máximo nas buscas",
                     "Suporte VIP Prioritário",
+                    "Contas de social media ILIMITADAS",
+                    "Calendários com IA ilimitados",
+                    "Até 5 membros de equipe por conta para gestão de social media",
                   ],
                   notIncluded: [],
                 },

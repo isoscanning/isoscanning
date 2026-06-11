@@ -18,11 +18,20 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  SocialMediaSchedule, SocialMediaPost, NetworkType, PostType,
+  SocialMediaSchedule, SocialMediaPost, NetworkType, PostType, PostStatus,
   POST_TYPE_CONFIG, MONTHS_PT, COMMEMORATIVE_DATES
 } from "@/lib/social-media-types";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+const STATUS_DOT: Record<PostStatus, string> = {
+  draft:      "bg-amber-400 animate-pulse",
+  in_review:  "bg-yellow-300 animate-pulse",
+  rejected:   "bg-red-400 animate-pulse",
+  approved:   "bg-emerald-300",
+  scheduled:  "bg-sky-300",
+  published:  "bg-green-300",
+};
 
 const NETWORK_ICONS: Record<NetworkType, React.ComponentType<{ className?: string }>> = {
   instagram: Instagram,
@@ -120,6 +129,9 @@ export default function ScheduleCalendarPage() {
     tone: "",
     extraContext: "",
   });
+
+  // Context menu (right-click on card)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; post: SocialMediaPost } | null>(null);
 
   // Share modal
   const [showShareModal, setShowShareModal] = useState(false);
@@ -583,6 +595,38 @@ export default function ScheduleCalendarPage() {
 
   if (!schedule || !viewMonth) return null;
 
+  async function handleQuickStatusChange(post: SocialMediaPost, newStatus: PostStatus) {
+    setContextMenu(null);
+
+    // Atualização otimista — UI muda na hora
+    const optimistic = { ...post, status: newStatus };
+    setPosts((prev) => prev.map((p) => p.id === post.id ? optimistic : p));
+    if (selectedPost?.id === post.id) setSelectedPost(optimistic);
+
+    const now = new Date().toISOString();
+    try {
+      const { data, error } = await supabase.rpc("sm_update_post_status", {
+        p_post_id:      post.id,
+        p_status:       newStatus,
+        p_approved_by:  newStatus === "approved" ? (userProfile?.id ?? null) : null,
+        p_approved_at:  newStatus === "approved" ? now : null,
+        p_published_at: newStatus === "published" ? now : null,
+      });
+      if (error) throw error;
+      if (data) {
+        setPosts((prev) => prev.map((p) => p.id === post.id ? (data as SocialMediaPost) : p));
+        if (selectedPost?.id === post.id) setSelectedPost(data as SocialMediaPost);
+      }
+      toast.success("Status atualizado");
+    } catch (err) {
+      // Reverte se falhou
+      setPosts((prev) => prev.map((p) => p.id === post.id ? post : p));
+      if (selectedPost?.id === post.id) setSelectedPost(post);
+      console.error("quick status error:", err);
+      toast.error("Erro ao atualizar status");
+    }
+  }
+
   const monthName = MONTHS_PT[viewMonth.month - 1];
   const isOwnerMonth = schedule.month === viewMonth.month && schedule.year === viewMonth.year;
   const isDragging = draggingPostId !== null;
@@ -865,6 +909,9 @@ export default function ScheduleCalendarPage() {
                         const cfg = POST_TYPE_CONFIG[post.post_type];
                         const isBeingDragged = draggingPostId === post.id;
 
+                        const isPublished  = post.status === "published";
+                        const isInReview   = post.status === "in_review";
+
                         return (
                           <div
                             key={post.id}
@@ -872,13 +919,16 @@ export default function ScheduleCalendarPage() {
                             onDragStart={canEdit ? (e) => handleDragStart(e, post) : undefined}
                             onDragEnd={canEdit ? handleDragEnd : undefined}
                             onClick={() => { if (!dragStarted.current) setSelectedPost(post); }}
+                            onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, post }); }}
                             className={[
-                              "w-full text-left rounded px-1.5 py-1 text-[10px] font-medium leading-tight",
+                              "relative w-full text-left rounded px-1.5 py-1 text-[10px] font-medium leading-tight",
                               cfg.bgColor, cfg.color,
                               canEdit ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
                               isBeingDragged
                                 ? "opacity-30 scale-95"
                                 : "hover:opacity-90 hover:shadow-md transition-all duration-100",
+                              isPublished ? "opacity-50" : "",
+                              isInReview ? "ring-2 ring-yellow-400 [animation-duration:1.2s] animate-pulse" : "",
                             ].join(" ")}
                           >
                             <div className="flex items-center justify-between gap-0.5 opacity-80 mb-0.5">
@@ -888,9 +938,22 @@ export default function ScheduleCalendarPage() {
                                   {cfg.label}{post.position_number ? ` #${String(post.position_number).padStart(2, "0")}` : ""}
                                 </span>
                               </div>
-                              {post.scheduled_time && (
-                                <span className="text-[9px] opacity-80">{post.scheduled_time.slice(0, 5)}</span>
-                              )}
+                              <div className="flex items-center gap-1">
+                                {post.scheduled_time && (
+                                  <span className="text-[9px] opacity-80">{post.scheduled_time.slice(0, 5)}</span>
+                                )}
+                                {isInReview ? (
+                                  <span className="relative flex h-2 w-2 shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-300 opacity-90" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-yellow-400" />
+                                  </span>
+                                ) : (
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[post.status]}`}
+                                    title={post.status}
+                                  />
+                                )}
+                              </div>
                             </div>
                             <div className="line-clamp-2 leading-tight">{post.title}</div>
                           </div>
@@ -919,7 +982,7 @@ export default function ScheduleCalendarPage() {
                   }, {} as Record<string, number>)
                 ).map(([status, count]) => (
                   <span key={status}>
-                    {count} {status === "draft" ? "rascunho" : status === "in_review" ? "em revisão" : status === "approved" ? "aprovado" : status === "published" ? "publicado" : status}
+                    {count} {status === "draft" ? "em produção" : status === "in_review" ? "em revisão" : status === "approved" ? "aprovado" : status === "scheduled" ? "agendado" : status === "published" ? "publicado" : status}
                   </span>
                 ))}
               </div>
@@ -1470,6 +1533,45 @@ export default function ScheduleCalendarPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Right-click context menu */}
+      {contextMenu && (
+        <>
+          <div className="fixed inset-0 z-[60]" onClick={() => setContextMenu(null)} onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }} />
+          <div
+            className="fixed z-[61] bg-popover border border-border rounded-xl shadow-2xl py-1.5 min-w-[180px] overflow-hidden"
+            style={{
+              left: Math.min(contextMenu.x, window.innerWidth - 200),
+              top: Math.min(contextMenu.y, window.innerHeight - 200),
+            }}
+          >
+            <p className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide border-b border-border mb-1">
+              Alterar status
+            </p>
+            {([
+              { label: "Em Produção", status: "draft"     as PostStatus, dot: "bg-amber-400 animate-pulse" },
+              { label: "Aprovado",    status: "approved"  as PostStatus, dot: "bg-emerald-400" },
+              { label: "Agendado",    status: "scheduled" as PostStatus, dot: "bg-sky-400" },
+              { label: "Postado",     status: "published" as PostStatus, dot: "bg-green-400" },
+            ] as const).map(({ label, status, dot }) => {
+              const isActive = contextMenu.post.status === status;
+              return (
+                <button
+                  key={status}
+                  onClick={() => handleQuickStatusChange(contextMenu.post, status)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors text-left ${
+                    isActive ? "bg-muted font-semibold" : "hover:bg-muted"
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
+                  <span className="flex-1">{label}</span>
+                  {isActive && <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        </>
       )}
 
       <Footer />

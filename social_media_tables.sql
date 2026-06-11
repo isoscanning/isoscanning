@@ -249,6 +249,8 @@ CREATE POLICY "sm_history_insert" ON social_media_post_history FOR INSERT WITH C
 -- Colunas adicionadas posteriormente (idempotente — rode sempre que atualizar)
 ALTER TABLE social_media_posts ADD COLUMN IF NOT EXISTS material_link TEXT;
 ALTER TABLE social_media_posts ADD COLUMN IF NOT EXISTS video_link TEXT;
+ALTER TABLE social_media_posts ADD COLUMN IF NOT EXISTS capture_date DATE;
+ALTER TABLE social_media_posts ADD COLUMN IF NOT EXISTS production_status VARCHAR(50) DEFAULT 'pending' CHECK (production_status IN ('pending', 'in_progress', 'done'));
 
 -- ============================================================
 -- Funções SECURITY DEFINER para gestão de equipe
@@ -643,10 +645,12 @@ CREATE OR REPLACE FUNCTION sm_update_post(
   p_copy               text,
   p_hashtags           text[],
   p_content_description text,
-  p_scheduled_time     text,
+  p_scheduled_time     time,
   p_notes              text,
   p_material_link      text,
-  p_video_link         text
+  p_video_link         text,
+  p_capture_date       date,
+  p_production_status  text
 ) RETURNS json
 SECURITY DEFINER SET search_path = public
 LANGUAGE plpgsql AS $$
@@ -684,10 +688,12 @@ BEGIN
     copy                = NULLIF(p_copy, ''),
     hashtags            = p_hashtags,
     content_description = NULLIF(p_content_description, ''),
-    scheduled_time      = NULLIF(p_scheduled_time, ''),
+    scheduled_time      = p_scheduled_time,
     notes               = NULLIF(p_notes, ''),
     material_link       = NULLIF(p_material_link, ''),
     video_link          = NULLIF(p_video_link, ''),
+    capture_date        = p_capture_date,
+    production_status   = p_production_status,
     updated_at          = now()
   WHERE id = p_post_id
   RETURNING row_to_json(social_media_posts.*) INTO v_result;
@@ -695,7 +701,7 @@ BEGIN
   RETURN v_result;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION sm_update_post(uuid,text,text,text,text[],text,text,text,text,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION sm_update_post(uuid,text,text,text,text[],text,time,text,text,text,date,text) TO authenticated;
 
 -- ============================================================
 -- Atualizar status de um post (draft, in_review, approved…)

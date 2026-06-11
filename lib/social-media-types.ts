@@ -1,6 +1,7 @@
 export type PostType = "reels" | "carrossel" | "feed_image" | "feed_video" | "story" | "shorts" | "thread";
 export type NetworkType = "instagram" | "facebook" | "tiktok" | "linkedin" | "twitter" | "youtube";
 export type PostStatus = "draft" | "in_review" | "approved" | "scheduled" | "published" | "rejected";
+export type ProductionStatus = "pending" | "in_progress" | "done";
 export type MemberRole = "owner" | "editor" | "approver" | "viewer";
 export type MemberStatus = "pending" | "active" | "removed";
 export type ScheduleStatus = "active" | "archived";
@@ -39,6 +40,8 @@ export interface SocialMediaPost {
   notes?: string;
   material_link?: string;
   video_link?: string;
+  capture_date?: string;
+  production_status?: ProductionStatus;
   approved_by?: string;
   approved_at?: string;
   published_at?: string;
@@ -96,13 +99,19 @@ export const NETWORK_CONFIG: Record<NetworkType, { label: string; color: string 
   youtube: { label: "YouTube", color: "text-red-600" },
 };
 
+export const PRODUCTION_STATUS_CONFIG: Record<ProductionStatus, { label: string; color: string; bgColor: string; dot: string }> = {
+  pending:     { label: "Pendente",     color: "text-gray-600 dark:text-gray-400",   bgColor: "bg-gray-100 dark:bg-gray-800",         dot: "bg-gray-400" },
+  in_progress: { label: "Em Produção",  color: "text-amber-700 dark:text-amber-400", bgColor: "bg-amber-50 dark:bg-amber-900/30",     dot: "bg-amber-400" },
+  done:        { label: "Concluído",    color: "text-green-700 dark:text-green-400", bgColor: "bg-green-50 dark:bg-green-900/30",     dot: "bg-green-400" },
+};
+
 export const STATUS_CONFIG: Record<PostStatus, { label: string; color: string }> = {
-  draft: { label: "Rascunho", color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300" },
-  in_review: { label: "Em Revisão", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" },
-  approved: { label: "Aprovado", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
-  scheduled: { label: "Agendado", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
-  published: { label: "Publicado", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
-  rejected: { label: "Rejeitado", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
+  draft:     { label: "Em Produção", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
+  in_review: { label: "Em Revisão",  color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" },
+  approved:  { label: "Aprovado",    color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
+  scheduled: { label: "Agendado",    color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+  published: { label: "Publicado",   color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" },
+  rejected:  { label: "Rejeitado",   color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
 };
 
 export const MONTHS_PT = [

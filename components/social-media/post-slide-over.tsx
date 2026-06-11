@@ -16,8 +16,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  SocialMediaPost, PostComment, NetworkType, PostStatus, PostType,
-  POST_TYPE_CONFIG, STATUS_CONFIG, NETWORK_CONFIG
+  SocialMediaPost, PostComment, NetworkType, PostStatus, PostType, ProductionStatus,
+  POST_TYPE_CONFIG, STATUS_CONFIG, NETWORK_CONFIG, PRODUCTION_STATUS_CONFIG
 } from "@/lib/social-media-types";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -51,7 +51,7 @@ const STATUS_ACTIONS: Partial<Record<PostStatus, { label: string; next: PostStat
   ],
   in_review: [
     { label: "Aprovar", next: "approved", icon: Check, color: "bg-green-600 hover:bg-green-700 text-white" },
-    { label: "Pedir revisão", next: "draft", icon: AlertCircle, color: "bg-orange-500 hover:bg-orange-600 text-white" },
+    { label: "Voltar para produção", next: "draft", icon: AlertCircle, color: "bg-orange-500 hover:bg-orange-600 text-white" },
     { label: "Rejeitar", next: "rejected", icon: ThumbsDown, color: "bg-red-600 hover:bg-red-700 text-white" },
   ],
   approved: [
@@ -62,7 +62,7 @@ const STATUS_ACTIONS: Partial<Record<PostStatus, { label: string; next: PostStat
     { label: "Marcar publicado", next: "published", icon: Check, color: "bg-blue-600 hover:bg-blue-700 text-white" },
   ],
   rejected: [
-    { label: "Reabrir para revisão", next: "in_review", icon: AlertCircle, color: "bg-yellow-600 hover:bg-yellow-700 text-white" },
+    { label: "Voltar para produção", next: "draft", icon: AlertCircle, color: "bg-amber-500 hover:bg-amber-600 text-white" },
   ],
   published: [],
 };
@@ -91,6 +91,8 @@ export function PostSlideOver({
     notes: post?.notes || "",
     material_link: post?.material_link || "",
     video_link: post?.video_link || "",
+    capture_date: post?.capture_date || "",
+    production_status: (post?.production_status || "pending") as ProductionStatus,
     post_type: (post?.post_type || "feed_image") as PostType,
   });
 
@@ -105,6 +107,8 @@ export function PostSlideOver({
         notes: post.notes || "",
         material_link: post.material_link || "",
         video_link: post.video_link || "",
+        capture_date: post.capture_date || "",
+        production_status: post.production_status || "pending",
         post_type: post.post_type,
       });
       fetchComments(post.id);
@@ -143,6 +147,8 @@ export function PostSlideOver({
         p_notes:               editForm.notes || "",
         p_material_link:       editForm.material_link || "",
         p_video_link:          editForm.video_link || "",
+        p_capture_date:        editForm.capture_date || null,
+        p_production_status:   editForm.production_status,
       });
 
       if (error) throw error;
@@ -441,6 +447,44 @@ export function PostSlideOver({
                 </div>
               )}
 
+              {/* Status overview (view mode) */}
+              {!editing && (
+                <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Status</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-1">Aprovação</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_CONFIG[post.status].color}`}>
+                        {STATUS_CONFIG[post.status].label}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-1">Produção</p>
+                      {(() => {
+                        const ps = post.production_status || "pending";
+                        const cfg = PRODUCTION_STATUS_CONFIG[ps];
+                        return (
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${cfg.color} ${cfg.bgColor}`}>
+                            {cfg.label}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    {post.capture_date && (
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-1">Data de Captação</p>
+                        <span className="text-xs font-medium">
+                          {(() => {
+                            try { return format(new Date(post.capture_date + "T00:00:00"), "dd/MM/yyyy"); }
+                            catch { return post.capture_date; }
+                          })()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Title + Type (edit mode) */}
               {editing ? (
                 <div className="space-y-4">
@@ -625,6 +669,39 @@ export function PostSlideOver({
                   )}
                 </div>
               </div>
+
+              {/* Production fields (edit mode) */}
+              {editing && (
+                <div className="space-y-3 pt-1 border-t border-border">
+                  <Label className="text-xs flex items-center gap-1.5 text-muted-foreground">
+                    <History className="h-3.5 w-3.5" />
+                    Produção
+                  </Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Data de Captação</Label>
+                      <Input
+                        type="date"
+                        value={editForm.capture_date}
+                        onChange={(e) => setEditForm((p) => ({ ...p, capture_date: e.target.value }))}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Status de Produção</Label>
+                      <select
+                        value={editForm.production_status}
+                        onChange={(e) => setEditForm((p) => ({ ...p, production_status: e.target.value as ProductionStatus }))}
+                        className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      >
+                        <option value="pending">Pendente</option>
+                        <option value="in_progress">Em Produção</option>
+                        <option value="done">Concluído</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Notes */}
               {editing && (

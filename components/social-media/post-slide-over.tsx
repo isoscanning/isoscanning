@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  SocialMediaPost, PostComment, NetworkType, PostStatus,
+  SocialMediaPost, PostComment, NetworkType, PostStatus, PostType,
   POST_TYPE_CONFIG, STATUS_CONFIG, NETWORK_CONFIG
 } from "@/lib/social-media-types";
 import { format } from "date-fns";
@@ -132,47 +132,26 @@ export function PostSlideOver({
         .map((h) => h.replace(/^#/, "").trim())
         .filter(Boolean);
 
-      const updates = {
-        title: editForm.title,
-        post_type: editForm.post_type,
-        copy: editForm.copy || null,
-        hashtags,
-        content_description: editForm.content_description || null,
-        scheduled_time: editForm.scheduled_time || null,
-        notes: editForm.notes || null,
-        material_link: editForm.material_link || null,
-        video_link: editForm.video_link || null,
-        updated_at: new Date().toISOString(),
-      };
-
-      // Log history for changed fields
-      const fieldsToTrack: (keyof typeof updates)[] = ["title", "copy", "hashtags"];
-      for (const field of fieldsToTrack) {
-        const oldVal = field === "hashtags" ? (post.hashtags || []).join(" ") : (post as any)[field];
-        const newVal = field === "hashtags" ? editForm.hashtags : updates[field];
-        if (String(oldVal || "") !== String(newVal || "")) {
-          await supabase.from("social_media_post_history").insert({
-            post_id: post.id,
-            user_id: userId,
-            field_changed: field,
-            old_value: String(oldVal || ""),
-            new_value: String(newVal || ""),
-          });
-        }
-      }
-
-      const { data, error } = await supabase
-        .from("social_media_posts")
-        .update(updates)
-        .eq("id", post.id)
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc("sm_update_post", {
+        p_post_id:             post.id,
+        p_title:               editForm.title,
+        p_post_type:           editForm.post_type,
+        p_copy:                editForm.copy || "",
+        p_hashtags:            hashtags,
+        p_content_description: editForm.content_description || "",
+        p_scheduled_time:      editForm.scheduled_time || null,
+        p_notes:               editForm.notes || "",
+        p_material_link:       editForm.material_link || "",
+        p_video_link:          editForm.video_link || "",
+      });
 
       if (error) throw error;
       onUpdate(data as SocialMediaPost);
       setEditing(false);
       toast.success("Post atualizado");
-    } catch {
+    } catch (err) {
+      const msg = (err as { message?: string })?.message ?? JSON.stringify(err);
+      console.error("save error:", msg, err);
       toast.error("Erro ao salvar alterações");
     } finally {
       setSaving(false);
@@ -183,25 +162,15 @@ export function PostSlideOver({
     if (!post) return;
     setSaving(true);
     try {
-      const updates: Partial<SocialMediaPost> = {
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      };
+      const now = new Date().toISOString();
 
-      if (newStatus === "approved") {
-        updates.approved_by = userId;
-        updates.approved_at = new Date().toISOString();
-      }
-      if (newStatus === "published") {
-        updates.published_at = new Date().toISOString();
-      }
-
-      const { data, error } = await supabase
-        .from("social_media_posts")
-        .update(updates)
-        .eq("id", post.id)
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc("sm_update_post_status", {
+        p_post_id:      post.id,
+        p_status:       newStatus,
+        p_approved_by:  newStatus === "approved" ? userId : null,
+        p_approved_at:  newStatus === "approved" ? now : null,
+        p_published_at: newStatus === "published" ? now : null,
+      });
 
       if (error) throw error;
 

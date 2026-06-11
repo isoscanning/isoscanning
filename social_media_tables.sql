@@ -633,4 +633,120 @@ $$;
 GRANT EXECUTE ON FUNCTION sm_get_shared_calendar(text) TO anon;
 GRANT EXECUTE ON FUNCTION sm_get_shared_calendar(text) TO authenticated;
 
+-- ============================================================
+-- Atualizar conteúdo de um post (title, copy, hashtags, etc.)
+-- ============================================================
+CREATE OR REPLACE FUNCTION sm_update_post(
+  p_post_id            uuid,
+  p_title              text,
+  p_post_type          text,
+  p_copy               text,
+  p_hashtags           text[],
+  p_content_description text,
+  p_scheduled_time     text,
+  p_notes              text,
+  p_material_link      text,
+  p_video_link         text
+) RETURNS json
+SECURITY DEFINER SET search_path = public
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_schedule_id uuid;
+  v_authorized  boolean := false;
+  v_result      json;
+BEGIN
+  SELECT schedule_id INTO v_schedule_id
+  FROM social_media_posts WHERE id = p_post_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Post not found'; END IF;
+
+  -- Dono do cronograma
+  SELECT EXISTS(
+    SELECT 1 FROM social_media_schedules
+    WHERE id = v_schedule_id AND owner_id = auth.uid()
+  ) INTO v_authorized;
+
+  -- Ou membro com role que pode editar
+  IF NOT v_authorized THEN
+    SELECT EXISTS(
+      SELECT 1 FROM social_media_team_members
+      WHERE schedule_id = v_schedule_id
+        AND user_id = auth.uid()
+        AND role IN ('editor','approver')
+        AND status = 'active'
+    ) INTO v_authorized;
+  END IF;
+
+  IF NOT v_authorized THEN RAISE EXCEPTION 'Not authorized'; END IF;
+
+  UPDATE social_media_posts SET
+    title               = p_title,
+    post_type           = p_post_type,
+    copy                = NULLIF(p_copy, ''),
+    hashtags            = p_hashtags,
+    content_description = NULLIF(p_content_description, ''),
+    scheduled_time      = NULLIF(p_scheduled_time, ''),
+    notes               = NULLIF(p_notes, ''),
+    material_link       = NULLIF(p_material_link, ''),
+    video_link          = NULLIF(p_video_link, ''),
+    updated_at          = now()
+  WHERE id = p_post_id
+  RETURNING row_to_json(social_media_posts.*) INTO v_result;
+
+  RETURN v_result;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION sm_update_post(uuid,text,text,text,text[],text,text,text,text,text) TO authenticated;
+
+-- ============================================================
+-- Atualizar status de um post (draft, in_review, approved…)
+-- ============================================================
+CREATE OR REPLACE FUNCTION sm_update_post_status(
+  p_post_id      uuid,
+  p_status       text,
+  p_approved_by  uuid        DEFAULT NULL,
+  p_approved_at  timestamptz DEFAULT NULL,
+  p_published_at timestamptz DEFAULT NULL
+) RETURNS json
+SECURITY DEFINER SET search_path = public
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_schedule_id uuid;
+  v_authorized  boolean := false;
+  v_result      json;
+BEGIN
+  SELECT schedule_id INTO v_schedule_id
+  FROM social_media_posts WHERE id = p_post_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Post not found'; END IF;
+
+  SELECT EXISTS(
+    SELECT 1 FROM social_media_schedules
+    WHERE id = v_schedule_id AND owner_id = auth.uid()
+  ) INTO v_authorized;
+
+  IF NOT v_authorized THEN
+    SELECT EXISTS(
+      SELECT 1 FROM social_media_team_members
+      WHERE schedule_id = v_schedule_id
+        AND user_id = auth.uid()
+        AND role IN ('owner','editor','approver')
+        AND status = 'active'
+    ) INTO v_authorized;
+  END IF;
+
+  IF NOT v_authorized THEN RAISE EXCEPTION 'Not authorized'; END IF;
+
+  UPDATE social_media_posts SET
+    status       = p_status,
+    approved_by  = p_approved_by,
+    approved_at  = p_approved_at,
+    published_at = p_published_at,
+    updated_at   = now()
+  WHERE id = p_post_id
+  RETURNING row_to_json(social_media_posts.*) INTO v_result;
+
+  RETURN v_result;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION sm_update_post_status(uuid,text,uuid,timestamptz,timestamptz) TO authenticated;
+
 SELECT 'Tabelas de Social Media criadas com sucesso!' AS status;

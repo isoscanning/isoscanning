@@ -287,7 +287,7 @@ export function PostSlideOver({
   if (!post) return null;
 
   const POST_TYPE_OPTIONS_ORDERED: PostType[] = [
-    "feed_image", "reels", "carrossel", "story", "feed_video", "shorts", "thread"
+    "feed_image", "reels", "carrossel", "story", "influencer", "shorts", "thread"
   ];
 
   const typeConfig = POST_TYPE_CONFIG[editing ? editForm.post_type : post.post_type];

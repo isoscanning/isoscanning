@@ -1,4 +1,4 @@
-export type PostType = "reels" | "carrossel" | "feed_image" | "feed_video" | "story" | "shorts" | "thread";
+export type PostType = "reels" | "carrossel" | "feed_image" | "influencer" | "story" | "shorts" | "thread";
 export type NetworkType = "instagram" | "facebook" | "tiktok" | "linkedin" | "twitter" | "youtube";
 export type PostStatus = "draft" | "in_review" | "approved" | "scheduled" | "published" | "rejected";
 export type ProductionStatus = "pending" | "in_progress" | "done";
@@ -81,13 +81,13 @@ export interface PostComment {
 }
 
 export const POST_TYPE_CONFIG: Record<PostType, { label: string; color: string; bgColor: string }> = {
-  reels: { label: "REELS", color: "text-white", bgColor: "bg-orange-600" },
-  carrossel: { label: "CARROSSEL", color: "text-white", bgColor: "bg-blue-700" },
-  feed_image: { label: "FEED", color: "text-white", bgColor: "bg-emerald-700" },
-  feed_video: { label: "FEED VÍD.", color: "text-white", bgColor: "bg-teal-700" },
-  story: { label: "STORY", color: "text-white", bgColor: "bg-pink-600" },
-  shorts: { label: "SHORTS", color: "text-white", bgColor: "bg-rose-700" },
-  thread: { label: "THREAD", color: "text-white", bgColor: "bg-sky-700" },
+  reels:      { label: "REELS",       color: "text-white", bgColor: "bg-orange-600" },
+  carrossel:  { label: "CARROSSEL",   color: "text-white", bgColor: "bg-blue-700" },
+  feed_image: { label: "FEED",        color: "text-white", bgColor: "bg-emerald-700" },
+  influencer: { label: "INFLUENCER",  color: "text-white", bgColor: "bg-purple-600" },
+  story:      { label: "STORY",       color: "text-white", bgColor: "bg-pink-600" },
+  shorts:     { label: "SHORTS",      color: "text-white", bgColor: "bg-rose-700" },
+  thread:     { label: "THREAD",      color: "text-white", bgColor: "bg-sky-700" },
 };
 
 export const NETWORK_CONFIG: Record<NetworkType, { label: string; color: string }> = {

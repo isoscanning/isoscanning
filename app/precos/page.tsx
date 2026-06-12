@@ -17,39 +17,61 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import apiClient from "@/lib/api-service";
+
+// Maps UI plan names to the canonical plan key sent to the API
+const PLAN_KEY: Record<string, string> = {
+    free: 'free',
+    pro: 'pro',
+    ultra: 'vip',
+};
 
 export default function PricingPage() {
-    const { updateSubscriptionTier, userProfile, loading: authLoading } = useAuth();
+    const { userProfile, loading: authLoading } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
     const [isAnnual, setIsAnnual] = useState(false);
     const [loadingTier, setLoadingTier] = useState<string | null>(null);
 
-    const handleSubscribe = async (tierName: string) => {
+    const handleSubscribe = async (planName: string) => {
         if (authLoading) return;
 
         if (!userProfile) {
-            router.push("/auth/login?redirect=/precos");
+            router.push(`/login?redirect=/precos`);
             return;
         }
 
-        const tier = tierName.toLowerCase() as 'free' | 'standard' | 'pro' | 'vip';
-        setLoadingTier(tierName);
+        const planKey = PLAN_KEY[planName.toLowerCase()];
+
+        // Free plan: nothing to pay, just send to dashboard
+        if (!planKey || planKey === 'free') {
+            router.push('/dashboard');
+            return;
+        }
+
+        setLoadingTier(planName);
 
         try {
-            await updateSubscriptionTier(tier);
-            toast({
-                title: "Plano atualizado!",
-                description: `Você agora é um assinante ${tierName}. Aproveite!`,
+            const { data } = await apiClient.post('/billing/subscribe', {
+                plan: planKey,
+                billingCycle: isAnnual ? 'annual' : 'monthly',
             });
-            // Optional: redirect to dashboard after success
-            // router.push("/dashboard");
-        } catch (error) {
-            console.error(error);
+
+            if (data.paymentUrl) {
+                // Redirect to Asaas checkout page
+                window.location.href = data.paymentUrl;
+            } else {
+                throw new Error('Payment URL not returned');
+            }
+        } catch (error: any) {
+            console.error('[precos] Subscribe error:', error);
+            const message =
+                error?.response?.data?.message ||
+                'Não foi possível iniciar o pagamento. Tente novamente.';
             toast({
                 variant: "destructive",
-                title: "Erro ao atualizar plano",
-                description: "Tente novamente mais tarde.",
+                title: "Erro ao assinar plano",
+                description: message,
             });
         } finally {
             setLoadingTier(null);

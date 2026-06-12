@@ -64,6 +64,7 @@ interface AuthContextType {
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   updateUserAuth: (attributes: { password?: string; email?: string; data?: any }) => Promise<void>;
   updateSubscriptionTier: (tier: 'free' | 'standard' | 'pro' | 'vip') => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -373,7 +374,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!userProfile) throw new Error("Usuário não autenticado");
 
     try {
-      // Update in database
       const { error } = await supabase
         .from('profiles')
         .update({ subscription_tier: tier })
@@ -381,14 +381,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (error) throw error;
 
-      // Update local state
       setUserProfile({
         ...userProfile,
         subscriptionTier: tier,
         updatedAt: new Date(),
       });
 
-      // Update local storage
       localStorage.setItem("user_profile", JSON.stringify({
         ...userProfile,
         subscriptionTier: tier,
@@ -398,6 +396,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       console.error("[auth-context] Update subscription error:", error);
       throw error;
+    }
+  };
+
+  // Fetches the latest profile from the API and refreshes local state.
+  // Used after billing events (post-payment redirect, cancellation).
+  const refreshProfile = async (): Promise<void> => {
+    try {
+      const response = await apiClient.get("/auth/me", {
+        headers: { "X-Skip-Auth-Redirect": "true" },
+      });
+      const fresh: UserProfile = response.data;
+      setUserProfile(fresh);
+      localStorage.setItem("user_profile", JSON.stringify(fresh));
+    } catch (error) {
+      console.error("[auth-context] refreshProfile error:", error);
     }
   };
 
@@ -416,6 +429,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     updateProfile,
     updateUserAuth,
     updateSubscriptionTier,
+    refreshProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

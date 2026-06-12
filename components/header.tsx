@@ -24,6 +24,7 @@ import {
   MessageSquare,
   Info,
   UserCircle,
+  CreditCard,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { trackEvent } from "@/lib/analytics";
@@ -330,6 +331,19 @@ export function Header() {
                     >
                       <Settings className="h-4 w-4 mr-2 text-purple-500 dark:text-purple-400" />
                       <span className="font-medium">Meus Dados</span>
+                    </Button>
+                  </Link>
+                  <Link
+                    href="/dashboard/assinatura"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start bg-transparent border-primary/30 hover:bg-primary/10 hover:text-primary"
+                    >
+                      <CreditCard className="h-4 w-4 mr-2 text-primary" />
+                      <span className="font-medium">Minha Assinatura</span>
                     </Button>
                   </Link>
                   <Button

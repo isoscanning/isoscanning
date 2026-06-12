@@ -47,7 +47,7 @@ const POST_TYPE_OPTIONS: { value: PostType; label: string; description: string }
   { value: "reels",      label: "Reels",         description: "Vídeo curto vertical" },
   { value: "carrossel",  label: "Carrossel",      description: "Slides / múltiplas imagens" },
   { value: "story",      label: "Stories",        description: "Conteúdo temporário 24h" },
-  { value: "feed_video", label: "Vídeo Feed",     description: "Vídeo longo no feed" },
+  { value: "influencer", label: "Influencer",     description: "Post em parceria com influencer" },
   { value: "shorts",     label: "Shorts",         description: "Vídeo curto YouTube" },
 ];
 
@@ -911,6 +911,7 @@ export default function ScheduleCalendarPage() {
 
                         const isPublished  = post.status === "published";
                         const isInReview   = post.status === "in_review";
+                        const isScheduled  = post.status === "scheduled";
 
                         return (
                           <div
@@ -927,8 +928,9 @@ export default function ScheduleCalendarPage() {
                               isBeingDragged
                                 ? "opacity-30 scale-95"
                                 : "hover:opacity-90 hover:shadow-md transition-all duration-100",
-                              isPublished ? "opacity-50" : "",
-                              isInReview ? "ring-2 ring-yellow-400 [animation-duration:1.2s] animate-pulse" : "",
+                              isPublished  ? "opacity-50" : "",
+                              isInReview   ? "ring-2 ring-yellow-400 [animation-duration:1.2s] animate-pulse" : "",
+                              isScheduled  ? "ring-2 ring-green-400 [animation-duration:1.2s] animate-pulse" : "",
                             ].join(" ")}
                           >
                             <div className="flex items-center justify-between gap-0.5 opacity-80 mb-0.5">

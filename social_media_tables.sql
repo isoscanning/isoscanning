@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS social_media_posts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   schedule_id UUID REFERENCES social_media_schedules(id) ON DELETE CASCADE NOT NULL,
   title VARCHAR(255) NOT NULL,
-  post_type VARCHAR(50) NOT NULL CHECK (post_type IN ('reels', 'carrossel', 'feed_image', 'feed_video', 'story', 'shorts', 'thread')),
+  post_type VARCHAR(50) NOT NULL CHECK (post_type IN ('reels', 'carrossel', 'feed_image', 'influencer', 'story', 'shorts', 'thread')),
   network VARCHAR(50) NOT NULL CHECK (network IN ('instagram', 'facebook', 'tiktok', 'linkedin', 'twitter', 'youtube')),
   scheduled_date DATE NOT NULL,
   scheduled_time TIME,

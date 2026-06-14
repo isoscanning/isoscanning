@@ -1,8 +1,20 @@
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
+import withPWAInit from '@ducanh2912/next-pwa';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+const withPWA = withPWAInit({
+  dest: 'public',
+  cacheOnFrontEndNav: true,
+  aggressiveFrontEndNavCaching: true,
+  reloadOnOnline: true,
+  disable: process.env.NODE_ENV === 'development',
+  workboxOptions: {
+    disableDevLogs: true,
+  },
+});
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -30,4 +42,4 @@ const nextConfig = {
   },
 }
 
-export default nextConfig
+export default withPWA(nextConfig)

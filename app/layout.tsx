@@ -22,6 +22,13 @@ export const metadata: Metadata = {
     "Plataforma completa para profissionais de fotografia e audiovisual. Encontre profissionais, alugue equipamentos e agende serviços.",
   icons: {
     icon: "/favicon.png",
+    apple: "/icons/icon-180x180.png",
+  },
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "ISO Scanning",
   },
   generator: "v0.app",
 };
@@ -41,6 +48,14 @@ export default function RootLayout({
     >
       <head>
         <link rel="icon" href="/favicon.png" />
+        <link rel="apple-touch-icon" href="/icons/icon-180x180.png" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="ISO Scanning" />
+        <meta name="application-name" content="ISO Scanning" />
+        <meta name="msapplication-TileColor" content="#0a0a0a" />
+        <meta name="theme-color" content="#0a0a0a" />
       </head>
       <body className="min-h-screen bg-background text-foreground">
         <ThemeProvider

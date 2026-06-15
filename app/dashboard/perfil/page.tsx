@@ -51,6 +51,7 @@ import {
 import { PersonalDataForm } from "./components/personal-data-form"
 import { PortfolioGallery } from "./components/portfolio-gallery"
 import { AvailabilityManager } from "./components/availability-manager"
+import { NotificationPermissionCard } from "@/components/notification-permission-card"
 
 
 const ESTADOS = [
@@ -983,6 +984,10 @@ export default function PerfilPage() {
                   </Button>
                 </div>
               </form>
+
+              <div className="mt-6">
+                <NotificationPermissionCard />
+              </div>
             </TabsContent>
 
             {/* TAB: PORTFOLIO */}

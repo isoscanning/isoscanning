@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import apiClient from "@/lib/api-service";
+import { playMessageReceived } from "@/lib/chat-sounds";
 
 export interface Message {
   id: string;
@@ -131,8 +132,9 @@ export function useChat(conversationId: string, currentUserId: string) {
           if (prev.some((m) => m.id === newMessage.id)) return prev;
           return [...prev, newMessage];
         });
-        // Se a mensagem é de outra pessoa, marca como lida automaticamente
+        // Se a mensagem é de outra pessoa, toca som e marca como lida
         if (row.sender_id !== currentUserId) {
+          playMessageReceived();
           apiClient.patch(`/chat/conversations/${conversationId}/read`).catch(() => {});
         }
       }

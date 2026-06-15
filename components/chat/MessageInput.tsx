@@ -5,6 +5,7 @@ import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { playMessageSent } from "@/lib/chat-sounds";
 
 interface MessageInputProps {
   onSend: (content: string) => Promise<void>;
@@ -31,6 +32,7 @@ export function MessageInput({ onSend, onTyping, disabled }: MessageInputProps) 
     const trimmed = value.trim();
     if (!trimmed || disabled) return;
     setValue("");
+    playMessageSent();
     await onSend(trimmed);
   };
 

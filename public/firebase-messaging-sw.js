@@ -25,6 +25,7 @@ messaging.onBackgroundMessage((payload) => {
     badge: "/icons/icon-72x72.png",
     data: { clickUrl },
     requireInteraction: false,
+    vibrate: [200, 100, 200],
   });
 });
 

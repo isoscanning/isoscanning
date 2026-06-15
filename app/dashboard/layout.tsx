@@ -5,11 +5,13 @@ import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Loader2 } from "lucide-react";
 import { PWAInstallBanner } from "@/components/pwa-install-banner";
+import { usePushNotifications } from "@/lib/use-push-notifications";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { userProfile, loading } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
+    usePushNotifications();
 
     useEffect(() => {
         if (!loading) {

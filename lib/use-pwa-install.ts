@@ -11,15 +11,21 @@ interface BeforeInstallPromptEvent extends Event {
 interface UsePWAInstall {
   isInstallable: boolean;
   isInstalled: boolean;
+  isIOS: boolean;
   install: () => Promise<"accepted" | "dismissed" | null>;
 }
 
 export function usePWAInstall(): UsePWAInstall {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
-    // Detect standalone mode (already installed)
+    const ua = window.navigator.userAgent;
+    const ios = /iphone|ipad|ipod/i.test(ua);
+    const safari = /safari/i.test(ua) && !/chrome|crios|fxios/i.test(ua);
+    setIsIOS(ios && safari);
+
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (window.navigator as any).standalone === true;
@@ -60,6 +66,7 @@ export function usePWAInstall(): UsePWAInstall {
   return {
     isInstallable: !!deferredPrompt,
     isInstalled,
+    isIOS,
     install,
   };
 }

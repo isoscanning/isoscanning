@@ -29,19 +29,22 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-// Ao clicar na notificação, abre/foca a URL correta
+// Ao clicar na notificação, navega para a URL correta
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.clickUrl ?? "/dashboard";
+  const path = event.notification.data?.clickUrl ?? "/dashboard";
+  const url = new URL(path, self.location.origin).href;
 
   event.waitUntil(
     clients
       .matchAll({ type: "window", includeUncontrolled: true })
       .then((clientList) => {
-        for (const client of clientList) {
-          if ("focus" in client) return client.focus();
+        if (clientList.length > 0) {
+          const client = clientList[0];
+          client.focus();
+          if ("navigate" in client) return client.navigate(url);
         }
-        if (clients.openWindow) return clients.openWindow(url);
+        return clients.openWindow(url);
       })
   );
 });

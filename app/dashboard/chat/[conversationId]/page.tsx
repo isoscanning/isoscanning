@@ -76,7 +76,7 @@ export default function ConversationPage({ params }: Props) {
         </div>
 
         {/* Input */}
-        <div className="shrink-0 border-t bg-background" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <div className="shrink-0 border-t bg-background" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
           <MessageInput onSend={sendMessage} onTyping={broadcastTyping} disabled={sending} />
         </div>
       </div>

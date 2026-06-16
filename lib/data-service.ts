@@ -138,7 +138,20 @@ export interface AppNotification {
   profileId: string;
   title: string;
   message: string;
-  type: "job_match" | "equipment_match" | "system" | "review_received";
+  type:
+    | "job_match"
+    | "equipment_match"
+    | "system"
+    | "review_received"
+    | "post_review_needed"
+    | "post_approved"
+    | "post_rejected"
+    | "post_comment"
+    | "post_published"
+    | "team_invite"
+    | "billing_confirmed"
+    | "billing_overdue"
+    | "billing_cancelled";
   referenceId?: string | null;
   isRead: boolean;
   createdAt: string;
@@ -1110,5 +1123,49 @@ export async function markNotificationAsRead(id: string): Promise<boolean> {
   } catch (error) {
     console.error("[data-service] Error marking notification as read:", error);
     return false;
+  }
+}
+
+// ── Social Media Notification Dispatchers ─────────────────────────────────────
+
+export async function notifySocialMediaPostStatus(data: {
+  postId: string;
+  scheduleId: string;
+  postTitle: string;
+  newStatus: string;
+  scheduleClientName: string;
+}): Promise<void> {
+  try {
+    await apiClient.post("/social-media/notifications/post-status", data);
+  } catch {
+    // non-critical — do not block UI
+  }
+}
+
+export async function notifySocialMediaTeamInvite(data: {
+  scheduleId: string;
+  invitedUserId: string;
+  role: string;
+  scheduleClientName: string;
+  inviterName: string;
+}): Promise<void> {
+  try {
+    await apiClient.post("/social-media/notifications/team-invite", data);
+  } catch {
+    // non-critical
+  }
+}
+
+export async function notifySocialMediaComment(data: {
+  postId: string;
+  scheduleId: string;
+  postTitle: string;
+  commentType: string;
+  scheduleClientName: string;
+}): Promise<void> {
+  try {
+    await apiClient.post("/social-media/notifications/comment", data);
+  } catch {
+    // non-critical
   }
 }

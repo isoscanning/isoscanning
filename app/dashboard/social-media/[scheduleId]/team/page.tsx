@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { TeamMember, MemberRole } from "@/lib/social-media-types";
+import { notifySocialMediaTeamInvite } from "@/lib/data-service";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -236,6 +237,16 @@ export default function TeamPage() {
       setSearchQuery("");
       setSearchResults([]);
       setDropdownOpen(false);
+
+      // Dispatch notification (non-blocking)
+      notifySocialMediaTeamInvite({
+        scheduleId,
+        invitedUserId: profile.id,
+        role: inviteRole,
+        scheduleClientName: scheduleName,
+        inviterName: userProfile?.displayName ?? "Alguém",
+      });
+
       await fetchTeam();
     } catch (err) {
       console.error("handleInvite exception:", err);

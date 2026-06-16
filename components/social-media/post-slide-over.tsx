@@ -19,6 +19,7 @@ import {
   SocialMediaPost, PostComment, NetworkType, PostStatus, PostType, ProductionStatus,
   POST_TYPE_CONFIG, STATUS_CONFIG, NETWORK_CONFIG, PRODUCTION_STATUS_CONFIG
 } from "@/lib/social-media-types";
+import { notifySocialMediaPostStatus, notifySocialMediaComment } from "@/lib/data-service";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -206,6 +207,18 @@ export function PostSlideOver({
 
       onUpdate(data as SocialMediaPost);
       toast.success("Status atualizado");
+
+      // Dispatch notification (non-blocking) for significant transitions
+      const notifyStatuses: PostStatus[] = ["in_review", "approved", "rejected", "published"];
+      if (notifyStatuses.includes(newStatus)) {
+        notifySocialMediaPostStatus({
+          postId: post.id,
+          scheduleId,
+          postTitle: post.title,
+          newStatus,
+          scheduleClientName: clientName ?? "",
+        });
+      }
     } catch {
       toast.error("Erro ao atualizar status");
     } finally {
@@ -258,6 +271,15 @@ export function PostSlideOver({
       if (error) throw error;
       setNewComment("");
       fetchComments(post.id);
+
+      // Dispatch notification (non-blocking)
+      notifySocialMediaComment({
+        postId: post.id,
+        scheduleId,
+        postTitle: post.title,
+        commentType: "comment",
+        scheduleClientName: clientName ?? "",
+      });
     } catch (err) {
       console.error("sm_add_post_comment error:", err);
       toast.error("Erro ao enviar comentário");

@@ -13,6 +13,21 @@ import { ptBR } from "date-fns/locale";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
+const NOTIFICATION_TOAST_TITLES: Partial<Record<AppNotification["type"], string>> = {
+    job_match: "Ei, uma vaga deu Match com você!",
+    equipment_match: "Equipamento encontrado!",
+    review_received: "Nova avaliação recebida!",
+    post_review_needed: "Post aguarda aprovação",
+    post_approved: "Post aprovado! ✓",
+    post_rejected: "Post rejeitado",
+    post_comment: "Novo comentário no post",
+    post_published: "Post publicado!",
+    team_invite: "Você foi convidado para um cronograma",
+    billing_confirmed: "Pagamento confirmado!",
+    billing_overdue: "Atenção: fatura em atraso",
+    billing_cancelled: "Assinatura encerrada",
+};
+
 export function NotificationBell() {
     const { userProfile } = useAuth();
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -56,7 +71,7 @@ export function NotificationBell() {
                     };
                     
                     // Show toast popup
-                    toast.success("Ei, uma vaga deu Match com você!", {
+                    toast.success(NOTIFICATION_TOAST_TITLES[newNotification.type] ?? "Nova notificação", {
                         description: newNotification.title,
                         duration: 5000,
                     });
@@ -84,12 +99,42 @@ export function NotificationBell() {
 
         setIsOpen(false);
 
-        if (notification.type === "job_match" && notification.referenceId) {
-            router.push(`/vagas/${notification.referenceId}`);
-        } else if (notification.type === "equipment_match" && notification.referenceId) {
-            router.push(`/equipamentos/${notification.referenceId}`);
-        } else if (notification.type === "review_received") {
+        const { type, referenceId } = notification;
+
+        if (type === "job_match" && referenceId) {
+            router.push(`/vagas/${referenceId}`);
+        } else if (type === "equipment_match" && referenceId) {
+            router.push(`/equipamentos/${referenceId}`);
+        } else if (type === "review_received") {
             router.push("/dashboard/perfil");
+        } else if (
+            type === "post_review_needed" ||
+            type === "post_approved" ||
+            type === "post_rejected" ||
+            type === "post_comment" ||
+            type === "post_published"
+        ) {
+            if (referenceId) {
+                const [scheduleId, postId] = referenceId.split("|");
+                const url = postId
+                    ? `/dashboard/social-media/${scheduleId}?post=${postId}`
+                    : `/dashboard/social-media/${scheduleId}`;
+                router.push(url);
+            } else {
+                router.push("/dashboard/social-media");
+            }
+        } else if (type === "team_invite") {
+            router.push(
+                referenceId
+                    ? `/dashboard/social-media/${referenceId}/team`
+                    : "/dashboard/social-media"
+            );
+        } else if (
+            type === "billing_confirmed" ||
+            type === "billing_overdue" ||
+            type === "billing_cancelled"
+        ) {
+            router.push("/dashboard/assinatura");
         }
     };
 

@@ -17,6 +17,7 @@ import {
   Share2, Copy, RefreshCw, ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
+import { notifySocialMediaPostStatus } from "@/lib/data-service";
 import {
   SocialMediaSchedule, SocialMediaPost, NetworkType, PostType, PostStatus,
   POST_TYPE_CONFIG, MONTHS_PT, COMMEMORATIVE_DATES
@@ -618,6 +619,18 @@ export default function ScheduleCalendarPage() {
         if (selectedPost?.id === post.id) setSelectedPost(data as SocialMediaPost);
       }
       toast.success("Status atualizado");
+
+      // Dispatch notification (non-blocking) for significant transitions
+      const notifyStatuses: PostStatus[] = ["in_review", "approved", "rejected", "published"];
+      if (notifyStatuses.includes(newStatus)) {
+        notifySocialMediaPostStatus({
+          postId: post.id,
+          scheduleId,
+          postTitle: post.title,
+          newStatus,
+          scheduleClientName: schedule?.client_name ?? "",
+        });
+      }
     } catch (err) {
       // Reverte se falhou
       setPosts((prev) => prev.map((p) => p.id === post.id ? post : p));

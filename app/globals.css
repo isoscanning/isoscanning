@@ -218,5 +218,7 @@
 
   body {
     @apply bg-background text-foreground;
+    /* Impede zoom por duplo toque em todo o app */
+    touch-action: manipulation;
   }
 }

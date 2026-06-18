@@ -76,11 +76,7 @@ export function Header() {
 
   const getShortName = (name?: string | null) => {
     if (!name) return "";
-    const parts = name.trim().split(/\s+/);
-    if (parts.length > 1) {
-      return `${parts[0]} ${parts[1]}`;
-    }
-    return parts[0] || "";
+    return name.trim().split(/\s+/)[0] || "";
   };
   const displayName = getShortName(userProfile?.displayName || googleName);
 
@@ -100,7 +96,7 @@ export function Header() {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-4 lg:gap-6 text-foreground/85 whitespace-nowrap">
+          <nav className="hidden md:flex items-center gap-3 lg:gap-6 text-sm text-foreground/85 whitespace-nowrap">
             <Link
               href="/profissionais"
               className={isActive("/profissionais") ? "text-primary font-medium" : "hover:text-primary transition-colors"}

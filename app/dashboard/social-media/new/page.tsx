@@ -16,13 +16,15 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import {
-  Share2, ArrowLeft, ArrowRight, Sparkles, Loader2,
-  Instagram, Facebook, Youtube, Linkedin, Twitter, Music2, Check
+  ArrowLeft, ArrowRight, Sparkles, Loader2,
+  Instagram, Facebook, Youtube, Linkedin, Twitter, Music2, Check, CalendarClock
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   NetworkType, PostType, MONTHS_PT, NETWORK_OPTIONS, TONE_OPTIONS, SocialMediaPost, POST_TYPE_CONFIG
 } from "@/lib/social-media-types";
+import { HolidayPicker } from "@/components/social-media/holiday-picker";
+import { SelectedHoliday } from "@/lib/holidays-data";
 
 const STEPS = ["Briefing", "Configuração", "Geração com IA"];
 
@@ -40,8 +42,8 @@ const POST_TYPE_OPTIONS: { value: PostType; label: string; description: string }
   { value: "reels",      label: "Reels",         description: "Vídeo curto vertical" },
   { value: "carrossel",  label: "Carrossel",      description: "Slides / múltiplas imagens" },
   { value: "story",      label: "Stories",        description: "Conteúdo temporário 24h" },
-  { value: "feed_video", label: "Vídeo Feed",     description: "Vídeo longo no feed" },
   { value: "shorts",     label: "Shorts",         description: "Vídeo curto YouTube" },
+  { value: "thread",     label: "Thread",         description: "Sequência de textos" },
 ];
 
 export default function NewSchedulePage() {
@@ -54,6 +56,7 @@ export default function NewSchedulePage() {
 
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
+  const currentDay = new Date().getDate();
 
   const [form, setForm] = useState({
     clientName: "",
@@ -66,7 +69,11 @@ export default function NewSchedulePage() {
     frequency: 4,
     tone: "Profissional e engajante",
     targetAudience: "",
+    startFromToday: false,
+    holidays: [] as SelectedHoliday[],
   });
+
+  const isCurrentMonth = form.month === currentMonth && form.year === currentYear;
 
   function toggleNetwork(net: NetworkType) {
     setForm((prev) => ({
@@ -109,6 +116,8 @@ export default function NewSchedulePage() {
           frequency: form.frequency,
           tone: form.tone,
           targetAudience: form.targetAudience,
+          startDay: form.startFromToday && isCurrentMonth ? currentDay : undefined,
+          holidays: form.holidays.length > 0 ? form.holidays : undefined,
         }),
       });
 
@@ -434,6 +443,46 @@ export default function NewSchedulePage() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Holidays picker */}
+                <HolidayPicker
+                  month={form.month}
+                  year={form.year}
+                  value={form.holidays}
+                  onChange={(holidays) => setForm((p) => ({ ...p, holidays }))}
+                />
+
+                {/* Start from today */}
+                <button
+                  type="button"
+                  onClick={() => setForm((p) => ({ ...p, startFromToday: !p.startFromToday }))}
+                  className={`w-full flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                    form.startFromToday
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                      : "border-border hover:border-blue-300"
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
+                    form.startFromToday
+                      ? "border-blue-500 bg-blue-500"
+                      : "border-muted-foreground/40"
+                  }`}>
+                    {form.startFromToday && <Check className="h-3 w-3 text-white" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <CalendarClock className={`h-4 w-4 shrink-0 ${form.startFromToday ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"}`} />
+                      <p className={`text-sm font-medium ${form.startFromToday ? "text-blue-700 dark:text-blue-300" : "text-foreground"}`}>
+                        Gerar a partir de hoje (dia {currentDay})
+                      </p>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-tight">
+                      {isCurrentMonth
+                        ? `A IA criará posts somente do dia ${currentDay} em diante, ignorando os dias já passados.`
+                        : "Disponível apenas quando o mês selecionado for o mês atual."}
+                    </p>
+                  </div>
+                </button>
               </CardContent>
             </Card>
           )}

@@ -11,15 +11,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollReveal } from "@/components/scroll-reveal";
+import { Input } from "@/components/ui/input";
 import {
   Share2, Plus, Calendar, Users, ChevronRight,
   Archive, Instagram, Facebook, Youtube, Linkedin, Twitter, Music2,
-  MoreVertical, Pencil, Trash2, Eye
+  MoreVertical, Trash2, Eye, AlertTriangle
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuTrigger, DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
@@ -47,6 +52,9 @@ export default function SocialMediaPage() {
   const [sharedSchedules, setSharedSchedules] = useState<ScheduleWithCount[]>([]);
   const [activeTab, setActiveTab] = useState<"owned" | "shared">("owned");
   const [fetching, setFetching] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<ScheduleWithCount | null>(null);
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!loading && !userProfile) router.push("/login");
@@ -61,7 +69,6 @@ export default function SocialMediaPage() {
     if (!userProfile) return;
     setFetching(true);
     try {
-      // Owned schedules
       const { data: owned, error: ownedErr } = await supabase
         .from("social_media_schedules")
         .select("*")
@@ -70,14 +77,12 @@ export default function SocialMediaPage() {
         .order("created_at", { ascending: false });
 
       if (ownedErr) {
-        // Tabela pode ainda não existir (migration pendente)
         console.warn("social_media_schedules:", ownedErr);
         setOwnedSchedules([]);
         setSharedSchedules([]);
         return;
       }
 
-      // Fetch post counts for owned schedules
       const ownedWithCount: ScheduleWithCount[] = await Promise.all(
         (owned || []).map(async (s) => {
           const { count } = await supabase
@@ -89,7 +94,6 @@ export default function SocialMediaPage() {
       );
       setOwnedSchedules(ownedWithCount);
 
-      // Shared schedules (team member)
       const { data: teamRows, error: teamErr } = await supabase
         .from("social_media_team_members")
         .select("role, schedule_id, social_media_schedules(*)")
@@ -132,6 +136,33 @@ export default function SocialMediaPage() {
     }
     toast.success("Cronograma arquivado");
     fetchSchedules();
+  }
+
+  async function deleteSchedule() {
+    if (!deleteTarget || confirmText.toLowerCase() !== "excluir") return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("social_media_schedules")
+        .delete()
+        .eq("id", deleteTarget.id);
+
+      if (error) {
+        toast.error("Erro ao excluir cronograma");
+        return;
+      }
+      toast.success("Cronograma excluído permanentemente");
+      setDeleteTarget(null);
+      setConfirmText("");
+      fetchSchedules();
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function openDeleteDialog(schedule: ScheduleWithCount) {
+    setConfirmText("");
+    setDeleteTarget(schedule);
   }
 
   const displaySchedules = activeTab === "owned" ? ownedSchedules : sharedSchedules;
@@ -256,6 +287,7 @@ export default function SocialMediaPage() {
                   isOwner={activeTab === "owned"}
                   delay={i * 0.05}
                   onArchive={() => archiveSchedule(schedule.id)}
+                  onDelete={() => openDeleteDialog(schedule)}
                 />
               ))}
             </div>
@@ -263,6 +295,60 @@ export default function SocialMediaPage() {
         </div>
       </main>
       <Footer />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setConfirmText(""); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+              </div>
+              <DialogTitle className="text-destructive">Excluir cronograma permanentemente</DialogTitle>
+            </div>
+            <DialogDescription className="space-y-3 pt-1">
+              <span className="block">
+                Você está prestes a excluir o cronograma{" "}
+                <strong className="text-foreground">{deleteTarget?.client_name}</strong>.
+                Todos os posts, comentários e dados associados serão apagados.
+              </span>
+              <span className="block font-semibold text-destructive">
+                Esta ação não pode ser desfeita.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 py-2">
+            <p className="text-sm text-muted-foreground">
+              Para confirmar, digite <strong className="text-foreground">excluir</strong> no campo abaixo:
+            </p>
+            <Input
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="excluir"
+              className="border-destructive/30 focus-visible:ring-destructive/50"
+              onKeyDown={(e) => { if (e.key === "Enter" && confirmText.toLowerCase() === "excluir") deleteSchedule(); }}
+            />
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => { setDeleteTarget(null); setConfirmText(""); }}
+              disabled={deleting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={deleteSchedule}
+              disabled={confirmText.toLowerCase() !== "excluir" || deleting}
+            >
+              {deleting ? "Excluindo..." : "Excluir permanentemente"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -272,11 +358,13 @@ function ScheduleCard({
   isOwner,
   delay,
   onArchive,
+  onDelete,
 }: {
   schedule: ScheduleWithCount;
   isOwner: boolean;
   delay: number;
   onArchive: () => void;
+  onDelete: () => void;
 }) {
   const monthName = MONTHS_PT[schedule.month - 1];
   const networks = (schedule.networks || []) as NetworkType[];
@@ -315,6 +403,14 @@ function ScheduleCard({
                   >
                     <Archive className="h-4 w-4 mr-2" />
                     Arquivar
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                    onClick={onDelete}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

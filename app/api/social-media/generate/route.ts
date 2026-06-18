@@ -47,6 +47,28 @@ function getCommemorativeDatesForMonth(month: number): string {
   return entries.length > 0 ? entries.join(", ") : "Nenhuma data especial identificada";
 }
 
+interface HolidayEntry {
+  date: string;
+  name: string;
+  type: string;
+  location?: string;
+}
+
+function buildHolidaysSection(holidays: HolidayEntry[] | undefined): string {
+  if (!holidays?.length) return "";
+  const TYPE_LABELS: Record<string, string> = {
+    nacional: "Feriado Nacional", estadual: "Feriado Estadual", municipal: "Feriado Municipal",
+    comercial: "Data Comemorativa", evento: "Evento", custom: "Data Especial",
+  };
+  const lines = holidays.map((h) => {
+    const [y, m, d] = h.date.split("-");
+    const label = TYPE_LABELS[h.type] ?? "Data Especial";
+    const loc = h.location ? ` — ${h.location}` : "";
+    return `- ${d}/${m}/${y}: ${h.name} [${label}${loc}]`;
+  });
+  return `FERIADOS E DATAS ESPECIAIS SELECIONADOS PELO GESTOR (OBRIGATÓRIO considerar):\n${lines.join("\n")}\n\n`;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const groqKey = process.env.GROQ_API_KEY;
@@ -55,7 +77,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { clientName, clientNiche, month, year, networks, postTypes, frequency, tone, targetAudience, extraContext } = body;
+    const { clientName, clientNiche, month, year, networks, postTypes, frequency, tone, targetAudience, extraContext, startDay, holidays } = body;
 
     if (!clientName || !month || !year || !networks?.length) {
       return NextResponse.json({ error: "Parâmetros obrigatórios faltando" }, { status: 400 });
@@ -63,7 +85,10 @@ export async function POST(request: NextRequest) {
 
     const monthName = MONTHS_PT[month - 1];
     const commemorativeDates = getCommemorativeDatesForMonth(month);
-    const totalPosts = Math.round((frequency || 4) * 4.3);
+    const effectiveStartDay: number | undefined = startDay && startDay > 1 ? Number(startDay) : undefined;
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const remainingDays = effectiveStartDay ? daysInMonth - effectiveStartDay + 1 : daysInMonth;
+    const totalPosts = Math.max(1, Math.round(((frequency || 4) * 4.3) * (remainingDays / daysInMonth)));
     const networksStr = networks.join(", ");
 
     const allowedTypes: string[] = postTypes?.length
@@ -99,16 +124,17 @@ DADOS DO CLIENTE:
 DATAS COMEMORATIVAS EM ${monthName.toUpperCase()}:
 ${commemorativeDates}
 
-${extraContext ? `INSTRUÇÕES ESPECIAIS PARA ESTE MÊS:\n${extraContext}\n\n` : ""}INSTRUÇÕES:
-1. Distribua os posts uniformemente ao longo do mês (evite finais de semana para nichos B2B)
+${buildHolidaysSection(holidays)}${extraContext ? `INSTRUÇÕES ESPECIAIS PARA ESTE MÊS:\n${extraContext}\n\n` : ""}${effectiveStartDay ? `RESTRIÇÃO IMPORTANTE: Gere posts APENAS a partir do dia ${effectiveStartDay} até o dia ${daysInMonth} de ${monthName}. Não crie nenhum post para os dias anteriores ao dia ${effectiveStartDay}.\n\n` : ""}INSTRUÇÕES:
+1. Distribua os posts uniformemente ${effectiveStartDay ? `do dia ${effectiveStartDay} ao final do mês` : "ao longo do mês"} (evite finais de semana para nichos B2B)
 2. Use SOMENTE os formatos permitidos listados acima — não invente outros
 3. Varie entre os formatos disponíveis de forma estratégica
-4. Para datas comemorativas relevantes ao nicho, crie posts temáticos
-5. Cada copy deve ser criativa, em português brasileiro, com call-to-action claro
-6. Inclua 10-15 hashtags relevantes por post
-7. O content_description deve ser um brief detalhado para o criador de conteúdo
-8. Horários sugeridos: Reels/Shorts 19h-21h, Feed/Carrossel 12h ou 18h, Stories 9h ou 20h
-9. Para Stories, prefira horários de maior engajamento (manhã ou noite)
+4. Para os FERIADOS E DATAS ESPECIAIS listados acima, priorize criar posts temáticos relevantes ao nicho do cliente
+5. Para outras datas comemorativas relevantes ao nicho, crie posts temáticos adicionais
+6. Cada copy deve ser criativa, em português brasileiro, com call-to-action claro
+7. Inclua 10-15 hashtags relevantes por post
+8. O content_description deve ser um brief detalhado para o criador de conteúdo
+9. Horários sugeridos: Reels/Shorts 19h-21h, Feed/Carrossel 12h ou 18h, Stories 9h ou 20h
+10. Para Stories, prefira horários de maior engajamento (manhã ou noite)
 
 Retorne EXATAMENTE este JSON (sem nenhum texto antes ou depois):
 {
@@ -163,8 +189,18 @@ Retorne EXATAMENTE este JSON (sem nenhum texto antes ou depois):
       return NextResponse.json({ error: "Formato inválido retornado pela IA" }, { status: 500 });
     }
 
+    // Filter out posts before startDay (safety net in case AI ignored the instruction)
+    const filteredPosts = effectiveStartDay
+      ? parsed.posts.filter((post: Record<string, unknown>) => {
+          const dateStr = post.scheduled_date as string | undefined;
+          if (!dateStr) return true;
+          const day = parseInt(dateStr.split("-")[2] ?? "0", 10);
+          return day >= effectiveStartDay;
+        })
+      : parsed.posts;
+
     // Add position numbers
-    const posts = parsed.posts.map((post: Record<string, unknown>, index: number) => ({
+    const posts = filteredPosts.map((post: Record<string, unknown>, index: number) => ({
       ...post,
       position_number: index + 1,
       ai_generated: true,

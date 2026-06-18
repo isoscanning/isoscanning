@@ -156,6 +156,7 @@ export function HolidayPicker({ month, year, value, onChange }: Props) {
   const [searchResults, setSearchResults] = useState<SearchDate[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const searchDebounce = useRef<ReturnType<typeof setTimeout>>();
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   // Fetch all municipalities from IBGE when state changes
   useEffect(() => {
@@ -207,7 +208,11 @@ export function HolidayPicker({ month, year, value, onChange }: Props) {
           body: JSON.stringify({ query: searchQuery }),
         });
         const data = await res.json();
-        setSearchResults(data.dates ?? []);
+        const allDates: SearchDate[] = data.dates ?? [];
+        setSearchResults(allDates.filter((d) => {
+          const full = d.date.length === 10 ? d.date : `${year}-${d.date}`;
+          return full >= todayStr;
+        }));
       } catch {
         setSearchResults([]);
       } finally {
@@ -226,6 +231,10 @@ export function HolidayPicker({ month, year, value, onChange }: Props) {
     ? municipalities.filter((m) => m.nome.toLowerCase().includes(municipalitySearch.toLowerCase()))
     : municipalities;
   const displayBaseEvents = monthEvents.length > 0 ? monthEvents : GLOBAL_EVENTS;
+
+  const filteredMonthHolidays = monthHolidays.filter((h) => buildFullDate(h.date, year) >= todayStr);
+  const filteredStateHolidays = stateHolidays.filter((h) => buildFullDate(h.date, year) >= todayStr);
+  const filteredDisplayBaseEvents = displayBaseEvents.filter((ev) => (ev.endDate ?? ev.startDate) >= todayStr);
 
   // Normalize string for matching city names (remove accents)
   function norm(s: string) {
@@ -397,12 +406,12 @@ export function HolidayPicker({ month, year, value, onChange }: Props) {
 
             {/* ── Nacionais ── */}
             {activeTab === "nacionais" && (
-              monthHolidays.length === 0 ? (
+              filteredMonthHolidays.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-6">
                   Nenhum feriado ou data comemorativa neste mês.
                 </p>
               ) : (
-                monthHolidays.map((h) => {
+                filteredMonthHolidays.map((h) => {
                   const sel = isSelected(h.key);
                   return (
                     <button
@@ -540,19 +549,19 @@ export function HolidayPicker({ month, year, value, onChange }: Props) {
                   <p className="text-sm text-muted-foreground text-center py-4">
                     Selecione um estado para ver os feriados regionais.
                   </p>
-                ) : (stateHolidays.length === 0 && allCityHolidays.length === 0) ? (
+                ) : (filteredStateHolidays.length === 0 && allCityHolidays.length === 0) ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
                     Nenhum feriado cadastrado para a seleção. Use a aba Personalizado para adicionar.
                   </p>
                 ) : (
                   <div className="space-y-2 pt-1">
                     {/* State holidays */}
-                    {stateHolidays.length > 0 && (
+                    {filteredStateHolidays.length > 0 && (
                       <>
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                           Feriados estaduais — {STATE_HOLIDAYS[selectedState]?.label}
                         </p>
-                        {stateHolidays.map((h) => {
+                        {filteredStateHolidays.map((h) => {
                           const sel = isSelected(h.key);
                           return (
                             <button
@@ -581,8 +590,13 @@ export function HolidayPicker({ month, year, value, onChange }: Props) {
 
                     {/* Per-city: static + AI holidays */}
                     {selectedCities.map((cityName) => {
-                      const staticHols = allCityHolidays.filter((x) => x.city === cityName);
-                      const aiHols = cityAiHolidays[cityName] ?? [];
+                      const staticHols = allCityHolidays.filter(
+                        (x) => x.city === cityName && buildFullDate(x.holiday.date, year) >= todayStr
+                      );
+                      const aiHols = (cityAiHolidays[cityName] ?? []).filter((h) => {
+                        const full = h.date.length === 10 ? h.date : buildFullDate(h.date, year);
+                        return full >= todayStr;
+                      });
                       const isLoading = cityHolidaysLoading.includes(cityName);
                       const hasAny = staticHols.length > 0 || aiHols.length > 0;
 
@@ -686,12 +700,12 @@ export function HolidayPicker({ month, year, value, onChange }: Props) {
             {activeTab === "eventos" && (
               <div className="space-y-2">
                 {/* Hardcoded catalog */}
-                {displayBaseEvents.length > 0 && (
+                {filteredDisplayBaseEvents.length > 0 && (
                   <>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pb-1">
                       {monthEvents.length > 0 ? "Eventos do período" : "Catálogo de eventos"}
                     </p>
-                    {displayBaseEvents.map((ev) => {
+                    {filteredDisplayBaseEvents.map((ev) => {
                       const sel = isSelected(ev.key);
                       const cat = EVENT_CATEGORY[ev.category];
                       return (
@@ -738,13 +752,19 @@ export function HolidayPicker({ month, year, value, onChange }: Props) {
                     </div>
                   )}
 
-                  {!aiEventsLoading && aiEvents.length === 0 && (
+                  {!aiEventsLoading && aiEvents.filter((ev) => {
+                    const full = ev.date.length === 10 ? ev.date : buildFullDate(ev.date, year);
+                    return full >= todayStr;
+                  }).length === 0 && (
                     <p className="text-xs text-muted-foreground text-center py-3">
                       Nenhuma sugestão gerada para este período.
                     </p>
                   )}
 
-                  {!aiEventsLoading && aiEvents.map((ev, idx) => {
+                  {!aiEventsLoading && aiEvents.filter((ev) => {
+                    const full = ev.date.length === 10 ? ev.date : buildFullDate(ev.date, year);
+                    return full >= todayStr;
+                  }).map((ev, idx) => {
                     const key = `ai-ev-${idx}-${ev.name.toLowerCase().replace(/\s+/g, "-").slice(0, 30)}`;
                     const sel = isSelected(key);
                     const cat = EVENT_CATEGORY[ev.category] ?? { label: ev.category, color: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300" };

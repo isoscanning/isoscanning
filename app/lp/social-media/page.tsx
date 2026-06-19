@@ -895,6 +895,9 @@ export default function LpSocialMedia() {
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-cyan-500 dark:from-blue-400 dark:to-cyan-400">Escale no seu ritmo.</span>
                   </h2>
                   <p className="text-base text-muted-foreground max-w-2xl mx-auto">Sem contratos. Cancele quando quiser.</p>
+                  <p className="text-sm text-blue-400 font-medium pt-1">
+                    🎉 Aproveite a versão completa por tempo limitado, basta criar sua conta
+                  </p>
                 </div>
               </ScrollReveal>
 
@@ -950,11 +953,19 @@ export default function LpSocialMedia() {
                             </div>
                           ))}
                         </div>
-                        <Link href="/precos" className="mt-auto pt-1">
-                          <Button variant={plan.ctaVariant} className={`w-full h-11 text-sm ${plan.popular ? "shadow-md hover:shadow-lg hover:shadow-primary/20" : ""}`}>
-                            {plan.cta}
-                          </Button>
-                        </Link>
+                        {plan.cta === "Começar Grátis" ? (
+                          <Link href="/precos" className="mt-auto pt-1">
+                            <Button variant={plan.ctaVariant} className={`w-full h-11 text-sm ${plan.popular ? "shadow-md hover:shadow-lg hover:shadow-primary/20" : ""}`}>
+                              {plan.cta}
+                            </Button>
+                          </Link>
+                        ) : (
+                          <div className="mt-auto pt-1">
+                            <Button variant={plan.ctaVariant} className={`w-full h-11 text-sm ${plan.popular ? "shadow-md hover:shadow-lg hover:shadow-primary/20" : ""}`} disabled>
+                              {plan.cta}
+                            </Button>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </ScrollReveal>

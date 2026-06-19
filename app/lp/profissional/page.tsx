@@ -786,6 +786,9 @@ export default function LpProfissional() {
                 <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">
                   Sem contratos de longo prazo. Cancele quando quiser.
                 </p>
+                <p className="text-sm text-blue-400 font-medium pt-1">
+                  🎉 Aproveite a versão completa por tempo limitado, basta criar sua conta
+                </p>
               </div>
             </ScrollReveal>
 
@@ -926,18 +929,30 @@ export default function LpProfissional() {
                         ))}
                       </div>
 
-                      <Link href="/precos" className="mt-auto pt-1">
-                        <Button
-                          variant={plan.ctaVariant}
-                          className={`w-full h-10 md:h-11 text-xs md:text-sm ${
-                            plan.popular
-                              ? "shadow-md hover:shadow-lg hover:shadow-primary/20"
-                              : ""
-                          }`}
-                        >
-                          {plan.cta}
-                        </Button>
-                      </Link>
+                      {plan.cta === "Começar Grátis" ? (
+                        <Link href="/precos" className="mt-auto pt-1">
+                          <Button
+                            variant={plan.ctaVariant}
+                            className={`w-full h-10 md:h-11 text-xs md:text-sm ${
+                              plan.popular ? "shadow-md hover:shadow-lg hover:shadow-primary/20" : ""
+                            }`}
+                          >
+                            {plan.cta}
+                          </Button>
+                        </Link>
+                      ) : (
+                        <div className="mt-auto pt-1">
+                          <Button
+                            variant={plan.ctaVariant}
+                            className={`w-full h-10 md:h-11 text-xs md:text-sm ${
+                              plan.popular ? "shadow-md hover:shadow-lg hover:shadow-primary/20" : ""
+                            }`}
+                            disabled
+                          >
+                            {plan.cta}
+                          </Button>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </ScrollReveal>

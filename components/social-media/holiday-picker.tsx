@@ -549,7 +549,7 @@ export function HolidayPicker({ month, year, value, onChange }: Props) {
                   <p className="text-sm text-muted-foreground text-center py-4">
                     Selecione um estado para ver os feriados regionais.
                   </p>
-                ) : (filteredStateHolidays.length === 0 && allCityHolidays.length === 0) ? (
+                ) : (filteredStateHolidays.length === 0 && allCityHolidays.length === 0 && selectedCities.length === 0) ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
                     Nenhum feriado cadastrado para a seleção. Use a aba Personalizado para adicionar.
                   </p>

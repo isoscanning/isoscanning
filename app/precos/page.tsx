@@ -211,6 +211,10 @@ export default function PricingPage() {
                                     </span>
                                 </div>
                             </ScrollReveal>
+
+                            <p className="mt-4 text-sm text-center text-blue-400 font-medium">
+                                🎉 Aproveite a versão completa por tempo limitado, basta criar sua conta
+                            </p>
                         </div>
 
 
@@ -220,7 +224,7 @@ export default function PricingPage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl mx-auto">
                             {plans.map((plan, index) => (
                                 <ScrollReveal key={plan.name} delay={index * 0.1}>
-                                    <Card className={`relative flex flex-col h-full overflow-hidden border-2 transition-all duration-300 hover:shadow-xl ${plan.popular ? "border-primary shadow-lg shadow-primary/10" : "border-border hover:border-primary/40"} bg-card/50`}>
+                                    <Card className={`relative flex flex-col h-full border-2 transition-all duration-300 hover:shadow-xl ${plan.popular ? "border-primary shadow-lg shadow-primary/10" : "border-border hover:border-primary/40"} bg-card/50`}>
                                         {plan.popular && (
                                             <div className="absolute top-0 inset-x-0 flex justify-center -mt-3.5">
                                                 <Badge className="bg-primary text-primary-foreground px-4 py-1 text-xs font-semibold shadow-md">
@@ -268,7 +272,7 @@ export default function PricingPage() {
                                                 variant={plan.ctaVariant}
                                                 size="lg"
                                                 onClick={() => handleSubscribe(plan.name)}
-                                                disabled={loadingTier === plan.name}
+                                                disabled
                                             >
                                                 {loadingTier === plan.name && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                                 {plan.cta}

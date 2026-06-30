@@ -5,7 +5,6 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -20,6 +19,7 @@ import {
   POST_TYPE_CONFIG, STATUS_CONFIG, NETWORK_CONFIG, PRODUCTION_STATUS_CONFIG
 } from "@/lib/social-media-types";
 import { notifySocialMediaPostStatus, notifySocialMediaComment } from "@/lib/data-service";
+import { RichText, RichTextArea } from "@/components/social-media/rich-text";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -228,6 +228,10 @@ export function PostSlideOver({
 
   async function handleGenerateCopy() {
     if (!post) return;
+    // Garante que o resultado fique visível: a copy gerada vai para o editForm,
+    // que só é exibido no modo de edição. Sem isso, clicar fora do modo edição
+    // "não faz nada" visualmente.
+    if (!editing) setEditing(true);
     setGeneratingCopy(true);
     try {
       const res = await fetch("/api/social-media/generate-copy", {
@@ -244,16 +248,23 @@ export function PostSlideOver({
           existingCopy: editForm.copy,
         }),
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const apiMsg = (data as { error?: string })?.error;
+        throw new Error(apiMsg || "Erro na geração pela IA");
+      }
+
       setEditForm((prev) => ({
         ...prev,
         copy: data.copy || prev.copy,
         hashtags: (data.hashtags || []).map((h: string) => `#${h.replace(/^#/, "")}`).join(" ") || prev.hashtags,
       }));
-      toast.success("Copy gerada com IA");
-    } catch {
-      toast.error("Erro ao gerar copy");
+      toast.success("Copy gerada com IA. Revise e clique em Salvar.");
+    } catch (err) {
+      const msg = (err as { message?: string })?.message || "Erro ao gerar copy";
+      console.error("generate-copy error:", msg, err);
+      toast.error(msg);
     } finally {
       setGeneratingCopy(false);
     }
@@ -568,16 +579,17 @@ export function PostSlideOver({
                   )}
                 </div>
                 {editing ? (
-                  <Textarea
+                  <RichTextArea
                     value={editForm.copy}
-                    onChange={(e) => setEditForm((p) => ({ ...p, copy: e.target.value }))}
+                    onChange={(v) => setEditForm((p) => ({ ...p, copy: v }))}
                     placeholder="Escreva a legenda do post..."
                     rows={6}
-                    className="text-sm resize-none"
                   />
                 ) : (
-                  <div className="rounded-lg border border-border p-3 text-sm whitespace-pre-wrap bg-muted/20 min-h-[80px]">
-                    {post.copy || <span className="text-muted-foreground italic">Sem legenda cadastrada</span>}
+                  <div className="rounded-lg border border-border p-3 text-sm bg-muted/20 min-h-[80px]">
+                    {post.copy
+                      ? <RichText text={post.copy} />
+                      : <span className="text-muted-foreground italic">Sem legenda cadastrada</span>}
                   </div>
                 )}
               </div>
@@ -612,16 +624,17 @@ export function PostSlideOver({
               <div className="space-y-2">
                 <Label className="text-xs">Brief para o Criador de Conteúdo</Label>
                 {editing ? (
-                  <Textarea
+                  <RichTextArea
                     value={editForm.content_description}
-                    onChange={(e) => setEditForm((p) => ({ ...p, content_description: e.target.value }))}
+                    onChange={(v) => setEditForm((p) => ({ ...p, content_description: v }))}
                     placeholder="Descreva o que deve ser filmado/fotografado, ângulos, referências visuais..."
                     rows={4}
-                    className="text-sm resize-none"
                   />
                 ) : (
                   <div className="rounded-lg border border-border p-3 text-sm bg-muted/20 min-h-[60px]">
-                    {post.content_description || <span className="text-muted-foreground italic">Sem brief cadastrado</span>}
+                    {post.content_description
+                      ? <RichText text={post.content_description} />
+                      : <span className="text-muted-foreground italic">Sem brief cadastrado</span>}
                   </div>
                 )}
               </div>
@@ -729,12 +742,11 @@ export function PostSlideOver({
               {editing && (
                 <div className="space-y-2">
                   <Label className="text-xs">Notas internas</Label>
-                  <Textarea
+                  <RichTextArea
                     value={editForm.notes}
-                    onChange={(e) => setEditForm((p) => ({ ...p, notes: e.target.value }))}
+                    onChange={(v) => setEditForm((p) => ({ ...p, notes: v }))}
                     placeholder="Observações internas sobre este post..."
                     rows={2}
-                    className="text-sm resize-none"
                   />
                 </div>
               )}
@@ -742,7 +754,7 @@ export function PostSlideOver({
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">Notas</Label>
                   <div className="rounded-lg border border-border p-3 text-sm text-muted-foreground bg-muted/20">
-                    {post.notes}
+                    <RichText text={post.notes} />
                   </div>
                 </div>
               )}

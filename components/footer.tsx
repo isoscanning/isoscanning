@@ -7,7 +7,7 @@ import { trackEvent } from "@/lib/analytics";
 
 export function Footer() {
   return (
-    <footer className="border-t bg-muted/50 relative z-50">
+    <footer className="border-t bg-muted/50 relative z-10">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}

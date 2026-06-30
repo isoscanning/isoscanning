@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
-import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PostSlideOver } from "@/components/social-media/post-slide-over";
@@ -589,7 +588,6 @@ export default function ScheduleCalendarPage() {
             <Skeleton className="h-[600px] w-full rounded-xl" />
           </div>
         </main>
-        <Footer />
       </div>
     );
   }
@@ -707,7 +705,7 @@ export default function ScheduleCalendarPage() {
                 </Button>
               )}
 
-              {(userRole === "owner" || userRole === "editor") && (
+              {userRole === "owner" && (
                 <Link href={`/dashboard/social-media/${scheduleId}/team`}>
                   <Button variant="outline" size="sm" className="gap-1.5">
                     <Users className="h-3.5 w-3.5" />
@@ -1588,8 +1586,6 @@ export default function ScheduleCalendarPage() {
           </div>
         </>
       )}
-
-      <Footer />
     </div>
   );
 }

@@ -101,6 +101,8 @@ export default function TeamPage() {
   const [scheduleName, setScheduleName] = useState("");
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [fetching, setFetching] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<ProfileResult[]>([]);
@@ -147,24 +149,39 @@ export default function TeamPage() {
   }, [userProfile, loading, router]);
 
   useEffect(() => {
+    // Aguarda o auth-context terminar de restaurar a sessão do Supabase.
+    // Sem isso, no mobile (cold start) a query RLS abaixo roda antes da sessão
+    // estar pronta, retorna vazio e a tela "abre e volta" para o calendário.
+    if (loading) return;
     if (!userProfile) return;
     fetchTeam();
-  }, [userProfile, scheduleId]);
+  }, [userProfile, loading, scheduleId]);
 
   async function fetchTeam() {
     setFetching(true);
+    setLoadError(false);
     try {
-      const { data: sched } = await supabase
+      const { data: sched, error: schedErr } = await supabase
         .from("social_media_schedules")
         .select("client_name, owner_id")
         .eq("id", scheduleId)
         .single();
 
-      if (!sched || sched.owner_id !== userProfile?.id) {
-        toast.error("Acesso não autorizado");
-        router.push(`/dashboard/social-media/${scheduleId}`);
+      // Falha de query (sessão/RLS ainda não pronta, rede, etc.): NÃO redireciona.
+      // Redirecionar aqui é o que causa o "abre e volta" no mobile.
+      if (schedErr || !sched) {
+        console.error("sm team: schedule fetch failed:", schedErr);
+        setLoadError(true);
         return;
       }
+
+      // Confirmação positiva de que o usuário não é o dono → mostra acesso negado
+      // (sem auto-redirect, para não piscar a tela).
+      if (sched.owner_id !== userProfile?.id) {
+        setAccessDenied(true);
+        return;
+      }
+
       setScheduleName(sched.client_name);
 
       const { data: memberRows, error: membersErr } = await supabase
@@ -175,8 +192,9 @@ export default function TeamPage() {
       }
 
       setMembers((memberRows as any[]) || []);
-    } catch {
-      toast.error("Erro ao carregar equipe");
+    } catch (err) {
+      console.error("fetchTeam exception:", err);
+      setLoadError(true);
     } finally {
       setFetching(false);
     }
@@ -293,6 +311,68 @@ export default function TeamPage() {
           <div className="container mx-auto max-w-3xl space-y-6">
             <Skeleton className="h-16 w-full rounded-xl" />
             <Skeleton className="h-64 w-full rounded-xl" />
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 flex items-center justify-center px-4">
+          <div className="text-center space-y-4 max-w-sm">
+            <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mx-auto">
+              <Users className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold">Acesso restrito</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Apenas o proprietário do cronograma pode gerenciar a equipe.
+              </p>
+            </div>
+            <Link href={`/dashboard/social-media/${scheduleId}`}>
+              <Button variant="outline" className="gap-2">
+                <ArrowLeft className="h-4 w-4" /> Voltar ao cronograma
+              </Button>
+            </Link>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 flex items-center justify-center px-4">
+          <div className="text-center space-y-4 max-w-sm">
+            <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mx-auto">
+              <Users className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold">Não foi possível carregar</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Verifique sua conexão e tente novamente.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                onClick={() => fetchTeam()}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Tentar novamente
+              </Button>
+              <Link href={`/dashboard/social-media/${scheduleId}`}>
+                <Button variant="outline" className="gap-2">
+                  <ArrowLeft className="h-4 w-4" /> Voltar
+                </Button>
+              </Link>
+            </div>
           </div>
         </main>
         <Footer />

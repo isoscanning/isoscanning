@@ -226,6 +226,21 @@ export default function TeamPage() {
 
   async function handleInvite(profile: ProfileResult) {
     if (inviting) return;
+
+    // Limites do plano (espelham o banco): equipe é recurso Ultra, máx. 5 ativos
+    const tier = (userProfile as any)?.subscriptionTier ?? "vip";
+    if (tier !== "vip") {
+      toast.error(
+        "Membros de equipe estão disponíveis apenas no plano Ultra. Faça upgrade em /precos para colaborar em equipe."
+      );
+      return;
+    }
+    const activeMembers = members.filter((m) => m.status === "active").length;
+    if (activeMembers >= 5) {
+      toast.error("Limite de 5 membros de equipe por conta atingido.");
+      return;
+    }
+
     setInviting(profile.id);
     try {
       const { data, error } = await supabase.rpc("sm_add_team_member", {
@@ -239,6 +254,8 @@ export default function TeamPage() {
         const msg: string = error.message || "";
         if (msg.toLowerCase().includes("already") || msg.includes("23505")) {
           toast.error("Este usuário já está na equipe");
+        } else if (msg.includes("plano Ultra") || msg.includes("Limite de 5")) {
+          toast.error(msg);
         } else {
           toast.error(`Erro ao adicionar: ${msg || "verifique o console"}`);
         }

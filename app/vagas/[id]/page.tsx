@@ -167,10 +167,12 @@ export default function DetalhesVagaPage() {
                 duration: 5000,
             });
             router.push("/dashboard/candidaturas");
-        } catch (error) {
+        } catch (error: any) {
             toast({
                 title: "Erro ao candidatar",
-                description: "Ocorreu um erro ao processar sua candidatura. Tente novamente.",
+                description:
+                    error?.response?.data?.message ||
+                    "Ocorreu um erro ao processar sua candidatura. Tente novamente.",
                 variant: "destructive",
             });
         } finally {
@@ -218,10 +220,12 @@ export default function DetalhesVagaPage() {
                 duration: 5000,
             });
             router.push("/dashboard/candidaturas");
-        } catch (error) {
+        } catch (error: any) {
             toast({
                 title: "Erro ao enviar",
-                description: "Ocorreu um erro ao enviar sua contraproposta. Tente novamente.",
+                description:
+                    error?.response?.data?.message ||
+                    "Ocorreu um erro ao enviar sua contraproposta. Tente novamente.",
                 variant: "destructive",
             });
         } finally {

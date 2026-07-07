@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
+import { tokenManager } from "@/lib/token-manager";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -401,7 +402,7 @@ export default function ScheduleCalendarPage() {
     try {
       const response = await fetch("/api/social-media/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
         body: JSON.stringify({
           clientName: schedule.client_name,
           clientNiche: schedule.client_niche,
@@ -416,7 +417,10 @@ export default function ScheduleCalendarPage() {
         }),
       });
 
-      if (!response.ok) throw new Error("Erro na geração");
+      if (!response.ok) {
+        const err = await response.json().catch(() => null);
+        throw new Error(err?.error || "Erro na geração");
+      }
       const { posts: generatedPosts, error: apiError } = await response.json();
       if (apiError) throw new Error(apiError);
 

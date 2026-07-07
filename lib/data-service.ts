@@ -151,7 +151,13 @@ export interface AppNotification {
     | "team_invite"
     | "billing_confirmed"
     | "billing_overdue"
-    | "billing_cancelled";
+    | "billing_cancelled"
+    | "application_received"
+    | "application_status"
+    | "proposal_received"
+    | "proposal_status"
+    | "booking_created"
+    | "booking_status";
   referenceId?: string | null;
   isRead: boolean;
   createdAt: string;
@@ -204,9 +210,10 @@ export async function createEquipment(
       },
     });
     return response.data.id;
-  } catch (error) {
+  } catch (error: any) {
     console.error("[data-service] Error creating equipment:", error);
-    throw new Error("Erro ao criar equipamento");
+    // Preserva mensagens do backend (ex.: limite do plano atingido)
+    throw new Error(error?.response?.data?.message || "Erro ao criar equipamento");
   }
 }
 
@@ -622,9 +629,10 @@ export async function createJobOffer(data: CreateJobOfferData): Promise<string> 
   try {
     const response = await apiClient.post("/job-offers", data);
     return response.data.id;
-  } catch (error) {
+  } catch (error: any) {
     console.error("[data-service] Error creating job offer:", error);
-    throw new Error("Erro ao criar vaga");
+    // Preserva mensagens do backend (ex.: limite do plano atingido)
+    throw new Error(error?.response?.data?.message || "Erro ao criar vaga");
   }
 }
 
@@ -796,23 +804,14 @@ export const fetchJobApplication = async (jobId: string, candidateId: string): P
 
 export const applyToJob = async (jobId: string, candidateId: string, message?: string, counterProposal?: number): Promise<boolean> => {
   try {
-    // Use upsert to handle both new applications and reactivating withdrawn ones
-    const { error } = await supabase
-      .from('job_applications')
-      .upsert({
-        job_offer_id: jobId,
-        candidate_id: candidateId,
-        status: 'pending',
-        message: message || null,
-        counter_proposal: counterProposal || null
-      }, {
-        onConflict: 'job_offer_id,candidate_id'
-      });
-
-    if (error) {
-      console.error("Error applying to job:", error);
-      throw error;
-    }
+    // Passa pelo backend para aplicar limites de plano, validações e
+    // notificar o dono da vaga. Candidaturas retiradas são reativadas.
+    await apiClient.post('/job-applications', {
+      jobOfferId: jobId,
+      candidateId,
+      message: message || undefined,
+      counterProposal: counterProposal || undefined,
+    });
 
     return true;
   } catch (error) {
@@ -1019,26 +1018,12 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
 
 export const updateJobApplicationStatus = async (applicationId: string, status: 'accepted' | 'rejected', agreedValue?: number): Promise<boolean> => {
   try {
-    const updateData: any = { status };
-    if (agreedValue !== undefined) {
-      updateData.agreed_value = agreedValue;
-    }
-
-    const { data, error } = await supabase
-      .from('job_applications')
-      .update(updateData)
-      .eq('id', applicationId)
-      .select();
-
-    if (error) {
-      console.error("Error updating application status:", error);
-      throw error;
-    }
-
-    if (!data || data.length === 0) {
-      console.warn("No application updated. Possible RLS issue or ID not found.");
-      return false;
-    }
+    // Passa pelo backend: valida que o ator é o dono da vaga, bloqueia a
+    // agenda do candidato ao aceitar e dispara a notificação de status.
+    await apiClient.patch(`/job-applications/${applicationId}`, {
+      status,
+      ...(agreedValue !== undefined ? { agreedValue } : {}),
+    });
 
     return true;
   } catch (error) {

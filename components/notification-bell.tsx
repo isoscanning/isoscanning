@@ -26,6 +26,12 @@ const NOTIFICATION_TOAST_TITLES: Partial<Record<AppNotification["type"], string>
     billing_confirmed: "Pagamento confirmado!",
     billing_overdue: "Atenção: fatura em atraso",
     billing_cancelled: "Assinatura encerrada",
+    application_received: "Nova candidatura na sua vaga!",
+    application_status: "Atualização da sua candidatura",
+    proposal_received: "Nova proposta recebida!",
+    proposal_status: "Atualização da sua proposta",
+    booking_created: "Nova solicitação de agendamento!",
+    booking_status: "Atualização de agendamento",
 };
 
 export function NotificationBell() {
@@ -135,6 +141,16 @@ export function NotificationBell() {
             type === "billing_cancelled"
         ) {
             router.push("/dashboard/assinatura");
+        } else if (type === "application_received") {
+            router.push(referenceId ? `/dashboard/vagas/${referenceId}/candidatos` : "/dashboard/vagas");
+        } else if (type === "application_status") {
+            router.push("/dashboard/candidaturas");
+        } else if (type === "proposal_received" || type === "proposal_status") {
+            router.push(referenceId ? `/equipamentos/${referenceId}` : "/equipamentos");
+        } else if (type === "booking_created") {
+            router.push("/dashboard/solicitacoes");
+        } else if (type === "booking_status") {
+            router.push("/dashboard/agenda");
         }
     };
 

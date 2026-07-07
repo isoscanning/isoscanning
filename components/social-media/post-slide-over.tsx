@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { tokenManager } from "@/lib/token-manager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -236,7 +237,7 @@ export function PostSlideOver({
     try {
       const res = await fetch("/api/social-media/generate-copy", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
         body: JSON.stringify({
           title: editForm.title || post.title,
           postType: post.post_type,

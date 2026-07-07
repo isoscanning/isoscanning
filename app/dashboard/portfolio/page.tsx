@@ -132,9 +132,15 @@ export default function PortfolioPage() {
     });
   };
 
-  // Limits definition
-  const MAX_MEDIA = 150;
-  const MAX_VIDEOS = 20;
+  // Limites por plano — espelham o backend (Free: 4 | Pro/Standard: 10 | Ultra/VIP: 150)
+  const PORTFOLIO_LIMITS: Record<string, { media: number; videos: number }> = {
+    free: { media: 4, videos: 1 },
+    standard: { media: 10, videos: 5 },
+    pro: { media: 10, videos: 5 },
+    vip: { media: 150, videos: 20 },
+  };
+  const tier = ((userProfile as any)?.subscriptionTier as string) ?? "vip";
+  const { media: MAX_MEDIA, videos: MAX_VIDEOS } = PORTFOLIO_LIMITS[tier] ?? PORTFOLIO_LIMITS.vip;
 
   const currentTotalMedia = portfolioItems.reduce((acc, item) => acc + (item.media?.length || 0), 0);
   const currentTotalVideos = portfolioItems.reduce((acc, item) => acc + (item.media?.filter(m => m.type === 'video').length || 0), 0);

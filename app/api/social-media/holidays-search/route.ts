@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/server/api-auth";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -6,6 +7,11 @@ export async function POST(request: NextRequest) {
   try {
     const groqKey = process.env.GROQ_API_KEY;
     if (!groqKey) return NextResponse.json({ dates: [] });
+
+    // Rota proxia a chave Groq — exige usuário autenticado
+    if (!(await requireUser(request))) {
+      return NextResponse.json({ error: "Não autorizado. Faça login novamente." }, { status: 401 });
+    }
 
     const { query } = await request.json();
     if (!query?.trim() || query.trim().length < 3) return NextResponse.json({ dates: [] });

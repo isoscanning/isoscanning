@@ -154,6 +154,9 @@ export default function ProfessionalProfilePage() {
   // Portfolio filter state
   const [portfolioFilter, setPortfolioFilter] = useState<'all' | 'photo' | 'video'>('all');
 
+  // Limite de visualizações de perfil do plano
+  const [planLimitError, setPlanLimitError] = useState<string | null>(null);
+
   // Lightbox state
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -169,6 +172,7 @@ export default function ProfessionalProfilePage() {
       // Fetch professional profile
       const profResponse = await apiClient.get(`/profiles/${professionalId}`);
       setProfessional(profResponse.data);
+      setPlanLimitError(null);
 
       // Fetch portfolio for this professional
       try {
@@ -251,7 +255,14 @@ export default function ProfessionalProfilePage() {
       } catch (error) {
         console.error("[profissional-detail] Error fetching availability:", error);
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Limite de visualizações de perfil do plano (403 do backend)
+      if (error?.response?.status === 403) {
+        setPlanLimitError(
+          error.response.data?.message ||
+          "Você atingiu o limite de visualizações de perfis do seu plano este mês."
+        );
+      }
       console.error(
         "[profissional-detail] Error fetching professional data:",
         error
@@ -334,6 +345,31 @@ export default function ProfessionalProfilePage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!professional && planLimitError) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <Card className="max-w-md bg-card border-border">
+            <CardContent className="pt-6 text-center space-y-4">
+              <p className="text-lg font-semibold">Limite do plano atingido</p>
+              <p className="text-muted-foreground">{planLimitError}</p>
+              <div className="flex gap-2 justify-center">
+                <Link href="/precos">
+                  <Button>Ver planos</Button>
+                </Link>
+                <Link href="/profissionais">
+                  <Button variant="outline">Voltar para busca</Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+        <Footer />
       </div>
     );
   }

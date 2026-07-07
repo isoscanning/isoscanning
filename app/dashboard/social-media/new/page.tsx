@@ -25,6 +25,15 @@ import {
 } from "@/lib/social-media-types";
 import { HolidayPicker } from "@/components/social-media/holiday-picker";
 import { SelectedHoliday } from "@/lib/holidays-data";
+import { tokenManager } from "@/lib/token-manager";
+
+// Limites de contas (cronogramas) por plano — espelha /precos e a RLS do banco
+const SCHEDULE_LIMITS: Record<string, number | null> = {
+  free: 1,
+  standard: 5,
+  pro: 5,
+  vip: null, // ilimitado
+};
 
 const STEPS = ["Briefing", "Configuração", "Geração com IA"];
 
@@ -105,7 +114,7 @@ export default function NewSchedulePage() {
     try {
       const res = await fetch("/api/social-media/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
         body: JSON.stringify({
           clientName: form.clientName,
           clientNiche: form.clientNiche,
@@ -140,6 +149,24 @@ export default function NewSchedulePage() {
     if (!userProfile || generatedPosts.length === 0) return;
     setSaving(true);
     try {
+      // Limite do plano: contas de social media (Free 1 | Pro 5 | Ultra ilimitado)
+      const tier = (userProfile as any).subscriptionTier ?? "vip";
+      const limit = SCHEDULE_LIMITS[tier] ?? null;
+      if (limit !== null) {
+        const { count } = await supabase
+          .from("social_media_schedules")
+          .select("*", { count: "exact", head: true })
+          .eq("owner_id", userProfile.id);
+        if ((count ?? 0) >= limit) {
+          toast.error(
+            `Seu plano permite gerenciar até ${limit} conta(s) de social media. ` +
+            `Faça upgrade em /precos para adicionar mais contas.`
+          );
+          setSaving(false);
+          return;
+        }
+      }
+
       // Create schedule
       const { data: schedule, error: scheduleErr } = await supabase
         .from("social_media_schedules")
@@ -193,7 +220,9 @@ export default function NewSchedulePage() {
       if (msg?.includes("does not exist") || msg?.includes("relation") || err?.code === "42P01") {
         toast.error("Tabela não encontrada. Execute o arquivo social_media_tables.sql no Supabase primeiro.");
       } else if (err?.code === "42501" || msg?.includes("policy")) {
-        toast.error("Sem permissão. Verifique as políticas RLS no Supabase.");
+        toast.error(
+          "Não foi possível criar o cronograma. Você pode ter atingido o limite de contas do seu plano — faça upgrade em /precos."
+        );
       } else {
         toast.error(`Erro ao salvar: ${msg || "verifique o console"}`);
       }

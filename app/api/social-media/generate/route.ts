@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser, checkAiCalendarQuota, recordAiCalendarUsage } from "@/lib/server/api-auth";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -74,6 +75,26 @@ export async function POST(request: NextRequest) {
     const groqKey = process.env.GROQ_API_KEY;
     if (!groqKey) {
       return NextResponse.json({ error: "GROQ_API_KEY não configurada" }, { status: 500 });
+    }
+
+    // Rota proxia a chave Groq — exige usuário autenticado
+    const auth = await requireUser(request);
+    if (!auth) {
+      return NextResponse.json({ error: "Não autorizado. Faça login novamente." }, { status: 401 });
+    }
+
+    // Limite de plano: Free = 1 calendário com IA por mês
+    const quota = await checkAiCalendarQuota(auth);
+    if (!quota.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            `Você já usou ${quota.used} de ${quota.limit} geração(ões) de calendário com IA este mês. ` +
+            `Faça upgrade do plano para gerações ilimitadas.`,
+          planLimit: true,
+        },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();
@@ -205,6 +226,9 @@ Retorne EXATAMENTE este JSON (sem nenhum texto antes ou depois):
       position_number: index + 1,
       ai_generated: true,
     }));
+
+    // Contabiliza a geração contra a cota mensal do plano
+    await recordAiCalendarUsage(auth);
 
     return NextResponse.json({ posts });
   } catch (error) {

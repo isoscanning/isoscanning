@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
+import { tokenManager } from "@/lib/token-manager";
 import {
   Plus, X, ChevronDown, ChevronUp, MapPin, Globe,
   CalendarDays, Tag, Search, Loader2, Sparkles,
@@ -182,7 +183,7 @@ export function HolidayPicker({ month, year, value, onChange }: Props) {
 
     fetch("/api/social-media/events-ai", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
       body: JSON.stringify({ month, year }),
     })
       .then((r) => r.json())
@@ -204,7 +205,7 @@ export function HolidayPicker({ month, year, value, onChange }: Props) {
       try {
         const res = await fetch("/api/social-media/holidays-search", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
           body: JSON.stringify({ query: searchQuery }),
         });
         const data = await res.json();
@@ -266,7 +267,7 @@ export function HolidayPicker({ month, year, value, onChange }: Props) {
       setCityHolidaysLoading((prev) => [...prev, cityName]);
       fetch("/api/social-media/city-holidays", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
         body: JSON.stringify({ cityName, state: selectedState, year }),
       })
         .then((r) => r.json())

@@ -37,4 +37,10 @@ function sync(): void {
   }
 }
 
-export const tokenManager = { get, set, clear, sync };
+// Headers de autenticação para fetch() direto (rotas /app/api).
+function authHeader(): Record<string, string> {
+  const token = get();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export const tokenManager = { get, set, clear, sync, authHeader };

@@ -109,7 +109,13 @@ export default function NewSchedulePage() {
   }
 
   async function handleGenerate() {
-    if (!userProfile) return;
+    // A autenticação da geração é feita no servidor via token Bearer (requireUser).
+    // Não dependemos de `userProfile` aqui — ele pode ainda não ter carregado
+    // (ex.: /auth/me lenta em produção) e não é usado no corpo da requisição.
+    if (!tokenManager.get()) {
+      toast.error("Sessão expirada. Faça login novamente para gerar o cronograma.");
+      return;
+    }
     setGenerating(true);
     try {
       const res = await fetch("/api/social-media/generate", {
@@ -146,7 +152,11 @@ export default function NewSchedulePage() {
   }
 
   async function handleSave() {
-    if (!userProfile || generatedPosts.length === 0) return;
+    if (generatedPosts.length === 0) return;
+    if (!userProfile) {
+      toast.error("Não foi possível identificar seu perfil. Recarregue a página e faça login novamente.");
+      return;
+    }
     setSaving(true);
     try {
       // Limite do plano: contas de social media (Free 1 | Pro 5 | Ultra ilimitado)

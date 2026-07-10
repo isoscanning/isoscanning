@@ -12,7 +12,7 @@ import {
   X, Pencil, Sparkles, Loader2, Send, Check, AlertCircle, ThumbsDown,
   Clock, Hash, FileText, MessageSquare, History, Instagram, Facebook,
   Youtube, Linkedin, Twitter, Music2, ChevronDown, Link2, ExternalLink,
-  Film, FolderOpen, Trash2
+  Film, FolderOpen, Trash2, Wand2, RefreshCw, BarChart3
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -31,12 +31,23 @@ interface PostSlideOverProps {
   clientNiche?: string;
   tone?: string;
   targetAudience?: string;
+  objective?: string;
   userRole: string;
   userId: string;
   onClose: () => void;
   onUpdate: (updated: SocialMediaPost) => void;
   onDelete?: (postId: string) => void;
 }
+
+// Refinos de 1 clique — cada chip envia a instrução para /api/social-media/refine-post
+const REFINE_PRESETS: { label: string; instruction: string }[] = [
+  { label: "Mais curta",        instruction: "Deixe a copy mais curta e direta, mantendo o gancho e o CTA." },
+  { label: "Mais persuasiva",   instruction: "Torne a copy mais persuasiva e focada em conversão, com CTA mais forte." },
+  { label: "Gancho mais forte", instruction: "Reescreva a primeira linha com um gancho mais chamativo (pergunta, dado surpreendente ou dor do público). Mantenha o restante coerente." },
+  { label: "Mais descontraída", instruction: "Deixe o tom mais leve e descontraído, com linguagem próxima do público." },
+  { label: "Mais profissional", instruction: "Deixe o tom mais profissional e sóbrio, sem perder a fluidez." },
+  { label: "Focar em venda",    instruction: "Direcione a copy para venda: destaque benefícios, quebre objeções e finalize com CTA de compra/contato." },
+];
 
 const NETWORK_ICONS: Record<NetworkType, React.ComponentType<{ className?: string }>> = {
   instagram: Instagram,
@@ -70,14 +81,22 @@ const STATUS_ACTIONS: Partial<Record<PostStatus, { label: string; next: PostStat
 };
 
 export function PostSlideOver({
-  post, scheduleId, clientName, clientNiche, tone, targetAudience,
+  post, scheduleId, clientName, clientNiche, tone, targetAudience, objective,
   userRole, userId, onClose, onUpdate, onDelete
 }: PostSlideOverProps) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [generatingCopy, setGeneratingCopy] = useState(false);
+  // Chave da ação de IA em andamento ("rewrite" | "full" | "custom" | label do chip) — null = ociosa
+  const [refining, setRefining] = useState<string | null>(null);
+  const [refineInstruction, setRefineInstruction] = useState("");
+  // Métricas de desempenho (alimentam o relatório mensal)
+  const [savingMetrics, setSavingMetrics] = useState(false);
+  const [showMetrics, setShowMetrics] = useState(false);
+  const [metricsForm, setMetricsForm] = useState({
+    likes: "", comments: "", shares: "", saves: "", reach: "", views: "",
+  });
   const [comments, setComments] = useState<PostComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [newComment, setNewComment] = useState("");
@@ -113,6 +132,15 @@ export function PostSlideOver({
         production_status: post.production_status || "pending",
         post_type: post.post_type,
       });
+      setMetricsForm({
+        likes: post.metric_likes != null ? String(post.metric_likes) : "",
+        comments: post.metric_comments != null ? String(post.metric_comments) : "",
+        shares: post.metric_shares != null ? String(post.metric_shares) : "",
+        saves: post.metric_saves != null ? String(post.metric_saves) : "",
+        reach: post.metric_reach != null ? String(post.metric_reach) : "",
+        views: post.metric_views != null ? String(post.metric_views) : "",
+      });
+      setShowMetrics(post.metrics_updated_at != null || post.status === "published");
       fetchComments(post.id);
     }
   }, [post?.id]);
@@ -227,47 +255,94 @@ export function PostSlideOver({
     }
   }
 
-  async function handleGenerateCopy() {
-    if (!post) return;
-    // Garante que o resultado fique visível: a copy gerada vai para o editForm,
-    // que só é exibido no modo de edição. Sem isso, clicar fora do modo edição
-    // "não faz nada" visualmente.
+  async function handleRefine(instruction: string | undefined, scope: "copy" | "full", actionKey: string) {
+    if (!post || refining) return;
+    // Garante que o resultado fique visível: o conteúdo refinado vai para o
+    // editForm, que só é exibido no modo de edição.
     if (!editing) setEditing(true);
-    setGeneratingCopy(true);
+    setRefining(actionKey);
     try {
-      const res = await fetch("/api/social-media/generate-copy", {
+      const currentHashtags = editForm.hashtags
+        .split(/[\s,]+/)
+        .map((h) => h.replace(/^#/, "").trim())
+        .filter(Boolean);
+
+      const res = await fetch("/api/social-media/refine-post", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
         body: JSON.stringify({
+          scope,
+          instruction,
           title: editForm.title || post.title,
-          postType: post.post_type,
+          postType: editForm.post_type || post.post_type,
           network: post.network,
+          copy: editForm.copy || undefined,
+          hashtags: currentHashtags,
+          contentDescription: editForm.content_description || undefined,
           clientName,
           clientNiche,
           tone,
           targetAudience,
-          existingCopy: editForm.copy,
+          objective,
         }),
       });
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         const apiMsg = (data as { error?: string })?.error;
-        throw new Error(apiMsg || "Erro na geração pela IA");
+        throw new Error(apiMsg || "Erro no refino pela IA");
       }
 
       setEditForm((prev) => ({
         ...prev,
+        ...(scope === "full" && data.title ? { title: data.title } : {}),
         copy: data.copy || prev.copy,
         hashtags: (data.hashtags || []).map((h: string) => `#${h.replace(/^#/, "")}`).join(" ") || prev.hashtags,
+        ...(scope === "full" && typeof data.content_description === "string" && data.content_description
+          ? { content_description: data.content_description }
+          : {}),
       }));
-      toast.success("Copy gerada com IA. Revise e clique em Salvar.");
+      setRefineInstruction("");
+      toast.success(scope === "full"
+        ? "Post regenerado com IA. Revise e clique em Salvar."
+        : "Copy refinada com IA. Revise e clique em Salvar.");
     } catch (err) {
-      const msg = (err as { message?: string })?.message || "Erro ao gerar copy";
-      console.error("generate-copy error:", msg, err);
+      const msg = (err as { message?: string })?.message || "Erro ao refinar com IA";
+      console.error("refine-post error:", msg, err);
       toast.error(msg);
     } finally {
-      setGeneratingCopy(false);
+      setRefining(null);
+    }
+  }
+
+  async function handleSaveMetrics() {
+    if (!post) return;
+    setSavingMetrics(true);
+    try {
+      const toInt = (v: string) => {
+        const n = parseInt(v.replace(/\D/g, ""), 10);
+        return Number.isFinite(n) ? n : null;
+      };
+      const { data, error } = await supabase.rpc("sm_update_post_metrics", {
+        p_post_id:  post.id,
+        p_likes:    toInt(metricsForm.likes),
+        p_comments: toInt(metricsForm.comments),
+        p_shares:   toInt(metricsForm.shares),
+        p_saves:    toInt(metricsForm.saves),
+        p_reach:    toInt(metricsForm.reach),
+        p_views:    toInt(metricsForm.views),
+      });
+      if (error) throw error;
+      onUpdate(data as SocialMediaPost);
+      toast.success("Métricas salvas — elas alimentam o relatório mensal.");
+    } catch (err) {
+      const msg = (err as { message?: string })?.message ?? "";
+      console.error("sm_update_post_metrics error:", msg, err);
+      toast.error(msg.includes("function") || msg.includes("does not exist")
+        ? "Banco desatualizado. Execute a migration 43-social-media-analytics.sql no Supabase."
+        : "Erro ao salvar métricas");
+    } finally {
+      setSavingMetrics(false);
     }
   }
 
@@ -568,11 +643,11 @@ export function PostSlideOver({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={handleGenerateCopy}
-                      disabled={generatingCopy}
+                      onClick={() => handleRefine(undefined, "copy", "rewrite")}
+                      disabled={refining !== null}
                       className="h-7 text-xs gap-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                     >
-                      {generatingCopy
+                      {refining === "rewrite"
                         ? <Loader2 className="h-3 w-3 animate-spin" />
                         : <Sparkles className="h-3 w-3" />}
                       {editForm.copy ? "Reescrever" : "Gerar"} com IA
@@ -594,6 +669,64 @@ export function PostSlideOver({
                   </div>
                 )}
               </div>
+
+              {/* Refino rápido com IA */}
+              {canEdit && (
+                <div className="rounded-lg border border-dashed border-blue-300 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-950/10 p-3 space-y-2.5">
+                  <Label className="text-xs flex items-center gap-1.5 text-blue-700 dark:text-blue-400">
+                    <Wand2 className="h-3.5 w-3.5" />
+                    Refino rápido com IA
+                  </Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {REFINE_PRESETS.map(({ label, instruction }) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => handleRefine(instruction, "copy", label)}
+                        disabled={refining !== null}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-blue-200 dark:border-blue-800 bg-background text-xs font-medium text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors disabled:opacity-50"
+                      >
+                        {refining === label && <Loader2 className="h-3 w-3 animate-spin" />}
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={refineInstruction}
+                      onChange={(e) => setRefineInstruction(e.target.value)}
+                      placeholder='Instrução livre: ex. "cite a promoção de julho no início"'
+                      className="h-8 text-xs flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && refineInstruction.trim()) {
+                          e.preventDefault();
+                          handleRefine(refineInstruction.trim(), "copy", "custom");
+                        }
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleRefine(refineInstruction.trim(), "copy", "custom")}
+                      disabled={refining !== null || !refineInstruction.trim()}
+                      className="h-8 text-xs gap-1.5 shrink-0"
+                    >
+                      {refining === "custom" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                      Aplicar
+                    </Button>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleRefine(refineInstruction.trim() || undefined, "full", "full")}
+                    disabled={refining !== null}
+                    className="h-7 w-full text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                  >
+                    {refining === "full" ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                    Regenerar post inteiro (nova ideia, copy e brief)
+                  </Button>
+                </div>
+              )}
 
               {/* Hashtags */}
               <div className="space-y-2">
@@ -704,6 +837,68 @@ export function PostSlideOver({
                     <p className="text-xs text-muted-foreground italic px-1">Nenhum link cadastrado</p>
                   )}
                 </div>
+              </div>
+
+              {/* Desempenho / métricas — alimentam o relatório mensal */}
+              <div className="space-y-3 pt-1 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setShowMetrics((v) => !v)}
+                  className="w-full flex items-center justify-between text-left"
+                >
+                  <Label className="text-xs flex items-center gap-1.5 text-muted-foreground cursor-pointer">
+                    <BarChart3 className="h-3.5 w-3.5" />
+                    Desempenho do post
+                    {post.metrics_updated_at && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                        registrado
+                      </span>
+                    )}
+                  </Label>
+                  <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${showMetrics ? "rotate-180" : ""}`} />
+                </button>
+                {showMetrics && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        ["likes", "Curtidas"],
+                        ["comments", "Comentários"],
+                        ["shares", "Compart."],
+                        ["saves", "Salvos"],
+                        ["reach", "Alcance"],
+                        ["views", "Visualizações"],
+                      ] as const).map(([key, label]) => (
+                        <div key={key} className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">{label}</Label>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            value={metricsForm[key]}
+                            disabled={!canEdit}
+                            onChange={(e) => setMetricsForm((p) => ({ ...p, [key]: e.target.value.replace(/\D/g, "") }))}
+                            placeholder="—"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    {canEdit && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleSaveMetrics}
+                        disabled={savingMetrics}
+                        className="h-8 w-full text-xs gap-1.5"
+                      >
+                        {savingMetrics ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                        Salvar métricas
+                      </Button>
+                    )}
+                    <p className="text-[11px] text-muted-foreground">
+                      As métricas alimentam o Relatório Mensal do cronograma (curtidas, comentários e ranking de posts).
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Production fields (edit mode) */}

@@ -6,6 +6,21 @@ export type MemberRole = "owner" | "editor" | "approver" | "viewer";
 export type MemberStatus = "pending" | "active" | "removed";
 export type ScheduleStatus = "active" | "archived";
 
+// Anamnese da conta gerada por IA (pesquisa web via @ do Instagram)
+export interface AccountAnalysis {
+  found?: boolean;
+  web_research?: boolean;
+  summary?: string;
+  tone_of_voice?: string;
+  content_themes?: string[];
+  target_audience?: string;
+  positioning?: string;
+  strengths?: string[];
+  weaknesses?: string[];
+  opportunities?: string[];
+  suggested_pillars?: string[];
+}
+
 export interface SocialMediaSchedule {
   id: string;
   owner_id: string;
@@ -18,6 +33,15 @@ export interface SocialMediaSchedule {
   tone_of_voice?: string;
   target_audience?: string;
   posting_frequency: number;
+  // Briefing avançado (usado na geração com IA)
+  objective?: string;
+  products_services?: string;
+  differentials?: string;
+  avoid_topics?: string;
+  preferred_cta?: string;
+  // Conta do Instagram + anamnese com IA
+  account_handle?: string;
+  account_analysis?: AccountAnalysis;
   status: ScheduleStatus;
   created_at: string;
   updated_at: string;
@@ -45,6 +69,69 @@ export interface SocialMediaPost {
   approved_by?: string;
   approved_at?: string;
   published_at?: string;
+  // Métricas de desempenho (manuais hoje; Graph API no futuro)
+  metric_likes?: number | null;
+  metric_comments?: number | null;
+  metric_shares?: number | null;
+  metric_saves?: number | null;
+  metric_reach?: number | null;
+  metric_views?: number | null;
+  metrics_updated_at?: string | null;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Relatório mensal ──────────────────────────────────────────
+export interface ReportPostStat {
+  id: string;
+  title: string;
+  post_type: PostType;
+  network: NetworkType;
+  scheduled_date: string;
+  likes: number;
+  comments: number;
+  shares: number;
+  saves: number;
+  reach: number;
+  views: number;
+  engagement: number; // likes + comments + shares + saves
+}
+
+export interface MonthlyReportStats {
+  totalPosts: number;
+  publishedPosts: number;
+  postsWithMetrics: number;
+  totalLikes: number;
+  totalComments: number;
+  totalShares: number;
+  totalSaves: number;
+  totalReach: number;
+  totalEngagement: number;
+  avgEngagementPerPost: number;
+  engagementRate: number | null; // engajamento / alcance (quando houver alcance)
+  topPosts: ReportPostStat[];
+  formatBreakdown: { post_type: PostType; count: number; avgEngagement: number }[];
+}
+
+export interface MonthlyReportAI {
+  executive_summary: string;
+  highlights: string[];
+  what_worked: string[];
+  what_underperformed: string[];
+  format_insights: string;
+  recommendations: string[];
+  next_month_strategy: string;
+  suggested_posts: { title: string; post_type: string; network: string; rationale: string }[];
+}
+
+export interface SmMonthlyReport {
+  id: string;
+  schedule_id: string;
+  month: number;
+  year: number;
+  stats: MonthlyReportStats;
+  report: MonthlyReportAI;
   created_by?: string;
   created_at: string;
   updated_at: string;
@@ -126,6 +213,16 @@ export const NETWORK_OPTIONS: { value: NetworkType; label: string }[] = [
   { value: "linkedin", label: "LinkedIn" },
   { value: "twitter", label: "X / Twitter" },
   { value: "youtube", label: "YouTube" },
+];
+
+// Objetivos de marketing — o valor é enviado à IA, que ajusta o mix de conteúdo
+export const OBJECTIVE_OPTIONS: { value: string; label: string }[] = [
+  { value: "vendas", label: "Gerar vendas / leads" },
+  { value: "engajamento", label: "Aumentar engajamento" },
+  { value: "autoridade", label: "Construir autoridade" },
+  { value: "seguidores", label: "Atrair novos seguidores" },
+  { value: "lancamento", label: "Lançamento de produto/serviço" },
+  { value: "relacionamento", label: "Relacionamento com clientes" },
 ];
 
 export const TONE_OPTIONS = [

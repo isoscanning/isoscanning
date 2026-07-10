@@ -16,6 +16,12 @@ CREATE TABLE IF NOT EXISTS social_media_schedules (
   tone_of_voice VARCHAR(255),
   target_audience TEXT,
   posting_frequency INTEGER DEFAULT 3,
+  -- Briefing avançado usado pela geração com IA (ver 42-social-media-briefing-fields.sql)
+  objective TEXT,
+  products_services TEXT,
+  differentials TEXT,
+  avoid_topics TEXT,
+  preferred_cta TEXT,
   status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'archived')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

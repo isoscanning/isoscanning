@@ -14,13 +14,13 @@ import {
   ArrowLeft, ChevronLeft, ChevronRight, Users,
   Instagram, Facebook, Youtube, Linkedin, Twitter, Music2,
   GripVertical, Sparkles, X, Loader2, CalendarDays, Check, Plus, Trash2,
-  Share2, Copy, RefreshCw, ExternalLink,
+  Share2, Copy, RefreshCw, ExternalLink, BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
 import { notifySocialMediaPostStatus } from "@/lib/data-service";
 import {
   SocialMediaSchedule, SocialMediaPost, NetworkType, PostType, PostStatus,
-  POST_TYPE_CONFIG, MONTHS_PT, COMMEMORATIVE_DATES
+  POST_TYPE_CONFIG, MONTHS_PT, COMMEMORATIVE_DATES, SmMonthlyReport
 } from "@/lib/social-media-types";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -130,6 +130,9 @@ export default function ScheduleCalendarPage() {
     tone: "",
     extraContext: "",
   });
+  // Último relatório mensal — permite gerar o próximo mês aplicando o diagnóstico
+  const [latestReport, setLatestReport] = useState<SmMonthlyReport | null>(null);
+  const [applyReportInsights, setApplyReportInsights] = useState(true);
 
   // Context menu (right-click on card)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; post: SocialMediaPost } | null>(null);
@@ -379,6 +382,15 @@ export default function ScheduleCalendarPage() {
       tone: schedule.tone_of_voice || "",
       extraContext: "",
     });
+    // Busca o relatório mais recente para oferecer o diagnóstico na geração
+    supabase
+      .from("sm_monthly_reports")
+      .select("*")
+      .eq("schedule_id", scheduleId)
+      .order("year", { ascending: false })
+      .order("month", { ascending: false })
+      .limit(1)
+      .then(({ data }) => setLatestReport((data?.[0] as SmMonthlyReport) ?? null));
     setShowGenerateModal(true);
   }
 
@@ -406,6 +418,12 @@ export default function ScheduleCalendarPage() {
         body: JSON.stringify({
           clientName: schedule.client_name,
           clientNiche: schedule.client_niche,
+          description: schedule.description || undefined,
+          objective: schedule.objective || undefined,
+          productsServices: schedule.products_services || undefined,
+          differentials: schedule.differentials || undefined,
+          avoidTopics: schedule.avoid_topics || undefined,
+          preferredCta: schedule.preferred_cta || undefined,
           month: viewMonth.month,
           year: viewMonth.year,
           networks: schedule.networks,
@@ -414,6 +432,16 @@ export default function ScheduleCalendarPage() {
           tone: generateForm.tone || schedule.tone_of_voice,
           targetAudience: schedule.target_audience,
           extraContext: generateForm.extraContext || undefined,
+          instagramHandle: schedule.account_handle || undefined,
+          accountAnalysis: schedule.account_analysis || undefined,
+          performanceInsights: applyReportInsights && latestReport
+            ? [
+                latestReport.report?.next_month_strategy,
+                latestReport.report?.recommendations?.length
+                  ? `Recomendações do relatório: ${latestReport.report.recommendations.join(" | ")}`
+                  : null,
+              ].filter(Boolean).join("\n")
+            : undefined,
         }),
       });
 
@@ -717,6 +745,13 @@ export default function ScheduleCalendarPage() {
                   </Button>
                 </Link>
               )}
+
+              <Link href={`/dashboard/social-media/${scheduleId}/report?month=${viewMonth?.month ?? schedule.month}&year=${viewMonth?.year ?? schedule.year}`}>
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <BarChart3 className="h-3.5 w-3.5" />
+                  Relatório
+                </Button>
+              </Link>
             </div>
           </div>
 
@@ -1020,6 +1055,7 @@ export default function ScheduleCalendarPage() {
           clientNiche={schedule.client_niche}
           tone={schedule.tone_of_voice}
           targetAudience={schedule.target_audience}
+          objective={schedule.objective}
           userRole={userRole}
           userId={userProfile.id}
           onClose={() => setSelectedPost(null)}
@@ -1519,6 +1555,33 @@ export default function ScheduleCalendarPage() {
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-none placeholder:text-muted-foreground/50"
                 />
               </div>
+
+              {/* Diagnóstico do último relatório mensal */}
+              {latestReport && (
+                <button
+                  type="button"
+                  onClick={() => setApplyReportInsights((v) => !v)}
+                  className={`w-full flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all ${
+                    applyReportInsights
+                      ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20"
+                      : "border-border hover:border-emerald-300"
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${
+                    applyReportInsights ? "border-emerald-500 bg-emerald-500" : "border-muted-foreground/40"
+                  }`}>
+                    {applyReportInsights && <Check className="h-3 w-3 text-white" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`text-sm font-medium ${applyReportInsights ? "text-emerald-700 dark:text-emerald-300" : "text-foreground"}`}>
+                      Aplicar diagnóstico do relatório de {MONTHS_PT[latestReport.month - 1]} {latestReport.year}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                      {latestReport.report?.next_month_strategy || "A IA usará as recomendações do último relatório para otimizar este cronograma."}
+                    </p>
+                  </div>
+                </button>
+              )}
             </div>
 
             {/* Footer */}

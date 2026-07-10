@@ -17,11 +17,12 @@ import {
 } from "@/components/ui/select";
 import {
   ArrowLeft, ArrowRight, Sparkles, Loader2,
-  Instagram, Facebook, Youtube, Linkedin, Twitter, Music2, Check, CalendarClock
+  Instagram, Facebook, Youtube, Linkedin, Twitter, Music2, Check, CalendarClock, ChevronDown
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  NetworkType, PostType, MONTHS_PT, NETWORK_OPTIONS, TONE_OPTIONS, SocialMediaPost, POST_TYPE_CONFIG
+  NetworkType, PostType, MONTHS_PT, NETWORK_OPTIONS, TONE_OPTIONS, OBJECTIVE_OPTIONS,
+  SocialMediaPost, POST_TYPE_CONFIG, AccountAnalysis
 } from "@/lib/social-media-types";
 import { HolidayPicker } from "@/components/social-media/holiday-picker";
 import { SelectedHoliday } from "@/lib/holidays-data";
@@ -62,6 +63,12 @@ export default function NewSchedulePage() {
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [generatedPosts, setGeneratedPosts] = useState<SocialMediaPost[]>([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  // Ajustes livres aplicados ao regerar (ex.: "mais posts de venda na 2ª quinzena")
+  const [adjustInstructions, setAdjustInstructions] = useState("");
+  // Anamnese da conta via @ do Instagram (pesquisa web com IA)
+  const [analyzing, setAnalyzing] = useState(false);
+  const [accountAnalysis, setAccountAnalysis] = useState<AccountAnalysis | null>(null);
 
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
@@ -70,7 +77,13 @@ export default function NewSchedulePage() {
   const [form, setForm] = useState({
     clientName: "",
     clientNiche: "",
+    instagramHandle: "",
     description: "",
+    objective: "engajamento",
+    productsServices: "",
+    differentials: "",
+    avoidTopics: "",
+    preferredCta: "",
     month: currentMonth,
     year: currentYear,
     networks: [] as NetworkType[],
@@ -108,6 +121,49 @@ export default function NewSchedulePage() {
     return true;
   }
 
+  async function handleAnalyzeAccount() {
+    const handle = form.instagramHandle.replace(/^@/, "").trim();
+    if (!handle) {
+      toast.error("Informe o @ da conta para analisar");
+      return;
+    }
+    if (!tokenManager.get()) {
+      toast.error("Sessão expirada. Faça login novamente.");
+      return;
+    }
+    setAnalyzing(true);
+    try {
+      const res = await fetch("/api/social-media/account-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
+        body: JSON.stringify({
+          handle,
+          clientName: form.clientName || undefined,
+          clientNiche: form.clientNiche || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Erro na análise da conta");
+
+      setAccountAnalysis(data.analysis as AccountAnalysis);
+      // Aproveita a anamnese para preencher campos vazios do briefing
+      if (data.analysis?.target_audience && !form.targetAudience) {
+        setForm((p) => ({ ...p, targetAudience: data.analysis.target_audience }));
+      }
+      toast.success(
+        data.analysis?.web_research === false
+          ? "Análise gerada com base no nicho (pesquisa web indisponível)."
+          : "Conta analisada! A anamnese será usada na geração do cronograma."
+      );
+    } catch (err) {
+      const msg = (err as { message?: string })?.message || "Erro ao analisar a conta";
+      console.error("account-analysis error:", msg, err);
+      toast.error(msg);
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
   async function handleGenerate() {
     // A autenticação da geração é feita no servidor via token Bearer (requireUser).
     // Não dependemos de `userProfile` aqui — ele pode ainda não ter carregado
@@ -124,6 +180,14 @@ export default function NewSchedulePage() {
         body: JSON.stringify({
           clientName: form.clientName,
           clientNiche: form.clientNiche,
+          instagramHandle: form.instagramHandle.replace(/^@/, "").trim() || undefined,
+          accountAnalysis: accountAnalysis || undefined,
+          description: form.description || undefined,
+          objective: form.objective || undefined,
+          productsServices: form.productsServices || undefined,
+          differentials: form.differentials || undefined,
+          avoidTopics: form.avoidTopics || undefined,
+          preferredCta: form.preferredCta || undefined,
           month: form.month,
           year: form.year,
           networks: form.networks,
@@ -131,6 +195,7 @@ export default function NewSchedulePage() {
           frequency: form.frequency,
           tone: form.tone,
           targetAudience: form.targetAudience,
+          extraContext: adjustInstructions.trim() || undefined,
           startDay: form.startFromToday && isCurrentMonth ? currentDay : undefined,
           holidays: form.holidays.length > 0 ? form.holidays : undefined,
         }),
@@ -191,6 +256,13 @@ export default function NewSchedulePage() {
           tone_of_voice: form.tone,
           target_audience: form.targetAudience || null,
           posting_frequency: form.frequency,
+          objective: form.objective || null,
+          products_services: form.productsServices || null,
+          differentials: form.differentials || null,
+          avoid_topics: form.avoidTopics || null,
+          preferred_cta: form.preferredCta || null,
+          account_handle: form.instagramHandle.replace(/^@/, "").trim() || null,
+          account_analysis: accountAnalysis || null,
           status: "active",
         })
         .select()
@@ -227,7 +299,9 @@ export default function NewSchedulePage() {
       const msg = err?.message || err?.details || err?.hint || JSON.stringify(err);
       console.error("handleSave error:", msg, err);
 
-      if (msg?.includes("does not exist") || msg?.includes("relation") || err?.code === "42P01") {
+      if (err?.code === "42703" || msg?.includes("column")) {
+        toast.error("Banco desatualizado. Execute a migration 42-social-media-briefing-fields.sql no Supabase.");
+      } else if (msg?.includes("does not exist") || msg?.includes("relation") || err?.code === "42P01") {
         toast.error("Tabela não encontrada. Execute o arquivo social_media_tables.sql no Supabase primeiro.");
       } else if (err?.code === "42501" || msg?.includes("policy")) {
         toast.error(
@@ -311,6 +385,110 @@ export default function NewSchedulePage() {
                     onChange={(e) => setForm((p) => ({ ...p, clientNiche: e.target.value }))}
                   />
                 </div>
+                {/* @ da conta + anamnese com IA */}
+                <div className="space-y-2">
+                  <Label htmlFor="instagramHandle">@ da conta no Instagram</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">@</span>
+                      <Input
+                        id="instagramHandle"
+                        placeholder="conta.do.cliente"
+                        value={form.instagramHandle}
+                        onChange={(e) => {
+                          setForm((p) => ({ ...p, instagramHandle: e.target.value.replace(/^@/, "") }));
+                          setAccountAnalysis(null);
+                        }}
+                        className="pl-8"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleAnalyzeAccount}
+                      disabled={analyzing || !form.instagramHandle.trim()}
+                      className="gap-2 shrink-0"
+                    >
+                      {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-blue-500" />}
+                      {analyzing ? "Analisando..." : "Analisar com IA"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    A IA pesquisa a conta e a empresa na internet e faz uma anamnese (tom de voz, temas, público, oportunidades) usada na geração do cronograma.
+                  </p>
+                </div>
+
+                {/* Resultado da anamnese */}
+                {accountAnalysis && (
+                  <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                        <Instagram className="h-4 w-4" />
+                        Anamnese de @{form.instagramHandle.replace(/^@/, "")}
+                      </p>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                        {accountAnalysis.web_research === false ? "Baseada no nicho" : "Pesquisa na internet"}
+                      </span>
+                    </div>
+                    {accountAnalysis.summary && (
+                      <p className="text-sm text-foreground/90">{accountAnalysis.summary}</p>
+                    )}
+                    <div className="grid sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                      {accountAnalysis.tone_of_voice && (
+                        <div>
+                          <p className="font-semibold text-muted-foreground">Tom de voz percebido</p>
+                          <p>{accountAnalysis.tone_of_voice}</p>
+                        </div>
+                      )}
+                      {accountAnalysis.positioning && (
+                        <div>
+                          <p className="font-semibold text-muted-foreground">Posicionamento</p>
+                          <p>{accountAnalysis.positioning}</p>
+                        </div>
+                      )}
+                    </div>
+                    {(accountAnalysis.content_themes?.length ?? 0) > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {accountAnalysis.content_themes!.map((t) => (
+                          <span key={t} className="text-[11px] px-2 py-0.5 rounded-full bg-background border border-blue-200 dark:border-blue-800">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {(accountAnalysis.opportunities?.length ?? 0) > 0 && (
+                      <div className="text-xs space-y-1">
+                        <p className="font-semibold text-muted-foreground">Oportunidades identificadas</p>
+                        <ul className="list-disc list-inside space-y-0.5">
+                          {accountAnalysis.opportunities!.slice(0, 4).map((o) => <li key={o}>{o}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                    <p className="text-[11px] text-muted-foreground">
+                      ✓ Esta anamnese será enviada à IA junto com o briefing na geração do cronograma.
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Objetivo principal do mês</Label>
+                  <Select
+                    value={form.objective}
+                    onValueChange={(v) => setForm((p) => ({ ...p, objective: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {OBJECTIVE_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    A IA ajusta o mix de conteúdo (educativo, engajamento, venda...) conforme o objetivo.
+                  </p>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">Descrição adicional</Label>
                   <Textarea
@@ -329,6 +507,67 @@ export default function NewSchedulePage() {
                     value={form.targetAudience}
                     onChange={(e) => setForm((p) => ({ ...p, targetAudience: e.target.value }))}
                   />
+                </div>
+
+                {/* Briefing avançado (opcional) — quanto mais contexto, melhor o cronograma */}
+                <div className="rounded-xl border border-border">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced((v) => !v)}
+                    className="w-full flex items-center justify-between p-3.5 text-sm font-medium hover:bg-muted/40 transition-colors rounded-xl"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-blue-500" />
+                      Briefing avançado (opcional)
+                    </span>
+                    <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+                  </button>
+                  {showAdvanced && (
+                    <div className="p-4 pt-1 space-y-4 border-t border-border">
+                      <p className="text-xs text-muted-foreground">
+                        Estes campos deixam os posts muito mais personalizados — a IA cita produtos, usa os diferenciais e respeita as restrições.
+                      </p>
+                      <div className="space-y-2">
+                        <Label htmlFor="productsServices">Produtos / serviços em destaque</Label>
+                        <Textarea
+                          id="productsServices"
+                          placeholder="Ex: Plano trimestral com personal incluso, aulas de spinning, avaliação física gratuita..."
+                          value={form.productsServices}
+                          onChange={(e) => setForm((p) => ({ ...p, productsServices: e.target.value }))}
+                          rows={2}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="differentials">Diferenciais do cliente</Label>
+                        <Textarea
+                          id="differentials"
+                          placeholder="Ex: Única academia 24h da região, equipe com 10 anos de experiência, resultados comprovados..."
+                          value={form.differentials}
+                          onChange={(e) => setForm((p) => ({ ...p, differentials: e.target.value }))}
+                          rows={2}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="avoidTopics">O que a IA deve evitar</Label>
+                        <Textarea
+                          id="avoidTopics"
+                          placeholder="Ex: Não falar de preço, evitar humor, não prometer resultados garantidos..."
+                          value={form.avoidTopics}
+                          onChange={(e) => setForm((p) => ({ ...p, avoidTopics: e.target.value }))}
+                          rows={2}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="preferredCta">CTA preferido</Label>
+                        <Input
+                          id="preferredCta"
+                          placeholder="Ex: Agende sua aula experimental pelo link da bio"
+                          value={form.preferredCta}
+                          onChange={(e) => setForm((p) => ({ ...p, preferredCta: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -594,8 +833,23 @@ export default function NewSchedulePage() {
                         className="gap-2"
                       >
                         {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                        Regerar
+                        {adjustInstructions.trim() ? "Regerar com ajustes" : "Regerar"}
                       </Button>
+                    </div>
+
+                    {/* Ajustes rápidos antes de salvar — vão como instrução especial na regeração */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="adjustInstructions" className="text-xs text-muted-foreground">
+                        Quer ajustar algo? Descreva e clique em "Regerar com ajustes"
+                      </Label>
+                      <Textarea
+                        id="adjustInstructions"
+                        placeholder='Ex: "Mais posts de venda na 2ª quinzena", "Menos stories, mais reels", "Inclua a promoção de inauguração"...'
+                        value={adjustInstructions}
+                        onChange={(e) => setAdjustInstructions(e.target.value)}
+                        rows={2}
+                        className="text-sm"
+                      />
                     </div>
                     <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
                       {generatedPosts.slice(0, 8).map((post, i) => (

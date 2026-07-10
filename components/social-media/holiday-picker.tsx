@@ -156,7 +156,7 @@ export function HolidayPicker({ month, year, value, onChange }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchDate[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const searchDebounce = useRef<ReturnType<typeof setTimeout>>();
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const todayStr = new Date().toISOString().slice(0, 10);
 
   // Fetch all municipalities from IBGE when state changes

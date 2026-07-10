@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, checkAiCalendarQuota, recordAiCalendarUsage } from "@/lib/server/api-auth";
-
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+import { callGroqJson, GroqError } from "@/lib/server/groq";
 
 const MONTHS_PT = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -37,6 +36,57 @@ const COMMEMORATIVE_DATES: Record<string, string> = {
   "12-31": "Véspera de Ano Novo",
 };
 
+const VALID_NETWORKS = ["instagram", "facebook", "tiktok", "linkedin", "twitter", "youtube"];
+
+const POST_TYPE_LABELS: Record<string, string> = {
+  feed_image: "Post Estático (imagem única no feed)",
+  reels: "Reels (vídeo curto vertical)",
+  carrossel: "Carrossel (múltiplos slides/imagens)",
+  story: "Stories (conteúdo temporário 24h)",
+  feed_video: "Vídeo Feed (vídeo longo no feed)",
+  shorts: "Shorts (vídeo curto YouTube)",
+  thread: "Thread (sequência de textos)",
+  influencer: "Influencer (post em parceria)",
+};
+
+// Diretrizes específicas por rede, injetadas apenas para as redes selecionadas
+const NETWORK_GUIDELINES: Record<string, string> = {
+  instagram: "Instagram: a 1ª linha da copy é o gancho (aparece antes do \"...mais\"); Reels 19h-21h, Carrossel/Feed 12h ou 18h, Stories 9h ou 20h; carrosséis educativos e Reels de descoberta performam melhor.",
+  facebook: "Facebook: textos um pouco mais longos funcionam; público tende a ser mais velho; horários 12h-14h e 19h-21h; priorize conteúdo compartilhável e de comunidade.",
+  tiktok: "TikTok: gancho nos 2 primeiros segundos (descreva isso no brief); tom autêntico e menos institucional; 18h-22h; use tendências adaptadas ao nicho.",
+  linkedin: "LinkedIn: tom profissional com storytelling; poste em dias úteis 8h-10h ou 12h; evite fins de semana; conteúdo de autoridade, bastidores de negócio e dados do setor.",
+  twitter: "X/Twitter: textos curtos e diretos, opinião e conversa; threads para conteúdo educativo; 9h-11h e 19h-21h; no máximo 1-2 hashtags.",
+  youtube: "YouTube: Shorts com gancho imediato; título otimizado para busca; 12h ou 19h-21h; descreva no brief a estrutura do vídeo (gancho, desenvolvimento, CTA).",
+};
+
+// Estratégia de mix de conteúdo conforme o objetivo principal do cliente
+const OBJECTIVE_STRATEGIES: Record<string, { label: string; mix: string }> = {
+  vendas: {
+    label: "Gerar vendas / leads",
+    mix: "35% conteúdo de oferta/venda (benefícios, quebra de objeções, urgência), 25% educativo que prepara para a compra, 20% prova social (resultados, depoimentos, casos), 20% engajamento/relacionamento. CTAs direcionados a compra, orçamento ou contato.",
+  },
+  engajamento: {
+    label: "Aumentar engajamento",
+    mix: "35% conteúdo de engajamento (perguntas, enquetes, opinião, memes do nicho), 30% educativo, 20% relacionamento/bastidores, 15% venda leve. CTAs que pedem comentário, compartilhamento ou salvamento.",
+  },
+  autoridade: {
+    label: "Construir autoridade",
+    mix: "45% educativo profundo (dicas, mitos e verdades, erros comuns, dados), 20% prova social e resultados, 20% bastidores e posicionamento, 15% venda consultiva. CTAs que reforçam expertise (baixar material, agendar consulta).",
+  },
+  seguidores: {
+    label: "Atrair novos seguidores",
+    mix: "40% conteúdo de descoberta com potencial de alcance (Reels, tendências, listas), 30% educativo compartilhável, 20% engajamento, 10% venda. CTAs que pedem seguir o perfil e compartilhar.",
+  },
+  lancamento: {
+    label: "Lançamento de produto/serviço",
+    mix: "estruture o mês como uma jornada de lançamento: 1ª fase antecipação/curiosidade, 2ª fase educação sobre o problema que o produto resolve, 3ª fase revelação e oferta com urgência, 4ª fase prova social e última chamada. CTAs progressivos (ativar lembrete → lista de espera → comprar).",
+  },
+  relacionamento: {
+    label: "Relacionamento com clientes",
+    mix: "35% bastidores e humanização da marca, 25% conteúdo de comunidade (UGC, depoimentos, perguntas), 25% educativo, 15% venda leve. CTAs de conversa e proximidade.",
+  },
+};
+
 function getCommemorativeDatesForMonth(month: number): string {
   const padded = String(month).padStart(2, "0");
   const entries = Object.entries(COMMEMORATIVE_DATES)
@@ -67,16 +117,92 @@ function buildHolidaysSection(holidays: HolidayEntry[] | undefined): string {
     const loc = h.location ? ` — ${h.location}` : "";
     return `- ${d}/${m}/${y}: ${h.name} [${label}${loc}]`;
   });
-  return `FERIADOS E DATAS ESPECIAIS SELECIONADOS PELO GESTOR (OBRIGATÓRIO considerar):\n${lines.join("\n")}\n\n`;
+  return `FERIADOS E DATAS ESPECIAIS SELECIONADOS PELO GESTOR (OBRIGATÓRIO criar posts temáticos para eles):\n${lines.join("\n")}\n\n`;
+}
+
+/** Monta a seção de contexto do cliente apenas com os campos preenchidos */
+function buildClientSection(fields: Array<[string, string | undefined | null]>): string {
+  return fields
+    .filter(([, value]) => value && String(value).trim().length > 0)
+    .map(([label, value]) => `- ${label}: ${String(value).trim()}`)
+    .join("\n");
+}
+
+interface NormalizeContext {
+  year: number;
+  month: number;
+  daysInMonth: number;
+  allowedTypes: string[];
+  networks: string[];
+  effectiveStartDay?: number;
+}
+
+/**
+ * Valida e normaliza os posts retornados pela IA: datas dentro do mês,
+ * formatos/redes permitidos, hashtags limpas, sem duplicatas, ordenados.
+ */
+function normalizePosts(rawPosts: unknown[], ctx: NormalizeContext) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const seen = new Set<string>();
+  const normalized: Record<string, unknown>[] = [];
+
+  for (const raw of rawPosts) {
+    if (!raw || typeof raw !== "object") continue;
+    const p = raw as Record<string, unknown>;
+
+    const title = String(p.title ?? "").trim().slice(0, 80);
+    if (!title) continue;
+
+    const dateMatch = String(p.scheduled_date ?? "").match(/\d{4}-(\d{1,2})-(\d{1,2})/);
+    if (!dateMatch) continue;
+    let day = parseInt(dateMatch[2], 10);
+    if (!Number.isFinite(day) || day < 1) continue;
+    day = Math.min(day, ctx.daysInMonth);
+    if (ctx.effectiveStartDay && day < ctx.effectiveStartDay) continue;
+    const scheduled_date = `${ctx.year}-${pad(ctx.month)}-${pad(day)}`;
+
+    const post_type = ctx.allowedTypes.includes(String(p.post_type)) ? String(p.post_type) : ctx.allowedTypes[0];
+    const network = ctx.networks.includes(String(p.network)) ? String(p.network) : ctx.networks[0];
+
+    const timeMatch = String(p.scheduled_time ?? "").match(/^(\d{1,2}):(\d{2})/);
+    const scheduled_time = timeMatch
+      ? `${pad(Math.min(23, parseInt(timeMatch[1], 10)))}:${timeMatch[2]}`
+      : null;
+
+    const hashtags = Array.isArray(p.hashtags)
+      ? p.hashtags.map((h) => String(h).replace(/^#/, "").trim()).filter(Boolean).slice(0, 20)
+      : [];
+
+    const dedupeKey = `${scheduled_date}|${title.toLowerCase()}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    normalized.push({
+      title,
+      post_type,
+      network,
+      scheduled_date,
+      scheduled_time,
+      copy: typeof p.copy === "string" ? p.copy : "",
+      hashtags,
+      content_description: typeof p.content_description === "string" ? p.content_description : "",
+    });
+  }
+
+  normalized.sort((a, b) =>
+    String(a.scheduled_date).localeCompare(String(b.scheduled_date)) ||
+    String(a.scheduled_time ?? "").localeCompare(String(b.scheduled_time ?? ""))
+  );
+
+  return normalized.map((post, index) => ({
+    ...post,
+    position_number: index + 1,
+    ai_generated: true,
+  }));
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const groqKey = process.env.GROQ_API_KEY;
-    if (!groqKey) {
-      return NextResponse.json({ error: "GROQ_API_KEY não configurada" }, { status: 500 });
-    }
-
     // Rota proxia a chave Groq — exige usuário autenticado
     const auth = await requireUser(request);
     if (!auth) {
@@ -98,10 +224,22 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { clientName, clientNiche, month, year, networks, postTypes, frequency, tone, targetAudience, extraContext, startDay, holidays } = body;
+    const {
+      clientName, clientNiche, month, year, networks, postTypes, frequency, tone,
+      targetAudience, extraContext, startDay, holidays,
+      // Briefing avançado (opcionais)
+      description, objective, productsServices, differentials, avoidTopics, preferredCta,
+      // Anamnese da conta (gerada por /account-analysis) e diagnóstico do relatório mensal
+      instagramHandle, accountAnalysis, performanceInsights,
+    } = body;
 
     if (!clientName || !month || !year || !networks?.length) {
       return NextResponse.json({ error: "Parâmetros obrigatórios faltando" }, { status: 400 });
+    }
+
+    const validNetworks: string[] = (networks as string[]).filter((n) => VALID_NETWORKS.includes(n));
+    if (!validNetworks.length) {
+      return NextResponse.json({ error: "Nenhuma rede social válida informada" }, { status: 400 });
     }
 
     const monthName = MONTHS_PT[month - 1];
@@ -110,122 +248,155 @@ export async function POST(request: NextRequest) {
     const daysInMonth = new Date(year, month, 0).getDate();
     const remainingDays = effectiveStartDay ? daysInMonth - effectiveStartDay + 1 : daysInMonth;
     const totalPosts = Math.max(1, Math.round(((frequency || 4) * 4.3) * (remainingDays / daysInMonth)));
-    const networksStr = networks.join(", ");
 
     const allowedTypes: string[] = postTypes?.length
       ? postTypes
       : ["feed_image", "reels", "carrossel", "story"];
-
-    const POST_TYPE_LABELS: Record<string, string> = {
-      feed_image: "Post Estático (imagem única no feed)",
-      reels: "Reels (vídeo curto vertical)",
-      carrossel: "Carrossel (múltiplos slides/imagens)",
-      story: "Stories (conteúdo temporário 24h)",
-      feed_video: "Vídeo Feed (vídeo longo no feed)",
-      shorts: "Shorts (vídeo curto YouTube)",
-    };
     const allowedTypesLabels = allowedTypes.map((t) => POST_TYPE_LABELS[t] || t).join(", ");
     const allowedTypesEnum = allowedTypes.join("|");
+    const networksEnum = validNetworks.join("|");
 
-    const systemPrompt = `Você é um especialista em marketing digital e social media manager sênior.
-Sua função é criar cronogramas de postagens detalhados, criativos e estratégicos para redes sociais.
-Sempre responda APENAS com JSON válido, sem comentários, sem markdown, sem explicações adicionais.`;
+    const strategy = OBJECTIVE_STRATEGIES[objective as string];
+    const networkGuidelines = validNetworks
+      .map((n) => NETWORK_GUIDELINES[n])
+      .filter(Boolean)
+      .map((g) => `- ${g}`)
+      .join("\n");
 
-    const userPrompt = `Crie um cronograma completo de posts para ${monthName} de ${year}.
+    const clientSection = buildClientSection([
+      ["Nome da marca/cliente", clientName],
+      ["Conta no Instagram", instagramHandle ? `@${String(instagramHandle).replace(/^@/, "")}` : undefined],
+      ["Nicho/segmento", clientNiche || "Geral"],
+      ["Sobre o cliente", description],
+      ["Produtos/serviços em destaque", productsServices],
+      ["Diferenciais competitivos", differentials],
+      ["Público-alvo", targetAudience || "Geral"],
+      ["Objetivo principal do mês", strategy ? strategy.label : objective],
+      ["CTA preferido", preferredCta],
+    ]);
 
-DADOS DO CLIENTE:
-- Nome: ${clientName}
-- Nicho: ${clientNiche || "Geral"}
-- Redes sociais: ${networksStr}
+    // Seção de anamnese da conta (quando o gestor rodou a análise do @)
+    let analysisSection = "";
+    if (accountAnalysis && typeof accountAnalysis === "object") {
+      const a = accountAnalysis as Record<string, unknown>;
+      const joinArr = (v: unknown) => (Array.isArray(v) && v.length ? v.join("; ") : undefined);
+      const lines = buildClientSection([
+        ["Resumo da presença digital", a.summary as string],
+        ["Tom de voz já usado na conta", a.tone_of_voice as string],
+        ["Temas que a conta já trabalha", joinArr(a.content_themes)],
+        ["Posicionamento percebido", a.positioning as string],
+        ["Pontos fortes atuais", joinArr(a.strengths)],
+        ["Pontos fracos a corrigir", joinArr(a.weaknesses)],
+        ["Oportunidades de conteúdo", joinArr(a.opportunities)],
+        ["Pilares recomendados", joinArr(a.suggested_pillars)],
+      ]);
+      if (lines) {
+        analysisSection = `═══ ANAMNESE DA CONTA (análise de IA${a.web_research === false ? ", baseada no nicho" : ", com pesquisa na internet"}) ═══
+${lines}
+Use a anamnese assim: mantenha coerência com a identidade e o tom já existentes da conta, corrija os pontos fracos e explore as oportunidades listadas nos posts do mês.
+
+`;
+      }
+    }
+
+    const insightsSection = performanceInsights && String(performanceInsights).trim()
+      ? `═══ DIAGNÓSTICO DE PERFORMANCE DO MÊS ANTERIOR (aplique estas diretrizes) ═══\n${String(performanceInsights).trim()}\n\n`
+      : "";
+
+    const systemPrompt = `Você é um social media strategist sênior, especialista em marketing digital para marcas brasileiras.
+Você domina planejamento editorial por pilares de conteúdo, copywriting de conversão (ganchos, storytelling, CTA) e as boas práticas de cada rede social.
+
+REGRAS INEGOCIÁVEIS:
+1. Cada post deve ser ÚNICO — nunca repita títulos, ganchos, ideias ou estruturas de copy entre os posts do mês.
+2. Nada de conteúdo genérico que serviria para qualquer empresa: todo post deve estar amarrado ao cliente, nicho, produtos e diferenciais informados.
+3. Todo o conteúdo em português brasileiro natural e fluente.
+4. Respeite EXATAMENTE os formatos e redes permitidos.
+5. Responda APENAS com JSON válido — sem markdown, sem comentários, sem texto fora do JSON.`;
+
+    const userPrompt = `Crie o cronograma editorial de ${monthName} de ${year} para o cliente abaixo.
+
+═══ CONTEXTO DO CLIENTE ═══
+${clientSection}
+
+${analysisSection}${insightsSection}═══ CONFIGURAÇÃO DO CRONOGRAMA ═══
+- Redes sociais (use APENAS estas): ${validNetworks.join(", ")}
 - Formatos PERMITIDOS (use APENAS estes): ${allowedTypesLabels}
-- Frequência: ${frequency || 4} posts por semana (total aproximado: ${totalPosts} posts no mês)
+- Volume: gere EXATAMENTE ${totalPosts} posts (${frequency || 4} por semana), distribuídos uniformemente ${effectiveStartDay ? `do dia ${effectiveStartDay} ao dia ${daysInMonth}` : "ao longo do mês inteiro"}
 - Tom de voz: ${tone || "Profissional e engajante"}
-- Público-alvo: ${targetAudience || "Geral"}
 
-DATAS COMEMORATIVAS EM ${monthName.toUpperCase()}:
+═══ ESTRATÉGIA DE CONTEÚDO ═══
+${strategy
+  ? `Objetivo do mês: ${strategy.label}. Mix de conteúdo recomendado: ${strategy.mix}`
+  : "Equilibre o mês entre conteúdo educativo (~40%), engajamento (~25%), venda (~20%) e relacionamento/bastidores (~15%)."}
+Distribua os pilares ao longo das semanas (não concentre todo conteúdo de venda na mesma semana).
+${avoidTopics ? `\nEVITE OBRIGATORIAMENTE (não crie posts sobre isso e não use estas abordagens): ${avoidTopics}` : ""}
+
+═══ BOAS PRÁTICAS POR REDE ═══
+${networkGuidelines || "- Siga as boas práticas gerais de cada rede."}
+
+═══ DATAS COMEMORATIVAS EM ${monthName.toUpperCase()} ═══
 ${commemorativeDates}
 
-${buildHolidaysSection(holidays)}${extraContext ? `INSTRUÇÕES ESPECIAIS PARA ESTE MÊS:\n${extraContext}\n\n` : ""}${effectiveStartDay ? `RESTRIÇÃO IMPORTANTE: Gere posts APENAS a partir do dia ${effectiveStartDay} até o dia ${daysInMonth} de ${monthName}. Não crie nenhum post para os dias anteriores ao dia ${effectiveStartDay}.\n\n` : ""}INSTRUÇÕES:
-1. Distribua os posts uniformemente ${effectiveStartDay ? `do dia ${effectiveStartDay} ao final do mês` : "ao longo do mês"} (evite finais de semana para nichos B2B)
-2. Use SOMENTE os formatos permitidos listados acima — não invente outros
-3. Varie entre os formatos disponíveis de forma estratégica
-4. Para os FERIADOS E DATAS ESPECIAIS listados acima, priorize criar posts temáticos relevantes ao nicho do cliente
-5. Para outras datas comemorativas relevantes ao nicho, crie posts temáticos adicionais
-6. Cada copy deve ser criativa, em português brasileiro, com call-to-action claro
-7. Inclua 10-15 hashtags relevantes por post
-8. O content_description deve ser um brief detalhado para o criador de conteúdo
-9. Horários sugeridos: Reels/Shorts 19h-21h, Feed/Carrossel 12h ou 18h, Stories 9h ou 20h
-10. Para Stories, prefira horários de maior engajamento (manhã ou noite)
+${buildHolidaysSection(holidays)}${extraContext ? `═══ INSTRUÇÕES ESPECIAIS DO GESTOR (prioridade máxima) ═══\n${extraContext}\n\n` : ""}${effectiveStartDay ? `RESTRIÇÃO IMPORTANTE: gere posts APENAS do dia ${effectiveStartDay} ao dia ${daysInMonth}. Nenhum post antes do dia ${effectiveStartDay}.\n\n` : ""}═══ REGRAS DE QUALIDADE DE CADA POST ═══
+1. "title": título curto e específico (máx 80 caracteres), que resuma a ideia do post — nunca genérico como "Post motivacional".
+2. "copy": legenda completa e pronta para publicar:
+   - 1ª linha = gancho forte (pergunta, dado surpreendente ou dor do público);
+   - corpo escaneável com quebras de linha (\\n) e emojis com moderação;
+   - termina com CTA claro alinhado ao objetivo do mês${preferredCta ? ` (quando fizer sentido, use o CTA preferido do cliente)` : ""};
+   - adapte o comprimento à rede (X/Twitter curto, LinkedIn mais denso, Instagram médio).
+3. "hashtags": 8 a 15 hashtags SEM "#", misturando alto volume, nicho específico e localização/marca quando aplicável. Nunca repita o mesmo conjunto em todos os posts.
+4. "content_description": brief ACIONÁVEL para o criador de conteúdo executar sem perguntar nada:
+   - Reels/Shorts/TikTok: roteiro cena a cena (gancho dos 2s iniciais, desenvolvimento, encerramento) + sugestão de áudio/estilo;
+   - Carrossel: conteúdo slide a slide (Slide 1: ..., Slide 2: ...);
+   - Post estático: descrição da imagem, texto na arte e referência visual;
+   - Stories: sequência de telas e stickers interativos (enquete, caixa de pergunta).
+5. Para os feriados/datas listados, crie posts temáticos conectados ao nicho do cliente (não apenas "feliz data X").
+6. Evite fins de semana para nichos B2B/corporativos; para varejo e lazer, fins de semana são permitidos.
+7. Varie os horários conforme as boas práticas por rede acima.
 
 Retorne EXATAMENTE este JSON (sem nenhum texto antes ou depois):
 {
   "posts": [
     {
-      "title": "título curto do post (máx 80 chars)",
+      "title": "título curto e específico (máx 80 chars)",
       "post_type": "${allowedTypesEnum}",
-      "network": "instagram|facebook|tiktok|linkedin|twitter|youtube",
+      "network": "${networksEnum}",
       "scheduled_date": "${year}-${String(month).padStart(2, "0")}-DD",
       "scheduled_time": "HH:MM",
-      "copy": "legenda completa com emojis e call-to-action",
+      "copy": "legenda completa pronta para publicar",
       "hashtags": ["hashtag1", "hashtag2"],
-      "content_description": "brief detalhado para o criador: o que filmar/fotografar, ângulos, referências visuais, texto na arte se houver"
+      "content_description": "brief acionável para o criador de conteúdo"
     }
   ]
 }`;
 
-    const response = await fetch(GROQ_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${groqKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.75,
-        max_tokens: 8192,
-      }),
+    const parsed = await callGroqJson<{ posts?: unknown[] }>({
+      systemPrompt,
+      userPrompt,
+      temperature: 0.75,
+      maxTokens: 8192,
+      retries: 1,
     });
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error("Groq API error:", error);
-      return NextResponse.json({ error: "Erro na geração pela IA" }, { status: 500 });
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-
-    if (!content) {
-      return NextResponse.json({ error: "Resposta vazia da IA" }, { status: 500 });
-    }
-
-    const parsed = JSON.parse(content);
 
     if (!parsed.posts || !Array.isArray(parsed.posts)) {
       return NextResponse.json({ error: "Formato inválido retornado pela IA" }, { status: 500 });
     }
 
-    // Filter out posts before startDay (safety net in case AI ignored the instruction)
-    const filteredPosts = effectiveStartDay
-      ? parsed.posts.filter((post: Record<string, unknown>) => {
-          const dateStr = post.scheduled_date as string | undefined;
-          if (!dateStr) return true;
-          const day = parseInt(dateStr.split("-")[2] ?? "0", 10);
-          return day >= effectiveStartDay;
-        })
-      : parsed.posts;
+    const posts = normalizePosts(parsed.posts, {
+      year: Number(year),
+      month: Number(month),
+      daysInMonth,
+      allowedTypes,
+      networks: validNetworks,
+      effectiveStartDay,
+    });
 
-    // Add position numbers
-    const posts = filteredPosts.map((post: Record<string, unknown>, index: number) => ({
-      ...post,
-      position_number: index + 1,
-      ai_generated: true,
-    }));
+    if (posts.length === 0) {
+      return NextResponse.json(
+        { error: "A IA não retornou posts válidos. Tente gerar novamente." },
+        { status: 500 }
+      );
+    }
 
     // Contabiliza a geração contra a cota mensal do plano
     await recordAiCalendarUsage(auth);
@@ -233,6 +404,9 @@ Retorne EXATAMENTE este JSON (sem nenhum texto antes ou depois):
     return NextResponse.json({ posts });
   } catch (error) {
     console.error("Error in generate route:", error);
+    if (error instanceof GroqError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
 }

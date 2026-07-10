@@ -92,11 +92,15 @@ Rota: `GET /api/social-media/instagram/cron-sync`, protegida por
   e SUPABASE_SERVICE_ROLE_KEY).
 
 ### Agendadores (hospedagem no Render)
-1. **GitHub Actions (GRATUITO — recomendado)**: workflow já incluído em
-   `.github/workflows/instagram-sync.yml`. Configure 2 secrets no repo
-   `isoscanning` (Settings → Secrets and variables → Actions):
-   `SYNC_URL` (URL do front + rota) e `CRON_SECRET`. Dá para testar na hora
-   pela aba Actions → "Instagram Sync Diário" → Run workflow.
+1. **GitHub Actions (GRATUITO — recomendado)**: template pronto em
+   `docs/instagram-sync.workflow.yml`. Para ativar:
+   a) copie o arquivo para `.github/workflows/instagram-sync.yml` — via
+      interface web do GitHub (Add file → Create new file), pois push por
+      token exige o escopo `workflow` no Personal Access Token
+      (github.com/settings/tokens → editar token → marcar `workflow`);
+   b) configure 2 secrets no repo (Settings → Secrets and variables → Actions):
+      `SYNC_URL` (URL do front + rota) e `CRON_SECRET`;
+   c) teste pela aba Actions → "Instagram Sync Diário" → Run workflow.
 2. **Render Cron Job (~US$ 1/mês)**: serviço `isoscanning-instagram-sync` já
    descrito no `isoscanning-backend/render.yaml` — defina `SYNC_URL` e
    `CRON_SECRET` no dashboard do Render.

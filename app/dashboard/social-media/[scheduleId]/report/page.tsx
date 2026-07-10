@@ -11,15 +11,56 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft, Sparkles, Loader2, Printer, BarChart3, TrendingUp, TrendingDown,
-  Heart, MessageCircle, Share2, Bookmark, Eye, Trophy, Lightbulb, CalendarDays, Check,
+  Heart, MessageCircle, Share2, Bookmark, Eye, Trophy, Lightbulb, CalendarDays, Check, Instagram, Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   SocialMediaSchedule, SocialMediaPost, MonthlyReportStats, MonthlyReportAI,
-  MONTHS_PT, POST_TYPE_CONFIG, PostType,
+  MONTHS_PT, POST_TYPE_CONFIG, PostType, InstagramConnection, AudienceDemographics, AudienceSlice,
 } from "@/lib/social-media-types";
 
 const pad = (n: number) => String(n).padStart(2, "0");
+
+const GENDER_LABELS: Record<string, string> = { F: "Feminino", M: "Masculino", U: "Não informado" };
+
+// Gráfico de barras horizontais simples (theme-aware e imprimível)
+function AudienceBars({ title, slices, barClass, labelMap }: {
+  title: string;
+  slices: AudienceSlice[];
+  barClass: string;
+  labelMap?: Record<string, string>;
+}) {
+  const total = slices.reduce((s, x) => s + x.value, 0);
+  if (total === 0) {
+    return (
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground mb-2">{title}</p>
+        <p className="text-xs text-muted-foreground italic">Sem dados</p>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <p className="text-xs font-semibold text-muted-foreground mb-2">{title}</p>
+      <div className="space-y-1.5">
+        {slices.slice(0, 8).map((s) => {
+          const pct = (s.value / total) * 100;
+          return (
+            <div key={s.label} className="flex items-center gap-2">
+              <span className="text-xs w-24 truncate shrink-0" title={s.label}>
+                {labelMap?.[s.label] ?? s.label}
+              </span>
+              <div className="flex-1 h-3 rounded-full bg-muted overflow-hidden">
+                <div className={`h-full rounded-full ${barClass}`} style={{ width: `${Math.max(2, pct)}%` }} />
+              </div>
+              <span className="text-xs text-muted-foreground w-12 text-right">{pct.toFixed(1)}%</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function MonthlyReportPage() {
   // useSearchParams exige Suspense boundary no build do Next
@@ -48,6 +89,12 @@ function MonthlyReportInner() {
   const [stats, setStats] = useState<MonthlyReportStats | null>(null);
   const [report, setReport] = useState<MonthlyReportAI | null>(null);
   const [reportDate, setReportDate] = useState<string | null>(null);
+  const [igConnection, setIgConnection] = useState<InstagramConnection | null>(null);
+  const [igSyncing, setIgSyncing] = useState(false);
+  // Demografia dos seguidores (idade, gênero, cidade, país)
+  const [audience, setAudience] = useState<AudienceDemographics | null>(null);
+  const [audienceNote, setAudienceNote] = useState<string | null>(null);
+  const [audienceTried, setAudienceTried] = useState(false);
 
   useEffect(() => {
     if (!loading && userProfile) fetchData();
@@ -79,6 +126,13 @@ function MonthlyReportInner() {
         setCanGenerate(member?.role === "editor" || member?.role === "approver");
       }
 
+      // Conexão com o Instagram (falha silenciosa sem a migration 44)
+      supabase
+        .rpc("sm_get_instagram_connection", { p_schedule_id: scheduleId })
+        .then(({ data, error }) => {
+          if (!error && data) setIgConnection(data as InstagramConnection);
+        });
+
       const daysInMonth = new Date(year, month, 0).getDate();
       const { data: monthPosts, error: postsErr } = await supabase
         .from("social_media_posts")
@@ -102,6 +156,10 @@ function MonthlyReportInner() {
         setStats(saved.stats as MonthlyReportStats);
         setReport(saved.report as MonthlyReportAI);
         setReportDate(saved.updated_at || saved.created_at);
+        // Reaproveita o snapshot demográfico salvo no relatório
+        if ((saved.stats as MonthlyReportStats)?.audience) {
+          setAudience((saved.stats as MonthlyReportStats).audience!);
+        }
       } else {
         setStats(null);
         setReport(null);
@@ -122,6 +180,54 @@ function MonthlyReportInner() {
     ),
     [posts]
   );
+
+  // Busca a demografia atual assim que a conexão é detectada (1x por visita)
+  useEffect(() => {
+    if (!igConnection?.connected || audience || audienceTried || !tokenManager.get()) return;
+    setAudienceTried(true);
+    fetch("/api/social-media/instagram/demographics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
+      body: JSON.stringify({ scheduleId }),
+    })
+      .then((res) => res.json().catch(() => ({})))
+      .then((data) => {
+        if (data?.audience) setAudience(data.audience as AudienceDemographics);
+        else if (data?.note) setAudienceNote(data.note as string);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [igConnection?.connected, audience, audienceTried]);
+
+  async function handleIgSync() {
+    if (!tokenManager.get()) {
+      toast.error("Sessão expirada. Faça login novamente.");
+      return;
+    }
+    setIgSyncing(true);
+    try {
+      const res = await fetch("/api/social-media/instagram/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
+        body: JSON.stringify({ scheduleId, month, year }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Erro na sincronização");
+      const parts: string[] = [];
+      if (data.updated > 0) parts.push(`${data.updated} post(s) atualizados com métricas reais`);
+      if (data.created > 0) parts.push(`${data.created} publicação(ões) importadas para o calendário`);
+      toast.success(
+        parts.length > 0
+          ? `${parts.join(" e ")}.`
+          : "Nenhuma publicação do Instagram foi associada aos posts deste mês."
+      );
+      await fetchData();
+    } catch (err) {
+      toast.error((err as { message?: string })?.message || "Erro ao sincronizar métricas");
+    } finally {
+      setIgSyncing(false);
+    }
+  }
 
   async function handleGenerateReport() {
     if (!schedule || !userProfile) return;
@@ -162,7 +268,9 @@ function MonthlyReportInner() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Erro ao gerar relatório");
 
-      setStats(data.stats as MonthlyReportStats);
+      // Anexa o snapshot demográfico ao relatório (fica no PDF e no histórico)
+      const statsWithAudience = { ...(data.stats as MonthlyReportStats), audience: audience ?? null };
+      setStats(statsWithAudience);
       setReport(data.report as MonthlyReportAI);
       setReportDate(new Date().toISOString());
 
@@ -174,7 +282,7 @@ function MonthlyReportInner() {
             schedule_id: scheduleId,
             month,
             year,
-            stats: data.stats,
+            stats: statsWithAudience,
             report: data.report,
             created_by: userProfile.id,
             updated_at: new Date().toISOString(),
@@ -298,23 +406,76 @@ function MonthlyReportInner() {
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
               {postsWithMetrics.length === 0
-                ? "Abra cada post publicado no calendário e preencha a seção \"Desempenho do post\" para liberar o relatório."
+                ? igConnection?.connected
+                  ? "Clique em \"Sincronizar do Instagram\" para puxar as métricas automaticamente."
+                  : "Conecte o Instagram no calendário para puxar métricas automaticamente, ou preencha a seção \"Desempenho do post\" em cada post publicado."
                 : reportDate
                   ? `Último relatório gerado em ${new Date(reportDate).toLocaleDateString("pt-BR")}. Gere novamente se atualizou métricas.`
                   : "Métricas prontas — gere o relatório com IA."}
             </p>
           </div>
-          {canGenerate && (
-            <Button
-              onClick={handleGenerateReport}
-              disabled={generating || postsWithMetrics.length === 0}
-              className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
-            >
-              {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              {generating ? "Analisando resultados..." : report ? "Regerar relatório" : "Gerar relatório com IA"}
-            </Button>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {igConnection?.connected && canGenerate && (
+              <Button
+                variant="outline"
+                onClick={handleIgSync}
+                disabled={igSyncing}
+                className="gap-2"
+              >
+                {igSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Instagram className="h-4 w-4 text-pink-500" />}
+                {igSyncing ? "Sincronizando..." : "Sincronizar do Instagram"}
+              </Button>
+            )}
+            {canGenerate && (
+              <Button
+                onClick={handleGenerateReport}
+                disabled={generating || postsWithMetrics.length === 0}
+                className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+              >
+                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                {generating ? "Analisando resultados..." : report ? "Regerar relatório" : "Gerar relatório com IA"}
+              </Button>
+            )}
+          </div>
         </div>
+
+        {/* Público da conta (demografia dos seguidores via Instagram) */}
+        {audience ? (
+          <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h2 className="font-bold flex items-center gap-2">
+                <Users className="h-4 w-4 text-pink-500" />
+                Público da conta
+              </h2>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                {typeof audience.followers === "number" && (
+                  <span className="px-2.5 py-1 rounded-full bg-pink-50 dark:bg-pink-950/30 text-pink-700 dark:text-pink-300 font-medium">
+                    {audience.followers.toLocaleString("pt-BR")} seguidores
+                  </span>
+                )}
+                <span className="flex items-center gap-1">
+                  <Instagram className="h-3 w-3" />
+                  dados do Instagram
+                </span>
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-x-8 gap-y-5">
+              <AudienceBars title="Faixa etária" slices={audience.age} barClass="bg-blue-500" />
+              <AudienceBars title="Gênero" slices={audience.gender} barClass="bg-pink-500" labelMap={GENDER_LABELS} />
+              <AudienceBars title="Principais cidades" slices={audience.city} barClass="bg-emerald-500" />
+              <AudienceBars title="Principais países" slices={audience.country} barClass="bg-violet-500" />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Demografia dos seguidores fornecida pela API do Instagram (snapshot atual da conta).
+              A Meta não disponibiliza esses dados por publicação individual — apenas no nível da conta.
+            </p>
+          </section>
+        ) : audienceNote ? (
+          <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground flex items-center gap-2 print:hidden">
+            <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
+            {audienceNote}
+          </div>
+        ) : null}
 
         {/* Corpo do relatório */}
         {stats && report ? (

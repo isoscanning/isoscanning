@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/social-media/instagram/cron-sync",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}

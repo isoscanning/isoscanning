@@ -82,6 +82,31 @@ export interface SocialMediaPost {
   updated_at: string;
 }
 
+// Status da conexão com o Instagram (retorno de sm_get_instagram_connection — sem token)
+export interface InstagramConnection {
+  connected: boolean;
+  ig_username?: string;
+  page_name?: string;
+  last_synced_at?: string | null;
+  token_expires_at?: string | null;
+  connected_at?: string;
+}
+
+// Demografia dos seguidores (follower_demographics da Graph API)
+export interface AudienceSlice {
+  label: string;
+  value: number;
+}
+
+export interface AudienceDemographics {
+  followers?: number | null;
+  age: AudienceSlice[];
+  gender: AudienceSlice[];
+  city: AudienceSlice[];
+  country: AudienceSlice[];
+  fetched_at?: string;
+}
+
 // ── Relatório mensal ──────────────────────────────────────────
 export interface ReportPostStat {
   id: string;
@@ -112,6 +137,8 @@ export interface MonthlyReportStats {
   engagementRate: number | null; // engajamento / alcance (quando houver alcance)
   topPosts: ReportPostStat[];
   formatBreakdown: { post_type: PostType; count: number; avgEngagement: number }[];
+  // Snapshot da demografia dos seguidores no momento da geração do relatório
+  audience?: AudienceDemographics | null;
 }
 
 export interface MonthlyReportAI {

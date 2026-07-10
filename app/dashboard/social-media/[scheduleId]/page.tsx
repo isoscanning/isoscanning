@@ -10,6 +10,7 @@ import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PostSlideOver } from "@/components/social-media/post-slide-over";
+import { InstagramConnectGuide } from "@/components/social-media/instagram-guide";
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Users,
   Instagram, Facebook, Youtube, Linkedin, Twitter, Music2,
@@ -20,7 +21,7 @@ import { toast } from "sonner";
 import { notifySocialMediaPostStatus } from "@/lib/data-service";
 import {
   SocialMediaSchedule, SocialMediaPost, NetworkType, PostType, PostStatus,
-  POST_TYPE_CONFIG, MONTHS_PT, COMMEMORATIVE_DATES, SmMonthlyReport
+  POST_TYPE_CONFIG, MONTHS_PT, COMMEMORATIVE_DATES, SmMonthlyReport, InstagramConnection
 } from "@/lib/social-media-types";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -134,6 +135,17 @@ export default function ScheduleCalendarPage() {
   const [latestReport, setLatestReport] = useState<SmMonthlyReport | null>(null);
   const [applyReportInsights, setApplyReportInsights] = useState(true);
 
+  // Conexão com o Instagram (Graph API)
+  const [igConnection, setIgConnection] = useState<InstagramConnection | null>(null);
+  const [showIgModal, setShowIgModal] = useState(false);
+  const [igConnecting, setIgConnecting] = useState(false);
+  const [igSyncing, setIgSyncing] = useState(false);
+  const [igDisconnecting, setIgDisconnecting] = useState(false);
+  // Erro persistente exibido dentro do modal (toast some rápido demais)
+  const [igError, setIgError] = useState<string | null>(null);
+  // Configuração do servidor (META_APP_ID etc.) — checada ao abrir o modal
+  const [igConfig, setIgConfig] = useState<{ configured: boolean; missing: string[] } | null>(null);
+
   // Context menu (right-click on card)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; post: SocialMediaPost } | null>(null);
 
@@ -182,6 +194,14 @@ export default function ScheduleCalendarPage() {
 
       if (schedErr) throw schedErr;
       setSchedule(sched as SocialMediaSchedule);
+
+      // Status da conexão com o Instagram (função não expõe o token;
+      // falha silenciosa se a migration 44 ainda não foi executada)
+      supabase
+        .rpc("sm_get_instagram_connection", { p_schedule_id: scheduleId })
+        .then(({ data, error }) => {
+          if (!error && data) setIgConnection(data as InstagramConnection);
+        });
       setViewMonth({ month: sched.month, year: sched.year });
 
       if (sched.owner_id === userProfile.id) {
@@ -371,6 +391,129 @@ export default function ScheduleCalendarPage() {
       toast.error("Erro ao criar post");
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  // ── Instagram (Graph API) ────────────────────────────────────
+  // Feedback do redirect de volta do OAuth da Meta
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const ig = q.get("ig");
+    if (!ig) return;
+    if (ig === "connected") {
+      const u = q.get("u");
+      toast.success(`Instagram ${u ? `@${u} ` : ""}conectado! Clique em "Sincronizar métricas" para puxar os resultados.`);
+    } else {
+      const reasons: Record<string, string> = {
+        denied: "Autorização cancelada no Facebook.",
+        no_ig_account: "Nenhuma conta Instagram Business vinculada a uma Página do Facebook foi encontrada nesse login. Confira: (1) o Instagram é profissional? (2) está vinculado a uma Página na Central de Contas? (3) na tela de autorização da Meta você selecionou a Página e a conta do Instagram?",
+        state: "Sessão de conexão expirada ou inválida. Clique em conectar novamente.",
+        code: "A Meta não retornou o código de autorização. Tente novamente.",
+        config: "Integração não configurada no servidor (META_APP_ID / META_APP_SECRET).",
+        service_role: "SUPABASE_SERVICE_ROLE_KEY não configurada no servidor.",
+        migration: "Banco desatualizado: execute a migration 44-social-media-instagram.sql no Supabase.",
+        meta_api: "A API da Meta retornou um erro na troca do token. Veja o log do terminal do servidor (npm run dev) para o detalhe.",
+        save: "Erro ao salvar a conexão no banco. Veja o log do terminal do servidor.",
+      };
+      const detail = q.get("detail");
+      const msg = (reasons[q.get("reason") ?? ""] || "Erro ao conectar o Instagram. Tente novamente.") +
+        (detail ? ` — Detalhe técnico: ${detail}` : "");
+      // Erro fica persistente dentro do modal — toast some rápido demais
+      setIgError(msg);
+      setShowIgModal(true);
+      toast.error(msg);
+    }
+    const url = new URL(window.location.href);
+    ["ig", "u", "reason", "detail"].forEach((k) => url.searchParams.delete(k));
+    window.history.replaceState({}, "", url.toString());
+  }, []);
+
+  function openIgModal() {
+    setIgError(null);
+    setShowIgModal(true);
+    // Checa se o servidor tem as envs da integração (Meta + service role)
+    if (!igConnection?.connected && tokenManager.get()) {
+      fetch("/api/social-media/instagram/connect", { headers: tokenManager.authHeader() })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => { if (data) setIgConfig(data); })
+        .catch(() => {});
+    }
+  }
+
+  async function handleIgConnect() {
+    setIgError(null);
+    if (!tokenManager.get()) {
+      setIgError("Sessão expirada. Faça login novamente.");
+      return;
+    }
+    setIgConnecting(true);
+    try {
+      const res = await fetch("/api/social-media/instagram/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
+        body: JSON.stringify({ scheduleId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Erro ao iniciar a conexão");
+      window.location.href = data.url; // diálogo de autorização da Meta
+    } catch (err) {
+      const msg = (err as { message?: string })?.message || "Erro ao conectar";
+      setIgError(msg);
+      toast.error(msg);
+      setIgConnecting(false);
+    }
+  }
+
+  async function handleIgSync() {
+    if (!viewMonth) return;
+    setIgSyncing(true);
+    try {
+      const res = await fetch("/api/social-media/instagram/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
+        body: JSON.stringify({ scheduleId, month: viewMonth.month, year: viewMonth.year }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Erro na sincronização");
+      const parts: string[] = [];
+      if (data.updated > 0) parts.push(`${data.updated} post(s) atualizados com métricas reais`);
+      if (data.created > 0) parts.push(`${data.created} publicação(ões) feitas fora do planejamento importadas para o calendário`);
+      if (parts.length > 0) {
+        toast.success(`${parts.join(" e ")} — ${data.mediaFound} publicações encontradas no mês.`);
+      } else {
+        toast.info(
+          data.mediaFound > 0
+            ? `${data.mediaFound} publicações encontradas, mas nenhuma correspondeu aos posts do mês.`
+            : "Nenhuma publicação encontrada no Instagram neste mês."
+        );
+      }
+      await fetchPosts(viewMonth.month, viewMonth.year);
+      supabase
+        .rpc("sm_get_instagram_connection", { p_schedule_id: scheduleId })
+        .then(({ data: conn, error }) => {
+          if (!error && conn) setIgConnection(conn as InstagramConnection);
+        });
+    } catch (err) {
+      const msg = (err as { message?: string })?.message || "Erro ao sincronizar métricas";
+      setIgError(msg);
+      toast.error(msg);
+    } finally {
+      setIgSyncing(false);
+    }
+  }
+
+  async function handleIgDisconnect() {
+    setIgDisconnecting(true);
+    try {
+      const { error } = await supabase.rpc("sm_disconnect_instagram", { p_schedule_id: scheduleId });
+      if (error) throw error;
+      setIgConnection({ connected: false });
+      toast.success("Instagram desconectado.");
+    } catch (err) {
+      console.error("disconnect error:", err);
+      toast.error("Erro ao desconectar");
+    } finally {
+      setIgDisconnecting(false);
     }
   }
 
@@ -752,6 +895,18 @@ export default function ScheduleCalendarPage() {
                   Relatório
                 </Button>
               </Link>
+
+              {/* Instagram: conectar / sincronizar métricas */}
+              <Button
+                variant="outline"
+                size="sm"
+                className={`gap-1.5 ${igConnection?.connected ? "border-pink-300 dark:border-pink-800 text-pink-600 dark:text-pink-400" : ""}`}
+                onClick={openIgModal}
+              >
+                {igConnection?.connected && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />}
+                <Instagram className="h-3.5 w-3.5" />
+                {igConnection?.connected ? `@${igConnection.ig_username ?? "conectado"}` : "Conectar Instagram"}
+              </Button>
             </div>
           </div>
 
@@ -1065,6 +1220,110 @@ export default function ScheduleCalendarPage() {
             setSelectedPost(null);
           }}
         />
+      )}
+
+      {/* Instagram Connect Modal */}
+      {showIgModal && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowIgModal(false)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md max-h-[88vh] rounded-2xl border border-border bg-background shadow-2xl overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-border sticky top-0 bg-background z-10">
+              <h3 className="font-bold flex items-center gap-2">
+                <Instagram className="h-5 w-5 text-pink-500" />
+                {igConnection?.connected ? "Instagram conectado" : "Conectar Instagram"}
+              </h3>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowIgModal(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Erro persistente da última ação (conectar/sincronizar) */}
+            {igError && (
+              <div className="mx-5 mt-4 rounded-xl border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-3 text-sm text-red-700 dark:text-red-300">
+                {igError}
+              </div>
+            )}
+
+            {igConnection?.connected ? (
+              <div className="p-5 space-y-4">
+                <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-1.5">
+                  <p className="text-sm">
+                    Conta: <strong>@{igConnection.ig_username ?? "—"}</strong>
+                  </p>
+                  {igConnection.page_name && (
+                    <p className="text-xs text-muted-foreground">Página do Facebook: {igConnection.page_name}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {igConnection.last_synced_at
+                      ? `Última sincronização: ${new Date(igConnection.last_synced_at).toLocaleString("pt-BR")}`
+                      : "Nenhuma sincronização feita ainda."}
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  A sincronização busca as publicações de {viewMonth ? `${MONTHS_PT[viewMonth.month - 1]} ${viewMonth.year}` : "do mês visualizado"} na conta,
+                  associa cada uma ao post do cronograma (por data e legenda) e preenche curtidas, comentários,
+                  compartilhamentos, salvos, alcance e visualizações automaticamente.
+                </p>
+                {canEdit && (
+                  <Button
+                    onClick={handleIgSync}
+                    disabled={igSyncing}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                  >
+                    {igSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    {igSyncing ? "Sincronizando..." : `Sincronizar métricas de ${viewMonth ? MONTHS_PT[viewMonth.month - 1] : "agora"}`}
+                  </Button>
+                )}
+                {userRole === "owner" && (
+                  <Button
+                    variant="ghost"
+                    onClick={handleIgDisconnect}
+                    disabled={igDisconnecting}
+                    className="w-full text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 gap-1.5"
+                  >
+                    {igDisconnecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                    Desconectar conta
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="p-5 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Conecte a conta para puxar métricas reais (curtidas, comentários, alcance...) e o
+                  público da conta automaticamente — sem digitação manual. Siga o guia abaixo
+                  (clique em cada passo para ver como fazer):
+                </p>
+                <InstagramConnectGuide />
+                {/* Servidor sem as envs da integração — avisa antes do clique */}
+                {igConfig && !igConfig.configured && (
+                  <div className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-1">
+                    <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                      ⚠️ Integração ainda não configurada no servidor
+                    </p>
+                    <p className="text-xs text-amber-700/80 dark:text-amber-300/80">
+                      Falta definir no .env.local: <strong>{igConfig.missing.join(", ")}</strong>.
+                      Siga o passo a passo em <code>docs/instagram-integration.md</code> (criar o app em
+                      developers.facebook.com e copiar a service_role key do Supabase) e reinicie o servidor.
+                    </p>
+                  </div>
+                )}
+                <Button
+                  onClick={handleIgConnect}
+                  disabled={igConnecting || userRole !== "owner" || (igConfig !== null && !igConfig.configured)}
+                  className="w-full bg-[#1877F2] hover:bg-[#166FE5] text-white gap-2"
+                >
+                  {igConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
+                  {igConnecting ? "Redirecionando..." : "Conectar com Facebook"}
+                </Button>
+                <p className="text-[11px] text-muted-foreground text-center">
+                  Você será redirecionado ao login seguro da Meta. Não temos acesso à sua senha — apenas a um
+                  token de leitura das métricas, que fica guardado com segurança no servidor.
+                  {userRole !== "owner" && " Somente o dono do cronograma pode conectar a conta."}
+                </p>
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {/* Create Post Modal */}

@@ -1,0 +1,30 @@
+# Sincronização diária das métricas do Instagram (gratuito via GitHub Actions).
+# Chama a rota de cron do app Next hospedado no Render.
+#
+# Configuração (uma vez, no GitHub do repo isoscanning):
+#   Settings → Secrets and variables → Actions → New repository secret:
+#     SYNC_URL    = https://SEU_DOMINIO_DO_FRONT/api/social-media/instagram/cron-sync
+#     CRON_SECRET = mesmo valor do CRON_SECRET no .env.local / env do Render
+#
+# Observações:
+# - O horário do schedule pode atrasar alguns minutos (comportamento do GitHub).
+# - Repositórios sem commits por 60 dias têm schedules pausados pelo GitHub
+#   (basta reativar na aba Actions).
+# - O --max-time alto cobre o cold start de serviços free do Render.
+
+name: Instagram Sync Diário
+
+on:
+  schedule:
+    - cron: "0 9 * * *" # 9h UTC = 6h em Brasília
+  workflow_dispatch: {} # permite rodar manualmente na aba Actions
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar rota de sincronização
+        run: |
+          curl -fsS --retry 3 --retry-delay 30 --retry-all-errors --max-time 280 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.SYNC_URL }}"

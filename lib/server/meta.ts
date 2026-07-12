@@ -37,11 +37,24 @@ export const META_MISSING_MSG =
   "Integração com a Meta não configurada. Defina META_APP_ID e META_APP_SECRET no .env.local " +
   "(crie um app Business em developers.facebook.com — veja docs/instagram-integration.md).";
 
+/**
+ * Origem pública da requisição. Atrás de proxy (Render/Cloudflare) a URL vista
+ * pelo Node é interna (ex.: localhost:10000) — os headers x-forwarded-* trazem
+ * o host/protocolo reais.
+ */
+export function getRequestOrigin(request: { url: string; headers: Headers }): string {
+  const url = new URL(request.url);
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? url.host;
+  const proto = (request.headers.get("x-forwarded-proto") ?? url.protocol.replace(":", ""))
+    .split(",")[0]
+    .trim();
+  return `${proto}://${host}`;
+}
+
 /** redirect_uri precisa ser idêntico no diálogo OAuth e na troca do code */
-export function getRedirectUri(requestUrl: string): string {
+export function getRedirectUri(request: { url: string; headers: Headers }): string {
   if (process.env.META_REDIRECT_URI) return process.env.META_REDIRECT_URI;
-  const origin = new URL(requestUrl).origin;
-  return `${origin}/api/social-media/instagram/callback`;
+  return `${getRequestOrigin(request)}/api/social-media/instagram/callback`;
 }
 
 // ── state assinado (anti-CSRF) ────────────────────────────────

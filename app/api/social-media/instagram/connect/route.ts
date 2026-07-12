@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Apenas o dono do cronograma pode conectar o Instagram." }, { status: 403 });
     }
 
-    const redirectUri = getRedirectUri(request.url);
+    const redirectUri = getRedirectUri(request);
     const state = signState({ scheduleId, userId: auth.user.id, ts: Date.now() }, config.appSecret);
 
     const url = new URL(`https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth`);

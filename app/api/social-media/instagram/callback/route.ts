@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMetaConfig, getRedirectUri, verifyState, graphGet, MetaApiError } from "@/lib/server/meta";
+import { getMetaConfig, getRedirectUri, getRequestOrigin, verifyState, graphGet, MetaApiError } from "@/lib/server/meta";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
 
 // Callback do OAuth da Meta. Chega via redirect do Facebook (sem sessão),
@@ -31,7 +31,8 @@ interface PageEntry {
 }
 
 export async function GET(request: NextRequest) {
-  const origin = new URL(request.url).origin;
+  // Origem pública (atrás do proxy do Render a URL interna é localhost:10000)
+  const origin = getRequestOrigin(request);
   const searchParams = request.nextUrl.searchParams;
   const config = getMetaConfig();
 
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest) {
       return redirectTo(origin, scheduleId, { ig: "error", reason: "service_role" });
     }
 
-    const redirectUri = getRedirectUri(request.url);
+    const redirectUri = getRedirectUri(request);
 
     // 1. code → token curto
     const shortToken = await graphGet<{ access_token: string }>("/oauth/access_token", {

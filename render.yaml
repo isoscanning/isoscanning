@@ -15,4 +15,6 @@ services:
         sync: false
       - key: NEXT_PUBLIC_API_URL
         sync: false
+      - key: NEXT_PUBLIC_GOOGLE_ANALYTICS_ID
+        sync: false
 

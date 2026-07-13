@@ -1,6 +1,6 @@
 import { sendGAEvent } from '@next/third-parties/google'
 
-type EventName = 
+type EventName =
   | 'login'
   | 'sign_up'
   | 'sign_out'
@@ -36,10 +36,12 @@ export const trackEvent = ({ action, category, label, value, ...params }: Analyt
       category,
       label,
       value,
-      debug_mode: true,
+      ...(process.env.NODE_ENV !== 'production' && { debug_mode: true }),
       ...params,
     })
-    console.log(`[Analytics] Event sent: ${action}`, params)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[Analytics] Event sent: ${action}`, params)
+    }
   } catch (error) {
     console.error('[Analytics] Failed to send event:', error)
   }

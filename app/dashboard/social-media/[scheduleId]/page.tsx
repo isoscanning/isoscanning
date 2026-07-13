@@ -15,13 +15,14 @@ import {
   ArrowLeft, ChevronLeft, ChevronRight, Users,
   Instagram, Facebook, Youtube, Linkedin, Twitter, Music2,
   GripVertical, Sparkles, X, Loader2, CalendarDays, Check, Plus, Trash2,
-  Share2, Copy, RefreshCw, ExternalLink, BarChart3,
+  Share2, Copy, RefreshCw, ExternalLink, BarChart3, LayoutGrid,
 } from "lucide-react";
 import { toast } from "sonner";
 import { notifySocialMediaPostStatus } from "@/lib/data-service";
 import {
   SocialMediaSchedule, SocialMediaPost, NetworkType, PostType, PostStatus,
-  POST_TYPE_CONFIG, MONTHS_PT, COMMEMORATIVE_DATES, SmMonthlyReport, InstagramConnection
+  POST_TYPE_CONFIG, MONTHS_PT, COMMEMORATIVE_DATES, SmMonthlyReport, InstagramConnection,
+  isPremiumSmTier
 } from "@/lib/social-media-types";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -135,6 +136,9 @@ export default function ScheduleCalendarPage() {
   const [latestReport, setLatestReport] = useState<SmMonthlyReport | null>(null);
   const [applyReportInsights, setApplyReportInsights] = useState(true);
 
+  // Recursos Pro/Ultra (Relatório e Simulador de Feed) — plano do dono
+  const [ownerPremium, setOwnerPremium] = useState<boolean | null>(null);
+
   // Conexão com o Instagram (Graph API)
   const [igConnection, setIgConnection] = useState<InstagramConnection | null>(null);
   const [showIgModal, setShowIgModal] = useState(false);
@@ -194,6 +198,16 @@ export default function ScheduleCalendarPage() {
 
       if (schedErr) throw schedErr;
       setSchedule(sched as SocialMediaSchedule);
+
+      // Plano do dono define o acesso a Relatório/Feed (badge PRO nos botões)
+      supabase
+        .from("profiles")
+        .select("subscription_tier")
+        .eq("id", sched.owner_id)
+        .maybeSingle()
+        .then(({ data }) =>
+          setOwnerPremium(isPremiumSmTier(data?.subscription_tier as string | null))
+        );
 
       // Status da conexão com o Instagram (função não expõe o token;
       // falha silenciosa se a migration 44 ainda não foi executada)
@@ -839,7 +853,7 @@ export default function ScheduleCalendarPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {networks.length > 1 && (
                 <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
                   <button
@@ -889,10 +903,27 @@ export default function ScheduleCalendarPage() {
                 </Link>
               )}
 
+              <Link href={`/dashboard/social-media/${scheduleId}/feed`}>
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <LayoutGrid className="h-3.5 w-3.5 text-pink-500" />
+                  Feed
+                  {ownerPremium === false && (
+                    <span className="text-[9px] font-bold px-1 py-px rounded bg-gradient-to-r from-blue-500 to-violet-500 text-white leading-none">
+                      PRO
+                    </span>
+                  )}
+                </Button>
+              </Link>
+
               <Link href={`/dashboard/social-media/${scheduleId}/report?month=${viewMonth?.month ?? schedule.month}&year=${viewMonth?.year ?? schedule.year}`}>
                 <Button variant="outline" size="sm" className="gap-1.5">
                   <BarChart3 className="h-3.5 w-3.5" />
                   Relatório
+                  {ownerPremium === false && (
+                    <span className="text-[9px] font-bold px-1 py-px rounded bg-gradient-to-r from-blue-500 to-violet-500 text-white leading-none">
+                      PRO
+                    </span>
+                  )}
                 </Button>
               </Link>
 

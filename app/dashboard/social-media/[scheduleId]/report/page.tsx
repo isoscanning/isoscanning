@@ -17,7 +17,9 @@ import { toast } from "sonner";
 import {
   SocialMediaSchedule, SocialMediaPost, MonthlyReportStats, MonthlyReportAI,
   MONTHS_PT, POST_TYPE_CONFIG, PostType, InstagramConnection, AudienceDemographics, AudienceSlice,
+  isPremiumSmTier,
 } from "@/lib/social-media-types";
+import { PremiumGate } from "@/components/social-media/premium-gate";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -95,6 +97,8 @@ function MonthlyReportInner() {
   const [audience, setAudience] = useState<AudienceDemographics | null>(null);
   const [audienceNote, setAudienceNote] = useState<string | null>(null);
   const [audienceTried, setAudienceTried] = useState(false);
+  // Plano do DONO do cronograma libera o recurso para toda a equipe
+  const [ownerAllowed, setOwnerAllowed] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!loading && userProfile) fetchData();
@@ -112,6 +116,19 @@ function MonthlyReportInner() {
         .single();
       if (schedErr) throw schedErr;
       setSchedule(sched as SocialMediaSchedule);
+
+      // Recurso Pro/Ultra — validado pelo plano do dono do cronograma
+      const { data: ownerProfile } = await supabase
+        .from("profiles")
+        .select("subscription_tier")
+        .eq("id", (sched as SocialMediaSchedule).owner_id)
+        .maybeSingle();
+      const allowed = isPremiumSmTier(ownerProfile?.subscription_tier as string | null);
+      setOwnerAllowed(allowed);
+      if (!allowed) {
+        setFetching(false);
+        return;
+      }
 
       if ((sched as SocialMediaSchedule).owner_id === userProfile.id) {
         setCanGenerate(true);
@@ -241,6 +258,7 @@ function MonthlyReportInner() {
         method: "POST",
         headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
         body: JSON.stringify({
+          scheduleId,
           clientName: schedule.client_name,
           clientNiche: schedule.client_niche,
           objective: schedule.objective,
@@ -326,6 +344,37 @@ function MonthlyReportInner() {
         <Header />
         <main className="container mx-auto max-w-4xl py-12 px-4">
           <p className="text-muted-foreground">Cronograma não encontrado.</p>
+        </main>
+      </div>
+    );
+  }
+
+  // Paywall: dono do cronograma não é Pro/Ultra
+  if (ownerAllowed === false) {
+    return (
+      <div className="min-h-screen bg-background/50">
+        <Header />
+        <main className="container mx-auto max-w-lg py-10 px-4 space-y-4">
+          <div className="flex items-center gap-3">
+            <Link href={`/dashboard/social-media/${scheduleId}`}>
+              <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+            </Link>
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-blue-500" />
+              Relatório Mensal
+            </h1>
+          </div>
+          <PremiumGate
+            title="Relatórios de resultados com IA"
+            description="Entregue ao seu cliente um relatório mensal profissional, gerado automaticamente a partir das métricas reais."
+            bullets={[
+              "Ranking dos melhores posts e análise por formato",
+              "Diagnóstico com IA: o que funcionou e o que corrigir",
+              "Demografia do público (idade, gênero, região)",
+              "Sugestões de posts e estratégia para o próximo mês",
+              "Exportação em PDF para enviar ao cliente",
+            ]}
+          />
         </main>
       </div>
     );

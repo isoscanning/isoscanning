@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/server/api-auth";
+import { requireUser, checkOwnerPremiumSm, PREMIUM_SM_MSG } from "@/lib/server/api-auth";
 import { callGroqJson, GroqError } from "@/lib/server/groq";
 
 // Relatório mensal de resultados: recebe os posts do mês com métricas,
@@ -98,18 +98,47 @@ function computeStats(posts: ReportPostInput[]) {
 export async function POST(request: NextRequest) {
   try {
     // Rota proxia a chave Groq — exige usuário autenticado
-    if (!(await requireUser(request))) {
+    const auth = await requireUser(request);
+    if (!auth) {
       return NextResponse.json({ error: "Não autorizado. Faça login novamente." }, { status: 401 });
     }
 
     const body = await request.json();
     const {
-      clientName, clientNiche, objective, tone, targetAudience,
+      scheduleId, clientName, clientNiche, objective, tone, targetAudience,
       month, year, posts, accountHandle,
     } = body;
 
-    if (!clientName || !month || !year || !Array.isArray(posts)) {
+    if (!scheduleId || !clientName || !month || !year || !Array.isArray(posts)) {
       return NextResponse.json({ error: "Parâmetros obrigatórios faltando" }, { status: 400 });
+    }
+
+    // Autorização: dono ou membro ativo do cronograma
+    const { data: schedule } = await auth.supabase
+      .from("social_media_schedules")
+      .select("id, owner_id")
+      .eq("id", scheduleId)
+      .maybeSingle();
+
+    let authorized = schedule?.owner_id === auth.user.id;
+    if (!authorized && schedule) {
+      const { data: member } = await auth.supabase
+        .from("social_media_team_members")
+        .select("role")
+        .eq("schedule_id", scheduleId)
+        .eq("user_id", auth.user.id)
+        .eq("status", "active")
+        .maybeSingle();
+      authorized = Boolean(member);
+    }
+    if (!schedule || !authorized) {
+      return NextResponse.json({ error: "Sem permissão para este cronograma." }, { status: 403 });
+    }
+
+    // Plano: relatório com IA é recurso Pro/Ultra (pelo plano do dono)
+    const premium = await checkOwnerPremiumSm(auth, schedule.owner_id);
+    if (!premium.allowed) {
+      return NextResponse.json({ error: PREMIUM_SM_MSG, planLimit: true }, { status: 403 });
     }
     if (posts.length === 0) {
       return NextResponse.json({ error: "Nenhum post no mês para analisar" }, { status: 400 });

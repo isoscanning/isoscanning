@@ -12,7 +12,7 @@ import {
   X, Pencil, Sparkles, Loader2, Send, Check, AlertCircle, ThumbsDown,
   Clock, Hash, FileText, MessageSquare, History, Instagram, Facebook,
   Youtube, Linkedin, Twitter, Music2, ChevronDown, Link2, ExternalLink,
-  Film, FolderOpen, Trash2, Wand2, RefreshCw, BarChart3
+  Film, FolderOpen, Trash2, Wand2, RefreshCw, BarChart3, ImagePlus, Image as ImageIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -91,6 +91,8 @@ export function PostSlideOver({
   // Chave da ação de IA em andamento ("rewrite" | "full" | "custom" | label do chip) — null = ociosa
   const [refining, setRefining] = useState<string | null>(null);
   const [refineInstruction, setRefineInstruction] = useState("");
+  // Arte do post (Simulador de Feed)
+  const [uploadingMedia, setUploadingMedia] = useState(false);
   // Métricas de desempenho (alimentam o relatório mensal)
   const [savingMetrics, setSavingMetrics] = useState(false);
   const [showMetrics, setShowMetrics] = useState(false);
@@ -312,6 +314,70 @@ export function PostSlideOver({
       toast.error(msg);
     } finally {
       setRefining(null);
+    }
+  }
+
+  async function handleMediaUpload(file: File) {
+    if (!post) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Envie um arquivo de imagem (JPG, PNG ou WebP).");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Imagem muito grande — o limite é 8MB.");
+      return;
+    }
+    setUploadingMedia(true);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `${scheduleId}/${post.id}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("sm-post-media")
+        .upload(path, file, { contentType: file.type, upsert: true });
+      if (upErr) throw upErr;
+
+      const { data: pub } = supabase.storage.from("sm-post-media").getPublicUrl(path);
+      const { data, error } = await supabase.rpc("sm_update_post_media", {
+        p_post_id: post.id,
+        p_media_url: pub.publicUrl,
+      });
+      if (error) throw error;
+      onUpdate(data as SocialMediaPost);
+      toast.success("Arte anexada — ela já aparece no Simulador de Feed.");
+    } catch (err) {
+      const msg = (err as { message?: string })?.message ?? "";
+      console.error("media upload error:", msg, err);
+      toast.error(msg.includes("Bucket not found") || msg.includes("does not exist") || msg.includes("function")
+        ? "Banco desatualizado. Execute a migration 45-social-media-feed-media.sql no Supabase."
+        : "Erro ao enviar a arte");
+    } finally {
+      setUploadingMedia(false);
+    }
+  }
+
+  async function handleMediaRemove() {
+    if (!post) return;
+    setUploadingMedia(true);
+    try {
+      // Remove o arquivo do Storage (best-effort) e limpa a coluna
+      const marker = "/sm-post-media/";
+      const idx = (post.media_url ?? "").indexOf(marker);
+      if (idx !== -1) {
+        const path = decodeURIComponent(post.media_url!.slice(idx + marker.length));
+        await supabase.storage.from("sm-post-media").remove([path]);
+      }
+      const { data, error } = await supabase.rpc("sm_update_post_media", {
+        p_post_id: post.id,
+        p_media_url: null,
+      });
+      if (error) throw error;
+      onUpdate(data as SocialMediaPost);
+      toast.success("Arte removida");
+    } catch (err) {
+      console.error("media remove error:", err);
+      toast.error("Erro ao remover a arte");
+    } finally {
+      setUploadingMedia(false);
     }
   }
 
@@ -631,6 +697,68 @@ export function PostSlideOver({
                   </div>
                 </div>
               ) : null}
+
+              {/* Arte do post (Simulador de Feed) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <ImageIcon className="h-3.5 w-3.5" />
+                    Arte do post
+                  </Label>
+                  {canEdit && post.media_url && (
+                    <button
+                      type="button"
+                      onClick={handleMediaRemove}
+                      disabled={uploadingMedia}
+                      className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50"
+                    >
+                      Remover
+                    </button>
+                  )}
+                </div>
+                {post.media_url ? (
+                  <div className="relative rounded-lg overflow-hidden border border-border group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={post.media_url} alt="Arte do post" className="w-full max-h-72 object-cover" />
+                    {canEdit && (
+                      <label className="absolute bottom-2 right-2 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/60 text-white text-xs cursor-pointer hover:bg-black/80 transition-colors">
+                        {uploadingMedia ? <Loader2 className="h-3 w-3 animate-spin" /> : <ImagePlus className="h-3 w-3" />}
+                        Trocar
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleMediaUpload(f);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                ) : canEdit ? (
+                  <label className="flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-border hover:border-blue-400 p-5 cursor-pointer transition-colors text-center">
+                    {uploadingMedia
+                      ? <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                      : <ImagePlus className="h-5 w-5 text-muted-foreground" />}
+                    <span className="text-sm font-medium">Enviar arte do post</span>
+                    <span className="text-[11px] text-muted-foreground">JPG/PNG até 8MB — aparece no Simulador de Feed</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleMediaUpload(f);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">Sem arte anexada</p>
+                )}
+              </div>
 
               {/* Copy */}
               <div className="space-y-2">

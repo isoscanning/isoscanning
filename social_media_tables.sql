@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS social_media_posts (
   scheduled_time TIME,
   status VARCHAR(50) DEFAULT 'draft' CHECK (status IN ('draft', 'in_review', 'approved', 'scheduled', 'published', 'rejected')),
   copy TEXT,
+  media_url TEXT,
   hashtags TEXT[] DEFAULT '{}',
   content_description TEXT,
   ai_generated BOOLEAN DEFAULT false,

@@ -70,6 +70,32 @@ export async function checkAiCalendarQuota(
   return { allowed: used < limit, used, limit };
 }
 
+/**
+ * Features premium de social media (Relatório mensal com IA, demografia e
+ * Simulador de Feed): disponíveis nos planos pro ("Pro") e vip ("Ultra"/VIP).
+ * A checagem é pelo plano do DONO do cronograma — membros da equipe herdam
+ * o acesso do dono. Tier null = promoção de lançamento (tratado como vip).
+ */
+const PREMIUM_SM_TIERS = ["pro", "vip"];
+
+export async function checkOwnerPremiumSm(
+  auth: AuthenticatedRequest,
+  ownerId: string
+): Promise<{ allowed: boolean; tier: string | null }> {
+  const { data: profile } = await auth.supabase
+    .from("profiles")
+    .select("subscription_tier")
+    .eq("id", ownerId)
+    .maybeSingle();
+
+  const tier = (profile?.subscription_tier as string | null) ?? null;
+  const allowed = tier === null || PREMIUM_SM_TIERS.includes(tier);
+  return { allowed, tier };
+}
+
+export const PREMIUM_SM_MSG =
+  "Este recurso está disponível nos planos Pro e Ultra. Faça upgrade em /precos para liberar relatórios com IA e o Simulador de Feed.";
+
 /** Registra uma geração de calendário (chamar após sucesso). */
 export async function recordAiCalendarUsage(auth: AuthenticatedRequest): Promise<void> {
   // Tabela criada na migration 41 — se ainda não existir, não quebra a rota.

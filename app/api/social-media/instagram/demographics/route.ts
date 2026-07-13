@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/server/api-auth";
+import { requireUser, checkOwnerPremiumSm, PREMIUM_SM_MSG } from "@/lib/server/api-auth";
 import { graphGet, MetaApiError } from "@/lib/server/meta";
 import { getSupabaseAdmin, ADMIN_MISSING_MSG } from "@/lib/server/supabase-admin";
 
@@ -88,6 +88,12 @@ export async function POST(request: NextRequest) {
     }
     if (!schedule || !authorized) {
       return NextResponse.json({ error: "Sem permissão para este cronograma." }, { status: 403 });
+    }
+
+    // Plano: demografia faz parte do relatório Pro/Ultra (pelo plano do dono)
+    const premium = await checkOwnerPremiumSm(auth, schedule.owner_id);
+    if (!premium.allowed) {
+      return NextResponse.json({ error: PREMIUM_SM_MSG, planLimit: true }, { status: 403 });
     }
 
     const { data: connection } = await admin

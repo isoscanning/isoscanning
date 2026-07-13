@@ -69,6 +69,8 @@ export interface SocialMediaPost {
   approved_by?: string;
   approved_at?: string;
   published_at?: string;
+  // Arte/imagem do post (bucket sm-post-media) — usada no Simulador de Feed
+  media_url?: string | null;
   // Métricas de desempenho (manuais hoje; Graph API no futuro)
   metric_likes?: number | null;
   metric_comments?: number | null;
@@ -80,6 +82,27 @@ export interface SocialMediaPost {
   created_by?: string;
   created_at: string;
   updated_at: string;
+}
+
+// Planos com acesso às features premium de social media (Relatório IA,
+// demografia e Simulador de Feed). Slugs do banco: pro = "Pro", vip = "Ultra".
+// Tier null/undefined = promoção de lançamento (tratado como vip).
+export const PREMIUM_SM_TIERS = ["pro", "vip"];
+export function isPremiumSmTier(tier?: string | null): boolean {
+  if (tier == null) return true;
+  return PREMIUM_SM_TIERS.includes(tier);
+}
+
+// Mídia real do feed do Instagram (retorno de /api/social-media/instagram/feed)
+export interface IgFeedMedia {
+  id: string;
+  image: string | null;         // media_url ou thumbnail_url (URLs expiram — buscar fresco)
+  permalink?: string;
+  timestamp?: string;
+  media_type?: string;          // IMAGE | VIDEO | CAROUSEL_ALBUM
+  media_product_type?: string;  // FEED | REELS
+  like_count?: number;
+  comments_count?: number;
 }
 
 // Status da conexão com o Instagram (retorno de sm_get_instagram_connection — sem token)

@@ -159,8 +159,8 @@ export function NotificationBell() {
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative group hover:bg-zinc-800 transition-colors">
-                    <Bell className="h-5 w-5 text-zinc-400 group-hover:text-white transition-colors" />
+                <Button variant="ghost" size="icon" className="relative group hover:bg-accent transition-colors">
+                    <Bell className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
                     {unreadCount > 0 && (
                         <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full border border-zinc-950 animate-pulse" />
                     )}

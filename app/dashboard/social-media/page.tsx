@@ -462,7 +462,7 @@ function ScheduleCard({
           {/* Action */}
           <Link href={`/dashboard/social-media/${schedule.id}`} className="block">
             <Button
-              className="w-full gap-2 bg-blue-600/10 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-500/30 hover:border-blue-600 transition-all"
+              className="w-full gap-2 border border-blue-500/30 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white hover:border-blue-600 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-600 dark:hover:text-white transition-all"
               variant="ghost"
             >
               <Eye className="h-4 w-4" />

@@ -90,10 +90,10 @@ export function ChatBell() {
         <Button
           variant="ghost"
           size="icon"
-          className="relative group hover:bg-zinc-800 transition-colors"
+          className="relative group hover:bg-accent transition-colors"
           aria-label="Mensagens"
         >
-          <MessageSquare className="h-5 w-5 text-zinc-400 group-hover:text-white transition-colors" />
+          <MessageSquare className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
           {hasUnread && (
             <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground border border-zinc-950">
               {totalUnread > 9 ? "9+" : totalUnread}

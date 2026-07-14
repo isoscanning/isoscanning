@@ -139,6 +139,18 @@ export default function ProfessionalProfilePage() {
   const [reviewModalOpen, setReviewModalOpen] = useState(false); // Modal state
   const [hasUserReviewed, setHasUserReviewed] = useState(false); // Checking state
   const [startingChat, setStartingChat] = useState(false);
+  const [reviewContractId, setReviewContractId] = useState<string | null>(null);
+
+  // Deep link do pedido de avaliação (?avaliar=1&contrato=<id>) vindo da notificação
+  // de conclusão de contrato — abre o modal de avaliação automaticamente.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get("avaliar") === "1") {
+      setReviewContractId(searchParams.get("contrato"));
+      setReviewModalOpen(true);
+    }
+  }, []);
 
   const handleStartChat = async () => {
     if (!currentUser || !professional) return;
@@ -816,6 +828,7 @@ export default function ProfessionalProfilePage() {
           onOpenChange={setReviewModalOpen}
           professionalId={professional.id}
           professionalName={professional.displayName}
+          contractId={reviewContractId}
           onSuccess={() => {
             // Refresh data
             fetchProfessionalData();

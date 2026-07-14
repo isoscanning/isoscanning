@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  SocialMediaPost, PostComment, NetworkType, PostStatus, PostType, ProductionStatus,
+  SocialMediaPost, PostComment, NetworkType, PostStatus, PostType, ProductionStatus, AccountAnalysis,
   POST_TYPE_CONFIG, STATUS_CONFIG, NETWORK_CONFIG, PRODUCTION_STATUS_CONFIG
 } from "@/lib/social-media-types";
 import { notifySocialMediaPostStatus, notifySocialMediaComment } from "@/lib/data-service";
@@ -32,6 +32,8 @@ interface PostSlideOverProps {
   tone?: string;
   targetAudience?: string;
   objective?: string;
+  /** Anamnese da conta — usada para manter o tom de voz da marca nos refinos de IA */
+  accountAnalysis?: AccountAnalysis | null;
   userRole: string;
   userId: string;
   onClose: () => void;
@@ -82,7 +84,7 @@ const STATUS_ACTIONS: Partial<Record<PostStatus, { label: string; next: PostStat
 
 export function PostSlideOver({
   post, scheduleId, clientName, clientNiche, tone, targetAudience, objective,
-  userRole, userId, onClose, onUpdate, onDelete
+  accountAnalysis, userRole, userId, onClose, onUpdate, onDelete
 }: PostSlideOverProps) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -91,6 +93,8 @@ export function PostSlideOver({
   // Chave da ação de IA em andamento ("rewrite" | "full" | "custom" | label do chip) — null = ociosa
   const [refining, setRefining] = useState<string | null>(null);
   const [refineInstruction, setRefineInstruction] = useState("");
+  // Variações de legenda geradas pela IA (ângulos criativos distintos)
+  const [variations, setVariations] = useState<{ angle: string; copy: string; hashtags: string[] }[]>([]);
   // Arte do post (Simulador de Feed)
   const [uploadingMedia, setUploadingMedia] = useState(false);
   // Métricas de desempenho (alimentam o relatório mensal)
@@ -286,6 +290,8 @@ export function PostSlideOver({
           tone,
           targetAudience,
           objective,
+          anamneseTone: accountAnalysis?.tone_of_voice || undefined,
+          positioning: accountAnalysis?.positioning || undefined,
         }),
       });
 
@@ -315,6 +321,55 @@ export function PostSlideOver({
     } finally {
       setRefining(null);
     }
+  }
+
+  // Gera 3 variações de legenda + hashtags com ângulos criativos diferentes
+  async function handleGenerateVariations() {
+    if (!post || refining) return;
+    setRefining("variations");
+    try {
+      const res = await fetch("/api/social-media/copy-variations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
+        body: JSON.stringify({
+          title: editForm.title || post.title,
+          postType: editForm.post_type || post.post_type,
+          network: post.network,
+          copy: editForm.copy || post.copy || undefined,
+          contentDescription: editForm.content_description || undefined,
+          clientName,
+          clientNiche,
+          tone,
+          targetAudience,
+          objective,
+          anamneseTone: accountAnalysis?.tone_of_voice || undefined,
+          positioning: accountAnalysis?.positioning || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string })?.error || "Erro ao gerar variações");
+      setVariations(Array.isArray(data.variations) ? data.variations : []);
+      toast.success("Variações geradas! Escolha a que preferir.");
+    } catch (err) {
+      const msg = (err as { message?: string })?.message || "Erro ao gerar variações";
+      console.error("copy-variations error:", msg, err);
+      toast.error(msg);
+    } finally {
+      setRefining(null);
+    }
+  }
+
+  function applyVariation(variation: { copy: string; hashtags: string[] }) {
+    if (!editing) setEditing(true);
+    setEditForm((prev) => ({
+      ...prev,
+      copy: variation.copy,
+      hashtags: variation.hashtags.length
+        ? variation.hashtags.map((h) => `#${h.replace(/^#/, "")}`).join(" ")
+        : prev.hashtags,
+    }));
+    setVariations([]);
+    toast.success("Variação aplicada. Revise e clique em Salvar.");
   }
 
   async function handleMediaUpload(file: File) {
@@ -843,16 +898,63 @@ export function PostSlideOver({
                       Aplicar
                     </Button>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleRefine(refineInstruction.trim() || undefined, "full", "full")}
-                    disabled={refining !== null}
-                    className="h-7 w-full text-xs gap-1.5 text-muted-foreground hover:text-foreground"
-                  >
-                    {refining === "full" ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                    Regenerar post inteiro (nova ideia, copy e brief)
-                  </Button>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleGenerateVariations}
+                      disabled={refining !== null}
+                      className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                    >
+                      {refining === "variations" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                      Gerar 3 variações de legenda
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleRefine(refineInstruction.trim() || undefined, "full", "full")}
+                      disabled={refining !== null}
+                      className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                    >
+                      {refining === "full" ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                      Regenerar post inteiro
+                    </Button>
+                  </div>
+                  {accountAnalysis?.tone_of_voice && (
+                    <p className="text-[10px] text-blue-600/70 dark:text-blue-400/70">
+                      ✨ A IA está usando o tom de voz identificado na anamnese da conta.
+                    </p>
+                  )}
+                  {variations.length > 0 && (
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs font-medium text-blue-700 dark:text-blue-400">Escolha uma variação:</p>
+                      {variations.map((v, idx) => (
+                        <div key={idx} className="rounded-lg border border-blue-200 dark:border-blue-800 bg-background p-2.5 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <Badge variant="outline" className="text-[10px] border-blue-300 text-blue-700 dark:text-blue-400">
+                              {v.angle}
+                            </Badge>
+                            <Button
+                              size="sm"
+                              className="h-6 text-[10px] px-2 bg-blue-600 hover:bg-blue-700 text-white"
+                              onClick={() => applyVariation(v)}
+                            >
+                              Usar esta
+                            </Button>
+                          </div>
+                          <p className="text-xs whitespace-pre-wrap line-clamp-4">{v.copy}</p>
+                          {v.hashtags.length > 0 && (
+                            <p className="text-[10px] text-blue-600/80 dark:text-blue-400/80 line-clamp-1">
+                              {v.hashtags.map((h) => `#${h}`).join(" ")}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                      <Button size="sm" variant="ghost" className="h-6 w-full text-[10px] text-muted-foreground" onClick={() => setVariations([])}>
+                        Descartar variações
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
 

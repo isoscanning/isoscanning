@@ -933,6 +933,7 @@ export interface JobCandidate {
   agreementValue?: number;
   agreementDeadline?: string;
   agreementLocation?: string;
+  contractId?: string | null;
   profile: {
     id: string;
     displayName: string;
@@ -964,6 +965,7 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
         agreement_value,
         agreement_deadline,
         agreement_location,
+        contract_id,
         profiles (
           id,
           display_name,
@@ -997,6 +999,7 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
       agreementValue: app.agreement_value,
       agreementDeadline: app.agreement_deadline,
       agreementLocation: app.agreement_location,
+      contractId: app.contract_id,
       profile: {
         id: app.profiles.id,
         displayName: app.profiles.display_name,

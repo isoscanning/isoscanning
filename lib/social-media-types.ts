@@ -6,6 +6,26 @@ export type MemberRole = "owner" | "editor" | "approver" | "viewer";
 export type MemberStatus = "pending" | "active" | "removed";
 export type ScheduleStatus = "active" | "archived";
 
+// Análise de concorrentes gerada por IA (pesquisa web via @s do Instagram)
+export interface CompetitorProfile {
+  handle: string;
+  found: boolean;
+  summary: string;
+  content_strategy: string;
+  posting_style: string;
+  strengths: string[];
+  weaknesses: string[];
+}
+
+export interface CompetitorAnalysis {
+  web_research: boolean;
+  generated_at: string;
+  competitors: CompetitorProfile[];
+  gaps: string[];
+  differentiation: string[];
+  recommendations: string[];
+}
+
 // Anamnese da conta gerada por IA (pesquisa web via @ do Instagram)
 export interface AccountAnalysis {
   found?: boolean;
@@ -42,6 +62,8 @@ export interface SocialMediaSchedule {
   // Conta do Instagram + anamnese com IA
   account_handle?: string;
   account_analysis?: AccountAnalysis;
+  // Análise de concorrentes com IA (migration 48)
+  competitor_analysis?: CompetitorAnalysis;
   status: ScheduleStatus;
   created_at: string;
   updated_at: string;

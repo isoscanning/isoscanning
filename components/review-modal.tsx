@@ -23,6 +23,8 @@ interface ReviewModalProps {
     onOpenChange: (open: boolean) => void;
     professionalId: string;
     professionalName: string;
+    /** Vincula a avaliação a um contrato concluído (fluxo integrado) */
+    contractId?: string | null;
     onSuccess: () => void;
 }
 
@@ -43,6 +45,7 @@ export function ReviewModal({
     onOpenChange,
     professionalId,
     professionalName,
+    contractId,
     onSuccess,
 }: ReviewModalProps) {
     const { userProfile } = useAuth();
@@ -70,6 +73,7 @@ export function ReviewModal({
                 professionalId,
                 clientId: userProfile.id,
                 clientName: userProfile.displayName || "Usuário",
+                ...(contractId ? { contractId } : {}),
                 rating,
                 comment,
                 qualities,

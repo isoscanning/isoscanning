@@ -915,6 +915,13 @@ export default function ScheduleCalendarPage() {
                 </Button>
               </Link>
 
+              <Link href={`/dashboard/social-media/${scheduleId}/competitors`}>
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <Users className="h-3.5 w-3.5 text-violet-500" />
+                  Concorrentes
+                </Button>
+              </Link>
+
               <Link href={`/dashboard/social-media/${scheduleId}/report?month=${viewMonth?.month ?? schedule.month}&year=${viewMonth?.year ?? schedule.year}`}>
                 <Button variant="outline" size="sm" className="gap-1.5">
                   <BarChart3 className="h-3.5 w-3.5" />
@@ -1242,6 +1249,7 @@ export default function ScheduleCalendarPage() {
           tone={schedule.tone_of_voice}
           targetAudience={schedule.target_audience}
           objective={schedule.objective}
+          accountAnalysis={schedule.account_analysis}
           userRole={userRole}
           userId={userProfile.id}
           onClose={() => setSelectedPost(null)}

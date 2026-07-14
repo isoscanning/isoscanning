@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
       scope = "copy", instruction,
       title, postType, network, copy, hashtags, contentDescription,
       clientName, clientNiche, tone, targetAudience, objective,
+      anamneseTone, positioning,
     } = body;
 
     if (!title || !postType || !network) {
@@ -44,6 +45,8 @@ export async function POST(request: NextRequest) {
       clientName ? `- Cliente: ${clientName}` : null,
       clientNiche ? `- Nicho: ${clientNiche}` : null,
       tone ? `- Tom de voz: ${tone}` : null,
+      anamneseTone ? `- Tom de voz identificado na anamnese da conta (mantenha este estilo em qualquer refino): ${anamneseTone}` : null,
+      positioning ? `- Posicionamento da marca: ${positioning}` : null,
       targetAudience ? `- Público-alvo: ${targetAudience}` : null,
       objective ? `- Objetivo do mês: ${objective}` : null,
     ].filter(Boolean).join("\n");

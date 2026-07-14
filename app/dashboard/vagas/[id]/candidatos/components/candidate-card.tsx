@@ -55,6 +55,25 @@ export function CandidateCard({
     const jobId = params.id as string;
     const [isAgreementModalOpen, setIsAgreementModalOpen] = useState(false);
     const [startingChat, setStartingChat] = useState(false);
+    const [generatingContract, setGeneratingContract] = useState(false);
+    const [contractId, setContractId] = useState<string | null>(candidate.contractId ?? null);
+
+    // Fluxo integrado: acordo aceito → contrato digital pré-preenchido → assinatura
+    const handleGenerateContract = async () => {
+        if (contractId) {
+            router.push(`/dashboard/contratos/${contractId}`);
+            return;
+        }
+        setGeneratingContract(true);
+        try {
+            const res = await apiClient.post(`/contracts/from-application/${candidate.id}`);
+            setContractId(res.data.id);
+            router.push(`/dashboard/contratos/${res.data.id}`);
+        } catch (error: any) {
+            console.error("Erro ao gerar contrato:", error);
+            setGeneratingContract(false);
+        }
+    };
 
     const handleStartChat = async () => {
         setStartingChat(true);
@@ -186,7 +205,22 @@ export function CandidateCard({
                                     </Button>
                                     {candidate.agreementText && (
                                         <Button size="sm" variant="outline" onClick={() => setIsAgreementModalOpen(true)} className="flex-1 sm:flex-none">
-                                            <FileText className="mr-2 h-4 w-4" /> Ver Contrato
+                                            <FileText className="mr-2 h-4 w-4" /> Ver Acordo
+                                        </Button>
+                                    )}
+                                    {candidate.status === 'accepted' && (
+                                        <Button
+                                            size="sm"
+                                            className="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-primary-foreground"
+                                            onClick={handleGenerateContract}
+                                            disabled={generatingContract}
+                                        >
+                                            {generatingContract ? (
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <FileText className="mr-2 h-4 w-4" />
+                                            )}
+                                            {contractId ? "Ver Contrato Digital" : "Gerar Contrato Digital"}
                                         </Button>
                                     )}
                                     <DropdownMenu>

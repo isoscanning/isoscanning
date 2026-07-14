@@ -84,38 +84,38 @@ export default function DashboardPage() {
       if (!userProfile) return;
 
       try {
-        // Fetch review stats from API
+        const [statsResult, requestsResult, equipResult] = await Promise.allSettled([
+          apiClient.get(`/reviews/stats/${userProfile.id}`),
+          apiClient.get(`/quotes?clientId=${userProfile.id}`),
+          apiClient.get(`/equipments?ownerId=${userProfile.id}`),
+        ]);
+
         let rating = 0;
         let reviews = 0;
-        try {
-          const statsRes = await apiClient.get(`/reviews/stats/${userProfile.id}`);
-          rating = statsRes.data.averageRating || 0;
-          reviews = statsRes.data.totalReviews || 0;
-        } catch (e) {
-          console.warn("Error fetching review stats", e);
+        if (statsResult.status === "fulfilled") {
+          rating = statsResult.value.data.averageRating || 0;
+          reviews = statsResult.value.data.totalReviews || 0;
+        } else {
+          console.warn("Error fetching review stats", statsResult.reason);
           // Fallback to profile data if endpoint fails
           rating = userProfile.averageRating || 0;
           reviews = userProfile.totalReviews || 0;
         }
 
-        // Fetch requests count
         let requestsCount = 0;
-        try {
-          const requestsRes = await apiClient.get(`/quotes?clientId=${userProfile.id}`);
-          const requestsData = requestsRes.data.data || requestsRes.data || [];
+        if (requestsResult.status === "fulfilled") {
+          const requestsData = requestsResult.value.data.data || requestsResult.value.data || [];
           requestsCount = requestsData.length;
-        } catch (e) {
-          console.warn("Error fetching requests count", e);
+        } else {
+          console.warn("Error fetching requests count", requestsResult.reason);
         }
 
-        // Fetch equipments count
         let equipmentsCount = 0;
-        try {
-          const equipRes = await apiClient.get(`/equipments?ownerId=${userProfile.id}`);
-          const equipData = equipRes.data.data || equipRes.data || [];
+        if (equipResult.status === "fulfilled") {
+          const equipData = equipResult.value.data.data || equipResult.value.data || [];
           equipmentsCount = equipData.length;
-        } catch (e) {
-          console.warn("Error fetching equipments count", e);
+        } else {
+          console.warn("Error fetching equipments count", equipResult.reason);
         }
 
         setStats({
@@ -283,7 +283,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 
             {/* Rating Stat */}
-            <ScrollReveal delay={0.1}>
+            <ScrollReveal delay={0.05} duration={0.4}>
               <Card className="hover:shadow-md transition-all duration-300 border-primary/10 h-full">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Nota Média</CardTitle>
@@ -302,7 +302,7 @@ export default function DashboardPage() {
             </ScrollReveal>
 
             {/* Reviews Stat */}
-            <ScrollReveal delay={0.2}>
+            <ScrollReveal delay={0.1} duration={0.4}>
               <Card className="hover:shadow-md transition-all duration-300 border-primary/10 h-full">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Avaliações</CardTitle>
@@ -318,7 +318,7 @@ export default function DashboardPage() {
             </ScrollReveal>
 
             {/* Requests Stat */}
-            <ScrollReveal delay={0.3}>
+            <ScrollReveal delay={0.15} duration={0.4}>
               <Card className="hover:shadow-md transition-all duration-300 border-primary/10 h-full">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Solicitações</CardTitle>
@@ -334,7 +334,7 @@ export default function DashboardPage() {
             </ScrollReveal>
 
             {/* Equipments Stat */}
-            <ScrollReveal delay={0.4}>
+            <ScrollReveal delay={0.2} duration={0.4}>
               <Card className="hover:shadow-md transition-all duration-300 border-primary/10 h-full">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Equipamentos</CardTitle>
@@ -360,7 +360,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
               {/* START: Profile Card (Highlight) */}
-              <ScrollReveal delay={0.5}>
+              <ScrollReveal delay={0.05} duration={0.4}>
                 <Link href="/dashboard/perfil" className="block h-full group" id="quick-profile">
                   <Card className="h-full border-2 border-primary/5 hover:border-primary/30 transition-all duration-300 hover:shadow-lg dark:hover:shadow-primary/5 bg-gradient-to-br from-background to-primary/5">
                     <CardHeader>
@@ -384,7 +384,7 @@ export default function DashboardPage() {
 
               {/* START: Finances Card (Only Professional) */}
               {isProfessional && (
-                <ScrollReveal delay={0.55}>
+                <ScrollReveal delay={0.1} duration={0.4}>
                   <Link href="/dashboard/financeiro" className="block h-full group" id="quick-finances">
                     <Card className="h-full border-border hover:border-emerald-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                       <CardHeader>
@@ -408,7 +408,7 @@ export default function DashboardPage() {
               {/* END: Finances Card */}
 
               {/* START: Agenda Card */}
-              <ScrollReveal delay={0.65}>
+              <ScrollReveal delay={0.15} duration={0.4}>
                 <Link href="/dashboard/agenda" className="block h-full group" id="quick-agenda">
                   <Card className="h-full border-border hover:border-pink-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                     <CardHeader>
@@ -431,7 +431,7 @@ export default function DashboardPage() {
               {/* END: Agenda Card */}
 
               {/* START: Equipments Card */}
-              <ScrollReveal delay={0.6}>
+              <ScrollReveal delay={0.2} duration={0.4}>
                 <Link href="/dashboard/equipamentos" className="block h-full group" id="quick-equipments">
                   <Card className="h-full border-border hover:border-green-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                     <CardHeader>
@@ -454,7 +454,7 @@ export default function DashboardPage() {
               {/* END: Equipments Card */}
 
               {/* START: Requests Card */}
-              <ScrollReveal delay={0.7}>
+              <ScrollReveal delay={0.25} duration={0.4}>
                 <Link href="/dashboard/solicitacoes" className="block h-full group" id="quick-requests">
                   <Card className="h-full border-border hover:border-purple-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                     <CardHeader>
@@ -478,7 +478,7 @@ export default function DashboardPage() {
 
               {/* START: Portfolio Card (Only Professional) */}
               {isProfessional && (
-                <ScrollReveal delay={0.8}>
+                <ScrollReveal delay={0.3} duration={0.4}>
                   <Link href="/dashboard/portfolio" className="block h-full group" id="quick-portfolio">
                     <Card className="h-full border-border hover:border-blue-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                       <CardHeader>
@@ -503,7 +503,7 @@ export default function DashboardPage() {
 
               {/* START: Find Professionals (Only Client) */}
               {!isProfessional && (
-                <ScrollReveal delay={0.8}>
+                <ScrollReveal delay={0.3} duration={0.4}>
                   <Link href="/profissionais" className="block h-full group" id="quick-find-pros">
                     <Card className="h-full border-border hover:border-blue-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                       <CardHeader>
@@ -527,7 +527,7 @@ export default function DashboardPage() {
               {/* END: Find Professionals */}
 
               {/* START: Jobs Card */}
-              <ScrollReveal delay={0.9}>
+              <ScrollReveal delay={0.35} duration={0.4}>
                 <Link href="/dashboard/vagas" className="block h-full group" id="quick-jobs">
                   <Card className="h-full border-border hover:border-orange-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                     <CardHeader>
@@ -550,7 +550,7 @@ export default function DashboardPage() {
               {/* END: Jobs Card */}
 
               {/* START: My Applications Card */}
-              <ScrollReveal delay={1.0}>
+              <ScrollReveal delay={0.4} duration={0.4}>
                 <Link href="/dashboard/candidaturas" className="block h-full group" id="quick-applications">
                   <Card className="h-full border-border hover:border-cyan-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                     <CardHeader>
@@ -573,7 +573,7 @@ export default function DashboardPage() {
               {/* END: My Applications Card */}
 
               {/* START: Budget Calculator Card */}
-              <ScrollReveal delay={1.1}>
+              <ScrollReveal delay={0.45} duration={0.4}>
                 <Link href="/dashboard/calculadora-orcamento" className="block h-full group" id="quick-budget-calculator">
                   <Card className="h-full border-border hover:border-amber-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                     <CardHeader>
@@ -596,7 +596,7 @@ export default function DashboardPage() {
               {/* END: Budget Calculator Card */}
 
               {/* START: Contract Management Card */}
-              <ScrollReveal delay={1.2}>
+              <ScrollReveal delay={0.5} duration={0.4}>
                 <Link href="/dashboard/contratos" className="block h-full group" id="quick-contracts">
                   <Card className="h-full border-border hover:border-indigo-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                     <CardHeader>
@@ -619,7 +619,7 @@ export default function DashboardPage() {
               {/* END: Contract Management Card */}
 
               {/* START: Social Media Card */}
-              <ScrollReveal delay={1.3}>
+              <ScrollReveal delay={0.55} duration={0.4}>
                 <Link href="/dashboard/social-media" className="block h-full group" id="quick-social-media">
                   <Card className="h-full border-border hover:border-violet-500/50 transition-all duration-300 hover:shadow-lg bg-card">
                     <CardHeader>

@@ -13,7 +13,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, Settings, LogOut, LogIn, UserPlus, Briefcase, PlayCircle, MessageSquare, UserCircle, CreditCard } from "lucide-react";
+import { User, Settings, LogOut, LogIn, UserPlus, Briefcase, PlayCircle, MessageSquare, UserCircle, CreditCard, ShieldCheck } from "lucide-react";
+import { isPlatformAdmin } from "@/lib/admin-config";
 
 export function UserNav() {
   const { userProfile, signOut, loading } = useAuth();
@@ -186,6 +187,23 @@ export function UserNav() {
               <span>Minha Assinatura</span>
             </Link>
           </DropdownMenuItem>
+          {isPlatformAdmin(userProfile.email) && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                asChild
+                className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
+              >
+                <Link
+                  href="/dashboard/admin"
+                  className="flex items-center w-full text-foreground"
+                >
+                  <ShieldCheck className="mr-2 h-4 w-4 text-amber-500" />
+                  <span>Painel Admin</span>
+                </Link>
+              </DropdownMenuItem>
+            </>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="cursor-pointer hover:bg-accent hover:text-accent-foreground"

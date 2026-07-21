@@ -29,6 +29,7 @@ export interface UserProfile {
   cpf?: string;
   phone?: string;
   phoneCountryCode?: string;
+  whatsappNotifications?: boolean;
   city?: string;
   state?: string;
   specialties?: string[];

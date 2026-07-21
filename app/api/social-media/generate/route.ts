@@ -231,6 +231,8 @@ export async function POST(request: NextRequest) {
       description, objective, productsServices, differentials, avoidTopics, preferredCta,
       // Anamnese da conta (gerada por /account-analysis) e diagnóstico do relatório mensal
       instagramHandle, accountAnalysis, performanceInsights,
+      // Documento de marketing da marca (.md) enviado no briefing
+      brandContext,
     } = body;
 
     if (!clientName || !month || !year || !networks?.length) {
@@ -303,6 +305,23 @@ Use a anamnese assim: mantenha coerência com a identidade e o tom já existente
       ? `═══ DIAGNÓSTICO DE PERFORMANCE DO MÊS ANTERIOR (aplique estas diretrizes) ═══\n${String(performanceInsights).trim()}\n\n`
       : "";
 
+    // Documento de marketing da marca (.md) — truncado para caber no contexto do modelo
+    const MAX_BRAND_CONTEXT_CHARS = 20000;
+    let brandContextSection = "";
+    if (brandContext && String(brandContext).trim()) {
+      let doc = String(brandContext).trim();
+      if (doc.length > MAX_BRAND_CONTEXT_CHARS) {
+        doc = doc.slice(0, MAX_BRAND_CONTEXT_CHARS) + "\n[... documento truncado ...]";
+      }
+      brandContextSection = `═══ DOCUMENTO DE MARKETING DA MARCA (fornecido pelo cliente — trate como fonte de verdade) ═══
+Este documento contém a leitura de marketing completa da empresa (identidade, posicionamento, personas, linguagem, estratégia). Todo o cronograma deve estar alinhado a ele; em caso de conflito com informações genéricas, o documento prevalece.
+---
+${doc}
+---
+
+`;
+    }
+
     const systemPrompt = `Você é um social media strategist sênior, especialista em marketing digital para marcas brasileiras.
 Você domina planejamento editorial por pilares de conteúdo, copywriting de conversão (ganchos, storytelling, CTA) e as boas práticas de cada rede social.
 
@@ -318,7 +337,7 @@ REGRAS INEGOCIÁVEIS:
 ═══ CONTEXTO DO CLIENTE ═══
 ${clientSection}
 
-${analysisSection}${insightsSection}═══ CONFIGURAÇÃO DO CRONOGRAMA ═══
+${brandContextSection}${analysisSection}${insightsSection}═══ CONFIGURAÇÃO DO CRONOGRAMA ═══
 - Redes sociais (use APENAS estas): ${validNetworks.join(", ")}
 - Formatos PERMITIDOS (use APENAS estes): ${allowedTypesLabels}
 - Volume: gere EXATAMENTE ${totalPosts} posts (${frequency || 4} por semana), distribuídos uniformemente ${effectiveStartDay ? `do dia ${effectiveStartDay} ao dia ${daysInMonth}` : "ao longo do mês inteiro"}

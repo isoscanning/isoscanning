@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
@@ -17,12 +17,13 @@ import {
 } from "@/components/ui/select";
 import {
   ArrowLeft, ArrowRight, Sparkles, Loader2,
-  Instagram, Facebook, Youtube, Linkedin, Twitter, Music2, Check, CalendarClock, ChevronDown
+  Instagram, Facebook, Youtube, Linkedin, Twitter, Music2, Check, CalendarClock, ChevronDown,
+  FileText, Upload, X
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   NetworkType, PostType, MONTHS_PT, NETWORK_OPTIONS, TONE_OPTIONS, OBJECTIVE_OPTIONS,
-  SocialMediaPost, POST_TYPE_CONFIG, AccountAnalysis
+  SocialMediaPost, POST_TYPE_CONFIG, AccountAnalysis, SocialMediaSchedule, SmMonthlyReport
 } from "@/lib/social-media-types";
 import { HolidayPicker } from "@/components/social-media/holiday-picker";
 import { SelectedHoliday } from "@/lib/holidays-data";
@@ -56,10 +57,21 @@ const POST_TYPE_OPTIONS: { value: PostType; label: string; description: string }
   { value: "thread",     label: "Thread",         description: "Sequência de textos" },
 ];
 
-export default function NewSchedulePage() {
+function NewSchedulePageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { userProfile } = useAuth();
   const [step, setStep] = useState(0);
+
+  // Modo "novo mês": gera um cronograma de outro mês para uma conta existente,
+  // reaproveitando o briefing salvo (sem pedir nome/nicho de novo)
+  const extendScheduleId = searchParams.get("scheduleId");
+  const isExtendMode = !!extendScheduleId;
+  const [extendSchedule, setExtendSchedule] = useState<SocialMediaSchedule | null>(null);
+  const [loadingExtend, setLoadingExtend] = useState(isExtendMode);
+  // Último relatório mensal — permite gerar o novo mês aplicando o diagnóstico
+  const [latestReport, setLatestReport] = useState<SmMonthlyReport | null>(null);
+  const [applyReportInsights, setApplyReportInsights] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [generatedPosts, setGeneratedPosts] = useState<SocialMediaPost[]>([]);
@@ -69,6 +81,9 @@ export default function NewSchedulePage() {
   // Anamnese da conta via @ do Instagram (pesquisa web com IA)
   const [analyzing, setAnalyzing] = useState(false);
   const [accountAnalysis, setAccountAnalysis] = useState<AccountAnalysis | null>(null);
+  // Documento de marketing da marca (.md) — contexto aprofundado para a IA
+  const [brandContext, setBrandContext] = useState("");
+  const [brandContextFilename, setBrandContextFilename] = useState("");
 
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
@@ -97,6 +112,71 @@ export default function NewSchedulePage() {
 
   const isCurrentMonth = form.month === currentMonth && form.year === currentYear;
 
+  // Pré-carrega o briefing da conta existente no modo "novo mês"
+  useEffect(() => {
+    if (!extendScheduleId) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from("social_media_schedules")
+        .select("*")
+        .eq("id", extendScheduleId)
+        .single();
+
+      if (error || !data) {
+        console.error("extend load error:", error);
+        toast.error("Cronograma não encontrado");
+        router.push("/dashboard/social-media");
+        return;
+      }
+
+      const sched = data as SocialMediaSchedule;
+      setExtendSchedule(sched);
+
+      const qMonth = Number(searchParams.get("month"));
+      const qYear = Number(searchParams.get("year"));
+      setForm((p) => ({
+        ...p,
+        clientName: sched.client_name,
+        clientNiche: sched.client_niche || "",
+        instagramHandle: sched.account_handle || "",
+        description: sched.description || "",
+        objective: sched.objective || p.objective,
+        productsServices: sched.products_services || "",
+        differentials: sched.differentials || "",
+        avoidTopics: sched.avoid_topics || "",
+        preferredCta: sched.preferred_cta || "",
+        month: qMonth >= 1 && qMonth <= 12 ? qMonth : p.month,
+        year: qYear > 2000 ? qYear : p.year,
+        networks: (sched.networks || []) as NetworkType[],
+        frequency: sched.posting_frequency || p.frequency,
+        tone: sched.tone_of_voice || p.tone,
+        targetAudience: sched.target_audience || "",
+      }));
+      if (sched.account_analysis) {
+        setAccountAnalysis(sched.account_analysis as AccountAnalysis);
+      }
+      if (sched.brand_context) {
+        setBrandContext(sched.brand_context);
+        setBrandContextFilename(sched.brand_context_filename || "documento-da-marca.md");
+      }
+
+      // Relatório mais recente para oferecer o diagnóstico na geração
+      supabase
+        .from("sm_monthly_reports")
+        .select("*")
+        .eq("schedule_id", extendScheduleId)
+        .order("year", { ascending: false })
+        .order("month", { ascending: false })
+        .limit(1)
+        .then(({ data: reports }) =>
+          setLatestReport((reports?.[0] as SmMonthlyReport) ?? null)
+        );
+
+      setLoadingExtend(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extendScheduleId]);
+
   function toggleNetwork(net: NetworkType) {
     setForm((prev) => ({
       ...prev,
@@ -119,6 +199,34 @@ export default function NewSchedulePage() {
     if (step === 0) return form.clientName.trim().length > 0;
     if (step === 1) return form.networks.length > 0 && form.postTypes.length > 0;
     return true;
+  }
+
+  function handleBrandContextFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const name = file.name.toLowerCase();
+    if (!name.endsWith(".md") && !name.endsWith(".markdown") && !name.endsWith(".txt")) {
+      toast.error("Envie um arquivo Markdown (.md) ou texto (.txt)");
+      return;
+    }
+    if (file.size > 500 * 1024) {
+      toast.error("Arquivo muito grande — o limite é 500 KB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? "").trim();
+      if (!text) {
+        toast.error("O arquivo está vazio");
+        return;
+      }
+      setBrandContext(text);
+      setBrandContextFilename(file.name);
+      toast.success("Documento carregado! Ele será usado como contexto na geração do cronograma.");
+    };
+    reader.onerror = () => toast.error("Erro ao ler o arquivo");
+    reader.readAsText(file);
   }
 
   async function handleAnalyzeAccount() {
@@ -198,6 +306,15 @@ export default function NewSchedulePage() {
           extraContext: adjustInstructions.trim() || undefined,
           startDay: form.startFromToday && isCurrentMonth ? currentDay : undefined,
           holidays: form.holidays.length > 0 ? form.holidays : undefined,
+          brandContext: brandContext || undefined,
+          performanceInsights: isExtendMode && applyReportInsights && latestReport
+            ? [
+                latestReport.report?.next_month_strategy,
+                latestReport.report?.recommendations?.length
+                  ? `Recomendações do relatório: ${latestReport.report.recommendations.join(" | ")}`
+                  : null,
+              ].filter(Boolean).join("\n")
+            : undefined,
         }),
       });
 
@@ -224,6 +341,57 @@ export default function NewSchedulePage() {
     }
     setSaving(true);
     try {
+      // Modo "novo mês": insere os posts no cronograma existente (não cria conta
+      // nova nem conta no limite do plano) e sincroniza o briefing/configuração
+      if (isExtendMode && extendScheduleId) {
+        const { error: updErr } = await supabase
+          .from("social_media_schedules")
+          .update({
+            description: form.description || null,
+            objective: form.objective || null,
+            products_services: form.productsServices || null,
+            differentials: form.differentials || null,
+            avoid_topics: form.avoidTopics || null,
+            preferred_cta: form.preferredCta || null,
+            tone_of_voice: form.tone,
+            target_audience: form.targetAudience || null,
+            posting_frequency: form.frequency,
+            networks: form.networks,
+            account_handle: form.instagramHandle.replace(/^@/, "").trim() || null,
+            account_analysis: accountAnalysis || null,
+            brand_context: brandContext || null,
+            brand_context_filename: brandContext ? brandContextFilename || null : null,
+          })
+          .eq("id", extendScheduleId);
+        // Falha na sincronização do briefing não impede salvar os posts
+        if (updErr) console.error("extend briefing update error:", updErr);
+
+        const extendPosts = generatedPosts.map((post) => ({
+          schedule_id: extendScheduleId,
+          title: post.title,
+          post_type: post.post_type,
+          network: post.network,
+          scheduled_date: post.scheduled_date,
+          scheduled_time: post.scheduled_time || null,
+          status: "draft",
+          copy: post.copy || null,
+          hashtags: post.hashtags || [],
+          content_description: post.content_description || null,
+          ai_generated: true,
+          position_number: post.position_number || null,
+          created_by: userProfile.id,
+        }));
+
+        const { error: extendErr } = await supabase
+          .from("social_media_posts")
+          .insert(extendPosts);
+        if (extendErr) throw extendErr;
+
+        toast.success(`Cronograma de ${MONTHS_PT[form.month - 1]} ${form.year} salvo com sucesso!`);
+        router.push(`/dashboard/social-media/${extendScheduleId}`);
+        return;
+      }
+
       // Limite do plano: contas de social media (Free 1 | Pro 5 | Ultra ilimitado)
       const tier = (userProfile as any).subscriptionTier ?? "vip";
       const limit = SCHEDULE_LIMITS[tier] ?? null;
@@ -263,6 +431,8 @@ export default function NewSchedulePage() {
           preferred_cta: form.preferredCta || null,
           account_handle: form.instagramHandle.replace(/^@/, "").trim() || null,
           account_analysis: accountAnalysis || null,
+          brand_context: brandContext || null,
+          brand_context_filename: brandContext ? brandContextFilename || null : null,
           status: "active",
         })
         .select()
@@ -300,7 +470,7 @@ export default function NewSchedulePage() {
       console.error("handleSave error:", msg, err);
 
       if (err?.code === "42703" || msg?.includes("column")) {
-        toast.error("Banco desatualizado. Execute a migration 42-social-media-briefing-fields.sql no Supabase.");
+        toast.error("Banco desatualizado. Execute as migrations 42-social-media-briefing-fields.sql e 50-social-media-brand-context.sql no Supabase.");
       } else if (msg?.includes("does not exist") || msg?.includes("relation") || err?.code === "42P01") {
         toast.error("Tabela não encontrada. Execute o arquivo social_media_tables.sql no Supabase primeiro.");
       } else if (err?.code === "42501" || msg?.includes("policy")) {
@@ -316,7 +486,24 @@ export default function NewSchedulePage() {
   }
 
   const monthOptions = MONTHS_PT.map((m, i) => ({ value: i + 1, label: m }));
-  const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
+  const yearOptions = Array.from(
+    new Set([currentYear - 1, currentYear, currentYear + 1, form.year])
+  ).sort((a, b) => a - b);
+
+  if (loadingExtend) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background/50">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Carregando dados da conta...
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background/50">
@@ -326,14 +513,20 @@ export default function NewSchedulePage() {
 
           {/* Back + Title */}
           <div className="flex items-center gap-4">
-            <Link href="/dashboard/social-media">
+            <Link href={isExtendMode ? `/dashboard/social-media/${extendScheduleId}` : "/dashboard/social-media"}>
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             </Link>
             <div>
-              <h1 className="text-2xl font-bold">Novo Cronograma</h1>
-              <p className="text-sm text-muted-foreground">Gere um cronograma completo com IA</p>
+              <h1 className="text-2xl font-bold">
+                {isExtendMode ? `Novo mês — ${extendSchedule?.client_name ?? ""}` : "Novo Cronograma"}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {isExtendMode
+                  ? `Gere o cronograma de ${MONTHS_PT[form.month - 1]} ${form.year} reaproveitando o briefing da conta`
+                  : "Gere um cronograma completo com IA"}
+              </p>
             </div>
           </div>
 
@@ -364,27 +557,42 @@ export default function NewSchedulePage() {
             <Card>
               <CardHeader>
                 <CardTitle>Briefing do Cliente</CardTitle>
-                <CardDescription>Informe os dados básicos para personalizar o cronograma</CardDescription>
+                <CardDescription>
+                  {isExtendMode
+                    ? "Revise o briefing da conta — ele será usado na geração do novo mês"
+                    : "Informe os dados básicos para personalizar o cronograma"}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="clientName">Nome do Cliente / Marca *</Label>
-                  <Input
-                    id="clientName"
-                    placeholder="Ex: Academia Fitness Plus"
-                    value={form.clientName}
-                    onChange={(e) => setForm((p) => ({ ...p, clientName: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="clientNiche">Nicho / Segmento</Label>
-                  <Input
-                    id="clientNiche"
-                    placeholder="Ex: Academia e fitness, Restaurante, E-commerce de moda..."
-                    value={form.clientNiche}
-                    onChange={(e) => setForm((p) => ({ ...p, clientNiche: e.target.value }))}
-                  />
-                </div>
+                {isExtendMode ? (
+                  <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 flex items-center justify-between gap-3 text-sm">
+                    <span className="font-medium">{form.clientName}</span>
+                    {form.clientNiche && (
+                      <span className="text-xs text-muted-foreground">{form.clientNiche}</span>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="clientName">Nome do Cliente / Marca *</Label>
+                      <Input
+                        id="clientName"
+                        placeholder="Ex: Academia Fitness Plus"
+                        value={form.clientName}
+                        onChange={(e) => setForm((p) => ({ ...p, clientName: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="clientNiche">Nicho / Segmento</Label>
+                      <Input
+                        id="clientNiche"
+                        placeholder="Ex: Academia e fitness, Restaurante, E-commerce de moda..."
+                        value={form.clientNiche}
+                        onChange={(e) => setForm((p) => ({ ...p, clientNiche: e.target.value }))}
+                      />
+                    </div>
+                  </>
+                )}
                 {/* @ da conta + anamnese com IA */}
                 <div className="space-y-2">
                   <Label htmlFor="instagramHandle">@ da conta no Instagram</Label>
@@ -507,6 +715,61 @@ export default function NewSchedulePage() {
                     value={form.targetAudience}
                     onChange={(e) => setForm((p) => ({ ...p, targetAudience: e.target.value }))}
                   />
+                </div>
+
+                {/* Documento de marketing da marca (.md) — contexto aprofundado para a IA */}
+                <div className="space-y-2">
+                  <Label>
+                    Documento de marketing da marca{" "}
+                    <span className="text-muted-foreground font-normal">(.md — opcional)</span>
+                  </Label>
+                  {brandContext ? (
+                    <div className="flex items-center gap-3 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/20 px-4 py-3">
+                      <FileText className="h-5 w-5 text-emerald-600 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {brandContextFilename || "documento-da-marca.md"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {brandContext.length.toLocaleString("pt-BR")} caracteres — usado como contexto aprofundado na geração
+                        </p>
+                      </div>
+                      <label className="cursor-pointer text-xs font-medium text-blue-600 hover:underline shrink-0">
+                        Trocar
+                        <input
+                          type="file"
+                          accept=".md,.markdown,.txt"
+                          className="hidden"
+                          onChange={handleBrandContextFile}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => { setBrandContext(""); setBrandContextFilename(""); }}
+                        className="text-muted-foreground hover:text-red-500 transition-colors shrink-0"
+                        title="Remover documento"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex items-center gap-3 rounded-xl border-2 border-dashed border-border hover:border-blue-400 hover:bg-muted/30 transition-colors px-4 py-3.5 cursor-pointer">
+                      <Upload className="h-5 w-5 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">Anexar arquivo Markdown (.md)</p>
+                        <p className="text-xs text-muted-foreground leading-tight">
+                          Se o cliente tem um documento com a leitura de marketing da empresa (identidade, personas,
+                          posicionamento, linguagem), envie aqui — a IA usa como fonte de verdade da marca ao gerar os posts.
+                        </p>
+                      </div>
+                      <input
+                        type="file"
+                        accept=".md,.markdown,.txt"
+                        className="hidden"
+                        onChange={handleBrandContextFile}
+                      />
+                    </label>
+                  )}
                 </div>
 
                 {/* Briefing avançado (opcional) — quanto mais contexto, melhor o cronograma */}
@@ -789,6 +1052,33 @@ export default function NewSchedulePage() {
                   </div>
                 </div>
 
+                {/* Diagnóstico do último relatório mensal (modo novo mês) */}
+                {isExtendMode && latestReport && (
+                  <button
+                    type="button"
+                    onClick={() => setApplyReportInsights((v) => !v)}
+                    className={`w-full flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all ${
+                      applyReportInsights
+                        ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20"
+                        : "border-border hover:border-emerald-300"
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${
+                      applyReportInsights ? "border-emerald-500 bg-emerald-500" : "border-muted-foreground/40"
+                    }`}>
+                      {applyReportInsights && <Check className="h-3 w-3 text-white" />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className={`text-sm font-medium ${applyReportInsights ? "text-emerald-700 dark:text-emerald-300" : "text-foreground"}`}>
+                        Aplicar diagnóstico do relatório de {MONTHS_PT[latestReport.month - 1]} {latestReport.year}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                        {latestReport.report?.next_month_strategy || "A IA usará as recomendações do último relatório para otimizar este cronograma."}
+                      </p>
+                    </div>
+                  </button>
+                )}
+
                 {generatedPosts.length === 0 ? (
                   <div className="text-center py-8 space-y-4">
                     <div className="w-16 h-16 rounded-2xl bg-blue-100 dark:bg-blue-900/20 text-blue-500 flex items-center justify-center mx-auto">
@@ -920,5 +1210,13 @@ export default function NewSchedulePage() {
       </main>
       <Footer />
     </div>
+  );
+}
+
+export default function NewSchedulePage() {
+  return (
+    <Suspense fallback={null}>
+      <NewSchedulePageInner />
+    </Suspense>
   );
 }

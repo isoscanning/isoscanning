@@ -234,6 +234,14 @@ export default function AdminDashboardPage() {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => router.push("/dashboard/admin/whatsapp")}
+            >
+              <MessageSquare className="mr-2 h-4 w-4 text-green-500" />
+              WhatsApp
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => mutate()}
               disabled={isValidating}
             >

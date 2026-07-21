@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { notifySocialMediaPostStatus } from "@/lib/data-service";
 import {
   SocialMediaSchedule, SocialMediaPost, NetworkType, PostType, PostStatus,
-  POST_TYPE_CONFIG, MONTHS_PT, COMMEMORATIVE_DATES, SmMonthlyReport, InstagramConnection,
+  POST_TYPE_CONFIG, MONTHS_PT, COMMEMORATIVE_DATES, InstagramConnection,
   isPremiumSmTier
 } from "@/lib/social-media-types";
 
@@ -54,15 +54,6 @@ const POST_TYPE_OPTIONS: { value: PostType; label: string; description: string }
   { value: "shorts",     label: "Shorts",         description: "Vídeo curto YouTube" },
 ];
 
-const TONE_OPTIONS = [
-  "Profissional e formal",
-  "Descontraído e informal",
-  "Inspiracional e motivacional",
-  "Educativo e informativo",
-  "Divertido e criativo",
-  "Persuasivo e comercial",
-];
-
 const NETWORK_LABELS: Record<NetworkType, string> = {
   instagram: "Instagram",
   facebook: "Facebook",
@@ -79,13 +70,6 @@ function getCommemorativeDate(date: Date): string | undefined {
 
 function toDateStr(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-interface GenerateForm {
-  postTypes: PostType[];
-  frequency: number;
-  tone: string;
-  extraContext: string;
 }
 
 interface CreatePostForm {
@@ -122,19 +106,6 @@ export default function ScheduleCalendarPage() {
   // Delete state
   const [pendingDeletePost, setPendingDeletePost] = useState<SocialMediaPost | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  // Generate modal
-  const [showGenerateModal, setShowGenerateModal] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generateForm, setGenerateForm] = useState<GenerateForm>({
-    postTypes: ["feed_image", "reels", "carrossel", "story"],
-    frequency: 4,
-    tone: "",
-    extraContext: "",
-  });
-  // Último relatório mensal — permite gerar o próximo mês aplicando o diagnóstico
-  const [latestReport, setLatestReport] = useState<SmMonthlyReport | null>(null);
-  const [applyReportInsights, setApplyReportInsights] = useState(true);
 
   // Recursos Pro/Ultra (Relatório e Simulador de Feed) — plano do dono
   const [ownerPremium, setOwnerPremium] = useState<boolean | null>(null);
@@ -216,7 +187,11 @@ export default function ScheduleCalendarPage() {
         .then(({ data, error }) => {
           if (!error && data) setIgConnection(data as InstagramConnection);
         });
-      setViewMonth({ month: sched.month, year: sched.year });
+      // Abre sempre no mês atual, independente do mês principal do cronograma
+      const today = new Date();
+      const initialMonth = today.getMonth() + 1;
+      const initialYear = today.getFullYear();
+      setViewMonth({ month: initialMonth, year: initialYear });
 
       if (sched.owner_id === userProfile.id) {
         setUserRole("owner");
@@ -231,7 +206,7 @@ export default function ScheduleCalendarPage() {
         setUserRole(member?.role || "viewer");
       }
 
-      await fetchPosts(sched.month, sched.year);
+      await fetchPosts(initialMonth, initialYear);
     } catch (err) {
       console.error(err);
       toast.error("Erro ao carregar cronograma");
@@ -531,107 +506,13 @@ export default function ScheduleCalendarPage() {
     }
   }
 
-  function openGenerateModal() {
-    if (!schedule) return;
-    setGenerateForm({
-      postTypes: ["feed_image", "reels", "carrossel", "story"],
-      frequency: schedule.posting_frequency || 4,
-      tone: schedule.tone_of_voice || "",
-      extraContext: "",
-    });
-    // Busca o relatório mais recente para oferecer o diagnóstico na geração
-    supabase
-      .from("sm_monthly_reports")
-      .select("*")
-      .eq("schedule_id", scheduleId)
-      .order("year", { ascending: false })
-      .order("month", { ascending: false })
-      .limit(1)
-      .then(({ data }) => setLatestReport((data?.[0] as SmMonthlyReport) ?? null));
-    setShowGenerateModal(true);
-  }
-
-  function togglePostType(type: PostType) {
-    setGenerateForm((prev) => ({
-      ...prev,
-      postTypes: prev.postTypes.includes(type)
-        ? prev.postTypes.filter((t) => t !== type)
-        : [...prev.postTypes, type],
-    }));
-  }
-
-  async function handleGenerateForMonth() {
-    if (!schedule || !viewMonth || !userProfile) return;
-    if (generateForm.postTypes.length === 0) {
-      toast.error("Selecione ao menos um tipo de post");
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      const response = await fetch("/api/social-media/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
-        body: JSON.stringify({
-          clientName: schedule.client_name,
-          clientNiche: schedule.client_niche,
-          description: schedule.description || undefined,
-          objective: schedule.objective || undefined,
-          productsServices: schedule.products_services || undefined,
-          differentials: schedule.differentials || undefined,
-          avoidTopics: schedule.avoid_topics || undefined,
-          preferredCta: schedule.preferred_cta || undefined,
-          month: viewMonth.month,
-          year: viewMonth.year,
-          networks: schedule.networks,
-          postTypes: generateForm.postTypes,
-          frequency: generateForm.frequency,
-          tone: generateForm.tone || schedule.tone_of_voice,
-          targetAudience: schedule.target_audience,
-          extraContext: generateForm.extraContext || undefined,
-          instagramHandle: schedule.account_handle || undefined,
-          accountAnalysis: schedule.account_analysis || undefined,
-          performanceInsights: applyReportInsights && latestReport
-            ? [
-                latestReport.report?.next_month_strategy,
-                latestReport.report?.recommendations?.length
-                  ? `Recomendações do relatório: ${latestReport.report.recommendations.join(" | ")}`
-                  : null,
-              ].filter(Boolean).join("\n")
-            : undefined,
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => null);
-        throw new Error(err?.error || "Erro na geração");
-      }
-      const { posts: generatedPosts, error: apiError } = await response.json();
-      if (apiError) throw new Error(apiError);
-
-      const postsToInsert = generatedPosts.map((p: Record<string, unknown>) => ({
-        ...p,
-        schedule_id: scheduleId,
-        created_by: userProfile.id,
-        status: "draft",
-        hashtags: p.hashtags || [],
-      }));
-
-      const { error: insertErr } = await supabase
-        .from("social_media_posts")
-        .insert(postsToInsert);
-
-      if (insertErr) throw insertErr;
-
-      await fetchPosts(viewMonth.month, viewMonth.year);
-      setShowGenerateModal(false);
-      toast.success(`${generatedPosts.length} posts gerados para ${MONTHS_PT[viewMonth.month - 1]} ${viewMonth.year}!`);
-    } catch (err) {
-      console.error(err);
-      toast.error("Erro ao gerar cronograma. Tente novamente.");
-    } finally {
-      setIsGenerating(false);
-    }
+  // Gerar cronograma de um novo mês passa pelo mesmo fluxo detalhado da criação
+  // (briefing, feriados, configuração), reutilizando os dados da conta
+  function goToGenerateFlow() {
+    if (!viewMonth) return;
+    router.push(
+      `/dashboard/social-media/new?scheduleId=${scheduleId}&month=${viewMonth.month}&year=${viewMonth.year}`
+    );
   }
 
   // ── Drag & Drop ──────────────────────────────────────────────
@@ -987,7 +868,7 @@ export default function ScheduleCalendarPage() {
                   {/* Generate button shown when empty */}
                   {isEmptyMonth && canEdit && (
                     <Button
-                      onClick={openGenerateModal}
+                      onClick={goToGenerateFlow}
                       size="sm"
                       className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
                     >
@@ -1067,7 +948,7 @@ export default function ScheduleCalendarPage() {
                     </div>
                     {canEdit ? (
                       <Button
-                        onClick={openGenerateModal}
+                        onClick={goToGenerateFlow}
                         className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white"
                       >
                         <Sparkles className="h-4 w-4" />
@@ -1705,208 +1586,6 @@ export default function ScheduleCalendarPage() {
                   <Trash2 className="h-4 w-4" />
                 )}
                 Excluir
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Generate Modal */}
-      {showGenerateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => !isGenerating && setShowGenerateModal(false)}
-          />
-
-          {/* Dialog */}
-          <div className="relative bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-border sticky top-0 bg-card z-10">
-              <div>
-                <h2 className="font-bold text-lg">Gerar cronograma</h2>
-                <p className="text-sm text-muted-foreground">
-                  {monthName} {viewMonth.year} · {schedule.client_name}
-                </p>
-              </div>
-              <button
-                onClick={() => !isGenerating && setShowGenerateModal(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-lg hover:bg-muted"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="px-6 py-5 space-y-6">
-
-              {/* Read-only info */}
-              <div className="bg-muted/50 rounded-xl p-4 space-y-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Dados do cliente</p>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Cliente</p>
-                    <p className="font-medium">{schedule.client_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Nicho</p>
-                    <p className="font-medium">{schedule.client_niche || "—"}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-xs text-muted-foreground mb-1.5">Redes sociais</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {networks.map((net) => {
-                        const Icon = NETWORK_ICONS[net];
-                        return (
-                          <span
-                            key={net}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-background border border-border text-xs font-medium"
-                          >
-                            {Icon && <Icon className="h-3 w-3" />}
-                            {NETWORK_LABELS[net]}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Post types */}
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm font-semibold">Tipos de post</p>
-                  <p className="text-xs text-muted-foreground">Selecione os formatos que a IA vai gerar</p>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {POST_TYPE_OPTIONS.map((opt) => {
-                    const isSelected = generateForm.postTypes.includes(opt.value);
-                    const cfg = POST_TYPE_CONFIG[opt.value];
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => togglePostType(opt.value)}
-                        className={[
-                          "flex items-center gap-3 p-3 rounded-xl border text-left transition-all",
-                          isSelected
-                            ? "border-blue-500/60 bg-blue-500/10"
-                            : "border-border hover:border-muted-foreground/40 hover:bg-muted/40",
-                        ].join(" ")}
-                      >
-                        <div className={`w-3 h-3 rounded-sm shrink-0 ${cfg.bgColor}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium leading-none">{opt.label}</p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">{opt.description}</p>
-                        </div>
-                        {isSelected && (
-                          <Check className="h-4 w-4 text-blue-500 shrink-0" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Frequency + Tone */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold">Posts por semana</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={14}
-                    value={generateForm.frequency}
-                    onChange={(e) => setGenerateForm((prev) => ({ ...prev, frequency: Number(e.target.value) }))}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                  />
-                  <p className="text-[11px] text-muted-foreground">≈ {Math.round(generateForm.frequency * 4.3)} posts no mês</p>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold">Tom de voz</label>
-                  <select
-                    value={generateForm.tone}
-                    onChange={(e) => setGenerateForm((prev) => ({ ...prev, tone: e.target.value }))}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                  >
-                    <option value="">Mesmo do cronograma</option>
-                    {TONE_OPTIONS.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Extra context */}
-              <div className="space-y-2">
-                <label className="text-sm font-semibold">
-                  Instruções especiais para {monthName}
-                  <span className="text-muted-foreground font-normal ml-1">(opcional)</span>
-                </label>
-                <textarea
-                  value={generateForm.extraContext}
-                  onChange={(e) => setGenerateForm((prev) => ({ ...prev, extraContext: e.target.value }))}
-                  placeholder={`Ex: Temos lançamento de produto novo no dia 15. Focar em posts sobre Black Friday no final do mês. Evitar fins de semana.`}
-                  rows={3}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-none placeholder:text-muted-foreground/50"
-                />
-              </div>
-
-              {/* Diagnóstico do último relatório mensal */}
-              {latestReport && (
-                <button
-                  type="button"
-                  onClick={() => setApplyReportInsights((v) => !v)}
-                  className={`w-full flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all ${
-                    applyReportInsights
-                      ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20"
-                      : "border-border hover:border-emerald-300"
-                  }`}
-                >
-                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${
-                    applyReportInsights ? "border-emerald-500 bg-emerald-500" : "border-muted-foreground/40"
-                  }`}>
-                    {applyReportInsights && <Check className="h-3 w-3 text-white" />}
-                  </div>
-                  <div className="min-w-0">
-                    <p className={`text-sm font-medium ${applyReportInsights ? "text-emerald-700 dark:text-emerald-300" : "text-foreground"}`}>
-                      Aplicar diagnóstico do relatório de {MONTHS_PT[latestReport.month - 1]} {latestReport.year}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                      {latestReport.report?.next_month_strategy || "A IA usará as recomendações do último relatório para otimizar este cronograma."}
-                    </p>
-                  </div>
-                </button>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-border flex items-center justify-between gap-3 sticky bottom-0 bg-card">
-              <Button
-                variant="outline"
-                onClick={() => setShowGenerateModal(false)}
-                disabled={isGenerating}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleGenerateForMonth}
-                disabled={isGenerating || generateForm.postTypes.length === 0}
-                className="gap-2 bg-blue-600 hover:bg-blue-700 text-white flex-1 max-w-[220px]"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Gerando com IA...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    Gerar cronograma
-                  </>
-                )}
               </Button>
             </div>
           </div>

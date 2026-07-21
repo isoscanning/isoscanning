@@ -62,6 +62,9 @@ export interface SocialMediaSchedule {
   // Conta do Instagram + anamnese com IA
   account_handle?: string;
   account_analysis?: AccountAnalysis;
+  // Documento de marketing da marca (.md) usado na geração com IA (migration 50)
+  brand_context?: string | null;
+  brand_context_filename?: string | null;
   // Análise de concorrentes com IA (migration 48)
   competitor_analysis?: CompetitorAnalysis;
   status: ScheduleStatus;

@@ -52,6 +52,7 @@ import { PersonalDataForm } from "./components/personal-data-form"
 import { PortfolioGallery } from "./components/portfolio-gallery"
 import { AvailabilityManager } from "./components/availability-manager"
 import { NotificationPermissionCard } from "@/components/notification-permission-card"
+import { WhatsappOptinCard } from "@/components/whatsapp-optin-card"
 
 
 const ESTADOS = [
@@ -985,8 +986,9 @@ export default function PerfilPage() {
                 </div>
               </form>
 
-              <div className="mt-6">
+              <div className="mt-6 space-y-4">
                 <NotificationPermissionCard />
+                <WhatsappOptinCard />
               </div>
             </TabsContent>
 

@@ -86,7 +86,7 @@ const CARDS = [
     type: 'multi', 
     title: 'Em quais áreas você atua?', 
     text: 'Selecione uma ou mais opções.', 
-    options: ['Cinegrafista', 'Videomaker', 'Editor de Vídeos', 'Editor de Fotos', 'Fotógrafo', 'Fotógrafo de Eventos', 'Fotógrafo de Retrato', 'Fotógrafo de Produtos', 'Piloto de Drone', 'Piloto de Drone FPV', 'Social Media', 'Storymaker', 'Produtor Audiovisual'], 
+    options: ['Cinegrafista', 'Videomaker', 'Editor de Vídeos', 'Editor de Fotos', 'Fotógrafo', 'Fotógrafo de Eventos', 'Fotógrafo de Retrato', 'Fotógrafo de Produtos', 'Piloto de Drone', 'Piloto de Drone FPV', 'Social Media', 'Storymaker', 'Produtor Audiovisual', 'Designer Gráfico', 'Motion Designer', 'Web Designer', 'Programador', 'Ilustrador'],
     field: 'specialties' 
   },
   { 

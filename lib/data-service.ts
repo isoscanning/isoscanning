@@ -81,16 +81,24 @@ export interface Specialty {
 }
 
 export const DEFAULT_SPECIALTIES: Specialty[] = [
-  { id: "1", name: "Fotógrafo" },
-  { id: "2", name: "Videomaker" },
-  { id: "3", name: "Editor de Vídeo" },
-  { id: "4", name: "Editor de Fotos" },
-  { id: "5", name: "Produtor Audiovisual" },
-  { id: "6", name: "Drone Pilot" },
-  { id: "7", name: "Fotógrafo de Eventos" },
-  { id: "8", name: "Fotógrafo de Produtos" },
-  { id: "9", name: "Fotógrafo de Retratos" },
-  { id: "10", name: "Cinegrafista" },
+  { id: "1", name: "Cinegrafista" },
+  { id: "2", name: "Designer Gráfico" },
+  { id: "3", name: "Editor de Fotos" },
+  { id: "4", name: "Editor de Vídeos" },
+  { id: "5", name: "Fotógrafo" },
+  { id: "6", name: "Fotógrafo de Eventos" },
+  { id: "7", name: "Fotógrafo de Produtos" },
+  { id: "8", name: "Fotógrafo de Retratos" },
+  { id: "9", name: "Ilustrador" },
+  { id: "10", name: "Motion Designer" },
+  { id: "11", name: "Piloto de Drone" },
+  { id: "12", name: "Piloto de Drone FPV" },
+  { id: "13", name: "Produtor Audiovisual" },
+  { id: "14", name: "Programador" },
+  { id: "15", name: "Social Media" },
+  { id: "16", name: "Storymaker" },
+  { id: "17", name: "Videomaker" },
+  { id: "18", name: "Web Designer" },
 ];
 
 export interface CreateEquipmentData {

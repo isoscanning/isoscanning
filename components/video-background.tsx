@@ -69,7 +69,8 @@ export function VideoBackground({
 }
 
 // Animated gradient background
-interface GradientBackgroundProps {
+interface GradientBackgroundProps
+    extends React.HTMLAttributes<HTMLDivElement> {
     children?: React.ReactNode
     className?: string
     variant?: "subtle" | "vibrant" | "dark" | "blue"
@@ -79,6 +80,7 @@ export function GradientBackground({
     children,
     className = "",
     variant = "subtle",
+    ...rest
 }: GradientBackgroundProps) {
     const gradients = {
         subtle: `
@@ -104,7 +106,10 @@ export function GradientBackground({
     }
 
     return (
-        <div className={`relative overflow-hidden ${gradients[variant]} ${className}`}>
+        <div
+            {...rest}
+            className={`relative overflow-hidden ${gradients[variant]} ${className}`}
+        >
             {/* Animated gradient orbs */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div

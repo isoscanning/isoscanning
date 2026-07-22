@@ -8,102 +8,103 @@ import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import { AuthAwareLink } from "@/components/auth-aware-link";
 import { Search, Calendar, Package, Users, Star, Zap, Shield, ArrowRight, CheckCircle2, Play, Camera, Video, Image as ImageIcon, SearchX, TrendingDown, Clock, DollarSign, AlertCircle } from "lucide-react";
-import { ParticleBackground } from "@/components/particle-background";
+import { FieldSceneLazy } from "@/components/three/field-scene-lazy";
 import { ScrollReveal, StaggerReveal } from "@/components/scroll-reveal";
 import { TypingText, CountUp, GlowText } from "@/components/typing-text";
-import { GradientBackground, FloatingParticles } from "@/components/video-background";
+import { FloatingParticles } from "@/components/video-background";
+import { HeroScene } from "@/components/gsap/hero-scene";
+import { GlowTitles } from "@/components/gsap/glow-titles";
+import { SectionEffects } from "@/components/gsap/section-effects";
+import { PuzzleBackground } from "@/components/gsap/puzzle-background";
+import { StepsPath } from "@/components/gsap/steps-path";
 import { motion } from "framer-motion";
 
 export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      {/* Campo de partículas único, fixo atrás de tudo. As seções opacas o
+          escondem e as transparentes o revelam — é isso que cria o ritmo. */}
+      <FieldSceneLazy />
+      <GlowTitles />
+      <SectionEffects />
+
       <Header />
 
-      <main className="flex-1">
+      <main className="flex-1 relative z-10">
         {/* ===== HERO SECTION ===== */}
-        <section className="relative min-h-[100vh] flex items-center justify-center py-20 md:py-0 overflow-hidden">
-          <ParticleBackground />
-
+        <HeroScene data-field-mode="0" className="relative min-h-[100vh] flex items-center justify-center py-20 md:py-0 overflow-hidden">
           {/* Gradient orbs for visual interest */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/20 dark:bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
-            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/20 dark:bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
+            <div data-parallax="0.35" className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/20 dark:bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
+            <div data-parallax="0.6" className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/20 dark:bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
           </div>
 
-          <div className="container mx-auto px-4 relative z-10">
+          <div data-parallax="0.12" className="container mx-auto px-4 relative z-10">
             <div className="max-w-5xl mx-auto text-center space-y-8">
-              <ScrollReveal delay={0.2}>
+              <div data-hero-item>
                 <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 dark:bg-primary/20 text-primary text-sm font-medium mb-4">
                   <Zap className="h-4 w-4" />
                   A plataforma que conecta talentos
                 </span>
-              </ScrollReveal>
+              </div>
 
-              <ScrollReveal delay={0.4}>
-                <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-tight">
-                  <span className="text-foreground">Onde a </span>
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 dark:from-blue-400 dark:via-indigo-400 dark:to-cyan-400">
-                    criatividade
-                  </span>
-                  <br className="hidden sm:block" />
-                  <span className="text-foreground"> encontra </span>
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-cyan-600 dark:from-indigo-400 dark:to-cyan-400">
-                    oportunidade
-                  </span>
-                </h1>
-              </ScrollReveal>
+              <h1 data-hero-heading data-glow="1.2" className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-tight">
+                <span className="text-foreground">Onde a </span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 dark:from-blue-400 dark:via-indigo-400 dark:to-cyan-400">
+                  criatividade
+                </span>
+                <br className="hidden sm:block" />
+                <span className="text-foreground"> encontra </span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-cyan-600 dark:from-indigo-400 dark:to-cyan-400">
+                  oportunidade
+                </span>
+              </h1>
 
-              <ScrollReveal delay={0.6}>
-                <p className="text-lg sm:text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto font-light leading-relaxed">
-                  Conectamos fotógrafos, videomakers e editores aos melhores projetos.
-                  <br className="hidden md:block" />
-                  <span className="font-medium text-foreground">
-                    Sua próxima grande oportunidade começa aqui.
-                  </span>
-                </p>
-              </ScrollReveal>
+              <p data-hero-item className="text-lg sm:text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto font-light leading-relaxed">
+                Conectamos fotógrafos, videomakers e editores aos melhores projetos.
+                <br className="hidden md:block" />
+                <span className="font-medium text-foreground">
+                  Sua próxima grande oportunidade começa aqui.
+                </span>
+              </p>
 
-              <ScrollReveal delay={0.8}>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-                  <AuthAwareLink href="/cadastro">
-                    <Button
-                      size="lg"
-                      className="w-full sm:w-auto h-14 px-8 text-lg rounded-full shadow-lg hover:shadow-xl hover:shadow-primary/25 transition-all duration-300 group"
-                    >
-                      Começar Gratuitamente
-                      <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                    </Button>
-                  </AuthAwareLink>
-                  <Link href="/profissionais">
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      className="w-full sm:w-auto h-14 px-8 text-lg rounded-full bg-background/50 backdrop-blur-sm border-2 hover:bg-background/80 transition-all duration-300"
-                    >
-                      <Search className="mr-2 h-5 w-5" />
-                      Explorar Profissionais
-                    </Button>
-                  </Link>
-                </div>
-              </ScrollReveal>
+              <div data-hero-item className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+                <AuthAwareLink href="/cadastro">
+                  <Button
+                    size="lg"
+                    className="w-full sm:w-auto h-14 px-8 text-lg rounded-full shadow-lg hover:shadow-xl hover:shadow-primary/25 transition-all duration-300 group"
+                  >
+                    Começar Gratuitamente
+                    <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </AuthAwareLink>
+                <Link href="/profissionais">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="w-full sm:w-auto h-14 px-8 text-lg rounded-full bg-background/50 backdrop-blur-sm border-2 hover:bg-background/80 transition-all duration-300"
+                  >
+                    <Search className="mr-2 h-5 w-5" />
+                    Explorar Profissionais
+                  </Button>
+                </Link>
+              </div>
 
               {/* Quick stats */}
-              <ScrollReveal delay={1.0}>
-                <div className="flex flex-wrap justify-center gap-8 pt-8 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    <span>100% Gratuito</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-blue-500" />
-                    <span>Perfis Verificados</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Star className="h-4 w-4 text-yellow-500" />
-                    <span>Avaliações Reais</span>
-                  </div>
+              <div data-hero-item className="flex flex-wrap justify-center gap-8 pt-8 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <span>100% Gratuito</span>
                 </div>
-              </ScrollReveal>
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-blue-500" />
+                  <span>Perfis Verificados</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Star className="h-4 w-4 text-yellow-500" />
+                  <span>Avaliações Reais</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -117,14 +118,14 @@ export default function HomePage() {
               <div className="w-1 h-2 bg-muted-foreground/50 rounded-full" />
             </div>
           </motion.div>
-        </section>
+        </HeroScene>
 
         {/* ===== PROBLEM/SOLUTION SECTION ===== */}
-        <section className="py-20 md:py-32 bg-muted/30 dark:bg-muted/10">
+        <section data-field-off data-field-mode="1" className="py-20 md:py-32 bg-muted/30 dark:bg-muted/10">
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto text-center space-y-12">
               <ScrollReveal>
-                <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight">
+                <h2 data-glow data-typed className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight">
                   <span className="text-muted-foreground">Cansado de </span>
                   <span className="text-foreground">perder oportunidades</span>
                   <span className="text-muted-foreground">?</span>
@@ -143,7 +144,7 @@ export default function HomePage() {
                   <Card className="border-2 border-dashed border-muted-foreground/20 bg-transparent">
                     <CardContent className="pt-6 text-center space-y-3">
                       <div className="h-16 w-16 mx-auto rounded-full bg-muted flex items-center justify-center mb-4">
-                        <SearchX className="h-8 w-8 text-muted-foreground" />
+                        <SearchX data-icon-anim="search" className="h-8 w-8 text-muted-foreground" />
                       </div>
                       <p className="text-muted-foreground">
                         Buscas intermináveis por profissionais qualificados
@@ -156,7 +157,7 @@ export default function HomePage() {
                   <Card className="border-2 border-dashed border-muted-foreground/20 bg-transparent">
                     <CardContent className="pt-6 text-center space-y-3">
                       <div className="h-16 w-16 mx-auto rounded-full bg-muted flex items-center justify-center mb-4">
-                        <TrendingDown className="h-8 w-8 text-muted-foreground" />
+                        <TrendingDown data-icon-anim="trend" className="h-8 w-8 text-muted-foreground" />
                       </div>
                       <p className="text-muted-foreground">
                         Talento incrível sem visibilidade no mercado
@@ -169,7 +170,7 @@ export default function HomePage() {
                   <Card className="border-2 border-dashed border-muted-foreground/20 bg-transparent">
                     <CardContent className="pt-6 text-center space-y-3">
                       <div className="h-16 w-16 mx-auto rounded-full bg-muted flex items-center justify-center mb-4">
-                        <Clock className="h-8 w-8 text-muted-foreground" />
+                        <Clock data-icon-anim="clock" className="h-8 w-8 text-muted-foreground" />
                       </div>
                       <p className="text-muted-foreground">
                         Tempo perdido com contatos que não dão retorno
@@ -191,14 +192,14 @@ export default function HomePage() {
         </section>
 
         {/* ===== FEATURES SECTION ===== */}
-        <section className="py-20 md:py-32">
+        <section data-field-mode="2" className="py-20 md:py-32">
           <div className="container mx-auto px-4">
             <ScrollReveal>
               <div className="text-center mb-16">
                 <span className="text-primary font-semibold text-sm uppercase tracking-wider">
                   Nossos Serviços
                 </span>
-                <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mt-4 mb-6">
+                <h2 data-glow className="text-3xl sm:text-4xl md:text-5xl font-bold mt-4 mb-6">
                   Tudo que você precisa.{" "}
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400">
                     Em um só lugar.
@@ -281,7 +282,7 @@ export default function HomePage() {
         </section>
 
         {/* ===== FINANCIAL MANAGEMENT SECTION ===== */}
-        <section className="py-20 md:py-32 bg-background border-t border-b border-muted">
+        <section data-field-off data-field-mode="2" className="py-20 md:py-32 bg-background border-t border-b border-muted">
           <div className="container mx-auto px-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center max-w-6xl mx-auto">
               {/* Text Side */}
@@ -291,7 +292,7 @@ export default function HomePage() {
                     <DollarSign className="h-4 w-4" />
                     Nova Funcionalidade
                   </span>
-                  <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight">
+                  <h2 data-glow className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight">
                     Gestão Financeira{" "}
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500">
                       na palma da mão.
@@ -330,7 +331,7 @@ export default function HomePage() {
 
               {/* Mockup Side */}
               <ScrollReveal direction="right" delay={0.2}>
-                <div className="relative rounded-2xl border border-muted-foreground/20 bg-card shadow-2xl overflow-hidden p-6 lg:p-8 transform rotate-1 hover:rotate-0 transition-transform duration-500">
+                <div data-count-scope className="relative rounded-2xl border border-muted-foreground/20 bg-card shadow-2xl overflow-hidden p-6 lg:p-8 transform rotate-1 hover:rotate-0 transition-transform duration-500">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-3xl rounded-full" />
                   <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-teal-500/5 blur-3xl rounded-full" />
                   
@@ -350,11 +351,11 @@ export default function HomePage() {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="bg-background/80 backdrop-blur rounded-xl p-4 border border-emerald-500/10 shadow-sm">
                             <p className="text-xs font-medium text-emerald-400 mb-1">Receita no Mês</p>
-                            <h4 className="text-2xl font-bold tracking-tight">R$ 5.320,00</h4>
+                            <h4 data-count="5320" className="text-2xl font-bold tracking-tight tabular-nums">R$ 5.320,00</h4>
                         </div>
                         <div className="bg-background/80 backdrop-blur rounded-xl p-4 border border-amber-500/10 shadow-sm">
                             <p className="text-xs font-medium text-amber-500 mb-1">A Receber</p>
-                            <h4 className="text-2xl font-bold tracking-tight">R$ 1.550,00</h4>
+                            <h4 data-count="1550" className="text-2xl font-bold tracking-tight tabular-nums">R$ 1.550,00</h4>
                         </div>
                     </div>
                     
@@ -367,15 +368,15 @@ export default function HomePage() {
                                     <AlertCircle className="h-3 w-3" />
                                     Saldo Restante Teto MEI
                                 </p>
-                                <h4 className="text-2xl font-bold text-white tracking-tight">R$ 68.450,00</h4>
+                                <h4 data-count="68450" className="text-2xl font-bold text-white tracking-tight tabular-nums">R$ 68.450,00</h4>
                             </div>
                             <div className="text-right">
                                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Teto Anual</p>
-                                <p className="text-sm font-semibold text-white/90">R$ 81.000</p>
+                                <p data-count="81000" data-count-decimals="0" className="text-sm font-semibold text-white/90 tabular-nums">R$ 81.000</p>
                             </div>
                         </div>
                         <div className="relative z-10 w-full bg-black/60 rounded-full h-2 mt-5 overflow-hidden shadow-inner border border-white/5">
-                            <div className="bg-gradient-to-r from-teal-500 to-emerald-400 h-full rounded-full w-[15%] relative">
+                            <div className="bg-gradient-to-r from-teal-500 to-emerald-400 h-full rounded-full w-[15%] relative" data-bar="15">
                                 <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
                             </div>
                         </div>
@@ -388,8 +389,8 @@ export default function HomePage() {
                             <span>Valor</span>
                         </div>
                         {[
-                            { title: 'Casamento Cliente VIP', status: 'Recebido', val: 'R$ 2.500,00', color: 'emerald' },
-                            { title: 'Ensaio Externo Corporativo', status: 'Pendente', val: 'R$ 850,00', color: 'amber' },
+                            { title: 'Casamento Cliente VIP', status: 'Recebido', val: 'R$ 2.500,00', amount: 2500, color: 'emerald' },
+                            { title: 'Ensaio Externo Corporativo', status: 'Pendente', val: 'R$ 850,00', amount: 850, color: 'amber' },
                         ].map((item, i) => (
                             <div key={i} className="flex justify-between items-center bg-muted/40 rounded-xl p-3 border border-transparent hover:border-muted transition-colors shadow-sm">
                                 <div className="flex items-center gap-3.5">
@@ -401,7 +402,7 @@ export default function HomePage() {
                                         <p className={`text-[10px] font-medium text-${item.color}-500 uppercase tracking-wider mt-0.5`}>{item.status}</p>
                                     </div>
                                 </div>
-                                <span className="text-sm font-bold tracking-tight">{item.val}</span>
+                                <span data-count={item.amount} className="text-sm font-bold tracking-tight tabular-nums">{item.val}</span>
                             </div>
                         ))}
                     </div>
@@ -413,8 +414,7 @@ export default function HomePage() {
         </section>
 
         {/* ===== FOR PROFESSIONALS SECTION ===== */}
-        <GradientBackground variant="vibrant" className="py-20 md:py-32">
-          <FloatingParticles count={15} />
+        <PuzzleBackground data-field-off data-field-mode="2" className="py-20 md:py-32">
           <div className="container mx-auto px-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center max-w-6xl mx-auto">
               <ScrollReveal direction="left">
@@ -422,7 +422,7 @@ export default function HomePage() {
                   <span className="text-primary font-semibold text-sm uppercase tracking-wider">
                     Para Profissionais
                   </span>
-                  <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight">
+                  <h2 data-glow className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight">
                     Mostre seu talento.{" "}
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-cyan-600 dark:from-indigo-400 dark:to-cyan-400">
                       Conquiste clientes.
@@ -539,58 +539,37 @@ export default function HomePage() {
               </ScrollReveal>
             </div>
           </div>
-        </GradientBackground>
+        </PuzzleBackground>
 
         {/* ===== HOW IT WORKS ===== */}
-        <section className="py-20 md:py-32 bg-muted/30 dark:bg-muted/10">
+        <section data-field-off data-field-mode="3" className="py-20 md:py-32 bg-muted/30 dark:bg-muted/10">
           <div className="container mx-auto px-4">
             <ScrollReveal>
               <div className="text-center mb-16">
                 <span className="text-primary font-semibold text-sm uppercase tracking-wider">
                   Simples e Rápido
                 </span>
-                <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mt-4">
+                <h2 data-glow className="text-3xl sm:text-4xl md:text-5xl font-bold mt-4">
                   Como Funciona
                 </h2>
               </div>
             </ScrollReveal>
 
             <div className="max-w-5xl mx-auto">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                {[
+              <StepsPath
+                steps={[
                   { step: 1, title: "Busque", desc: "Encontre profissionais ou equipamentos usando filtros avançados", icon: Search },
                   { step: 2, title: "Compare", desc: "Veja portfólios, avaliações e disponibilidade em tempo real", icon: Star },
                   { step: 3, title: "Conecte", desc: "Entre em contato diretamente e solicite orçamentos", icon: Users },
                   { step: 4, title: "Contrate", desc: "Agende o serviço e avalie sua experiência", icon: CheckCircle2 },
-                ].map((item, i) => (
-                  <ScrollReveal key={item.step} delay={i * 0.15}>
-                    <div className="relative text-center group">
-                      {/* Connector line */}
-                      {i < 3 && (
-                        <div className="hidden md:block absolute top-10 left-[60%] w-full h-0.5 bg-gradient-to-r from-primary/50 to-primary/10" />
-                      )}
-
-                      <div className="relative z-10">
-                        <div className="h-20 w-20 mx-auto rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/25 group-hover:scale-110 transition-transform duration-300">
-                          <item.icon className="h-10 w-10 text-primary-foreground" />
-                        </div>
-                        <div className="absolute -top-2 -right-2 h-8 w-8 rounded-full bg-background border-2 border-primary flex items-center justify-center font-bold text-primary">
-                          {item.step}
-                        </div>
-                      </div>
-
-                      <h3 className="text-xl font-bold mt-6 mb-2">{item.title}</h3>
-                      <p className="text-muted-foreground text-sm leading-relaxed">{item.desc}</p>
-                    </div>
-                  </ScrollReveal>
-                ))}
-              </div>
+                ]}
+              />
             </div>
           </div>
         </section>
 
         {/* ===== LAUNCH CTA SECTION ===== */}
-        <section className="py-20 md:py-24 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 dark:from-blue-700 dark:via-indigo-700 dark:to-cyan-700 relative overflow-hidden">
+        <section data-field-mode="3" className="py-20 md:py-24 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 dark:from-blue-700 dark:via-indigo-700 dark:to-cyan-700 relative overflow-hidden">
           <div className="absolute inset-0 bg-white/5 mix-blend-overlay"></div>
           <div className="container mx-auto px-4 relative z-10">
             <div className="max-w-4xl mx-auto text-center text-white space-y-8">
@@ -599,7 +578,7 @@ export default function HomePage() {
                   <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                   Oferta de Lançamento
                 </div>
-                <h2 className="text-3xl md:text-5xl font-bold leading-tight">
+                <h2 data-glow className="text-3xl md:text-5xl font-bold leading-tight">
                   A Revolução do Audiovisual Começou
                 </h2>
               </ScrollReveal>
@@ -631,14 +610,14 @@ export default function HomePage() {
         </section>
 
         {/* ===== TESTIMONIALS ===== */}
-        <section className="py-20 md:py-32">
+        <section data-field-off data-field-mode="3" className="py-20 md:py-32">
           <div className="container mx-auto px-4">
             <ScrollReveal>
               <div className="text-center mb-16">
                 <span className="text-primary font-semibold text-sm uppercase tracking-wider">
                   Depoimentos
                 </span>
-                <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mt-4">
+                <h2 data-glow className="text-3xl sm:text-4xl md:text-5xl font-bold mt-4">
                   O que dizem sobre nós
                 </h2>
               </div>
@@ -698,7 +677,7 @@ export default function HomePage() {
         </section>
 
         {/* ===== FINAL CTA ===== */}
-        <section className="py-24 md:py-32 relative overflow-hidden bg-slate-950">
+        <section data-field-mode="4" className="py-24 md:py-32 relative overflow-hidden bg-slate-950/85">
           <FloatingParticles count={15} />
           
           <div className="absolute inset-0 overflow-hidden pointer-events-none flex justify-center items-center">
@@ -708,7 +687,7 @@ export default function HomePage() {
           <div className="container mx-auto px-4 relative z-10 flex-1 flex flex-col justify-center">
             <div className="max-w-4xl mx-auto text-center text-white space-y-8">
               <ScrollReveal>
-                <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-tight tracking-tight">
+                <h2 data-glow className="text-4xl sm:text-5xl md:text-6xl font-bold leading-tight tracking-tight">
                   Pronto para transformar{" "}
                   <br className="hidden sm:block" />
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-cyan-400">

@@ -222,3 +222,96 @@
     touch-action: manipulation;
   }
 }
+/* ── GSAP ────────────────────────────────────────────────────────────
+   Elementos animados pelo GSAP começam invisíveis para não piscarem
+   entre o HTML do servidor e a hidratação. O próprio GSAP os revela.
+   Se o usuário pediu menos movimento, nada é escondido — a animação
+   também não roda (ver components/gsap/hero-scene.tsx). */
+[data-hero-heading],
+[data-hero-item],
+[data-step],
+[data-steps-line] {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-hero-heading],
+  [data-hero-item],
+  [data-step],
+  [data-steps-line] {
+    opacity: 1;
+  }
+}
+
+/* Títulos que acendem no hover. O GSAP anima só a custom property --glow;
+   as sombras são derivadas dela, então uma única tween controla brilho e
+   difusão ao mesmo tempo.
+
+   É text-shadow, e não filter: drop-shadow, por um motivo medido: o filtro
+   obriga o compositor a rasterizar a caixa inteira do título com desfoque a
+   cada quadro, e isso derrubou a página de 58 para 21 FPS. O text-shadow
+   desenha a partir da geometria do glifo e sai bem mais barato — inclusive
+   nos trechos com bg-clip-text, onde o texto é transparente. */
+[data-glow] {
+  --glow: 0;
+  text-shadow:
+    0 0 calc(var(--glow) * 18px) rgb(99 102 241 / calc(var(--glow) * 0.55)),
+    0 0 calc(var(--glow) * 6px) rgb(56 189 248 / calc(var(--glow) * 0.4));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-glow] {
+    text-shadow: none;
+  }
+}
+
+/* Título digitado. Os caracteres já ocupam o espaço final desde o começo —
+   ficam apenas invisíveis — então nada reflui enquanto o texto é escrito.
+   Antes do SplitText rodar o título fica oculto, senão ele apareceria
+   inteiro por um quadro e depois seria apagado para ser digitado. */
+[data-typed]:not(.typed-ready):not(.typed-done) {
+  visibility: hidden;
+}
+
+[data-typed] .typed-char {
+  visibility: hidden;
+  position: relative;
+}
+
+[data-typed] .typed-char.is-on {
+  visibility: visible;
+}
+
+/* O cursor é um pseudo-elemento no caractere recém-escrito, então ele
+   acompanha a digitação sem precisar de nenhum nó extra no DOM. */
+[data-typed] .typed-char.is-caret::after {
+  content: "";
+  position: absolute;
+  right: -0.09em;
+  top: 0.1em;
+  bottom: 0.12em;
+  width: 0.055em;
+  background: currentColor;
+  animation: typed-caret-blink 0.9s steps(1, end) infinite;
+}
+
+@keyframes typed-caret-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-typed] .typed-char {
+    visibility: visible;
+  }
+
+  [data-typed] .typed-char.is-caret::after {
+    display: none;
+  }
+}

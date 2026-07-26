@@ -22,8 +22,12 @@ import {
   BriefingSubitem,
   GeneratedBriefingStructure,
   GeneratedSection,
+  MemberRole,
+  PublicBriefingView,
   RefineMode,
 } from "./briefing-pro-types";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
 export interface CreateBriefingPayload {
   title: string;
@@ -98,6 +102,40 @@ export const briefingProService = {
 
   async confirmRead(id: string): Promise<BriefingReadConfirmation> {
     const { data } = await apiClient.post(`/briefing-pro/${id}/confirm-read`);
+    return data;
+  },
+
+  // ─── Compartilhamento por link ────────────────────────────────────────────
+
+  /** Ativa/atualiza o link público (só o dono). */
+  async enableShare(
+    briefingId: string,
+    role: MemberRole,
+    regenerate?: boolean
+  ): Promise<{ share_token: string; share_role: MemberRole }> {
+    const { data } = await apiClient.post(`/briefing-pro/${briefingId}/share`, {
+      role,
+      ...(regenerate ? { regenerate: true } : {}),
+    });
+    return data;
+  },
+
+  async disableShare(briefingId: string): Promise<void> {
+    await apiClient.delete(`/briefing-pro/${briefingId}/share`);
+  },
+
+  /** Visão pública do briefing — SEM autenticação (fetch direto, sem apiClient). */
+  async fetchPublicBriefing(token: string): Promise<PublicBriefingView> {
+    const response = await fetch(`${API_URL}/briefing-pro/public/${token}`);
+    if (!response.ok) {
+      throw new Error(response.status === 404 ? "Link inválido ou desativado" : "Erro ao carregar");
+    }
+    return response.json();
+  },
+
+  /** Entra no briefing pelo link (usuário autenticado). */
+  async joinShared(token: string): Promise<{ briefing_id: string; role: string }> {
+    const { data } = await apiClient.post(`/briefing-pro/join/${token}`);
     return data;
   },
 

@@ -43,7 +43,7 @@ import {
   Package, MapPin, Phone, PlayCircle, CheckCircle2, Clock,
   ShieldCheck, Loader2, Search, X, ExternalLink, HardDrive,
   MessageSquare, Send, Sparkles, Eye, Lock, CornerDownRight,
-  GripVertical, Timer, Printer,
+  GripVertical, Timer, Printer, Share2, Link2 as LinkIcon, RefreshCw, Copy,
 } from "lucide-react";
 import { BriefingTimeShiftDialog } from "@/components/briefing-time-shift-dialog";
 import { BriefingIncidentsCard } from "@/components/briefing-incidents-card";
@@ -243,6 +243,7 @@ export default function BriefingDetailPage() {
   const [contactsDialog, setContactsDialog] = useState(false);
   const [locationsDialog, setLocationsDialog] = useState(false);
   const [timeShiftOpen, setTimeShiftOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const dndSensors = useSensors(
@@ -431,6 +432,21 @@ export default function BriefingDetailPage() {
             Briefings
           </Button>
           <div className="flex gap-2">
+            {isOwner && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                title="Compartilhar por link — consulta sem conta; participação com conta"
+                onClick={() => setShareOpen(true)}
+              >
+                <Share2 className="h-4 w-4" />
+                Compartilhar
+                {briefing.share_token && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" title="Link ativo" />
+                )}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -1221,6 +1237,14 @@ export default function BriefingDetailPage() {
         />
       )}
 
+      {shareOpen && (
+        <ShareBriefingDialog
+          briefing={briefing}
+          onClose={() => setShareOpen(false)}
+          onChanged={refresh}
+        />
+      )}
+
       {timeShiftOpen && (
         <BriefingTimeShiftDialog
           briefingId={briefingId}
@@ -1707,6 +1731,160 @@ function SectionDialog({
             {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             Salvar
           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Dialog: compartilhar por link ───────────────────────────────────────────
+
+function ShareBriefingDialog({
+  briefing, onClose, onChanged,
+}: {
+  briefing: BriefingDetail["briefing"];
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [role, setRole] = useState<string>(briefing.share_role ?? "viewer");
+  const [token, setToken] = useState<string | null>(briefing.share_token);
+  const [busy, setBusy] = useState(false);
+
+  const shareUrl = token && typeof window !== "undefined"
+    ? `${window.location.origin}/briefing/${token}`
+    : null;
+
+  async function enable(regenerate = false) {
+    setBusy(true);
+    try {
+      const result = await briefingProService.enableShare(
+        briefing.id,
+        role as "viewer" | "editor",
+        regenerate
+      );
+      setToken(result.share_token);
+      toast.success(regenerate ? "Novo link gerado — o anterior foi invalidado" : "Link ativado!");
+      onChanged();
+    } catch {
+      toast.error("Erro ao ativar o link");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function disable() {
+    setBusy(true);
+    try {
+      await briefingProService.disableShare(briefing.id);
+      setToken(null);
+      toast.success("Link desativado — quem tem o link perde o acesso");
+      onChanged();
+    } catch {
+      toast.error("Erro ao desativar o link");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copyLink() {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success("Link copiado!");
+    } catch {
+      toast.error("Não foi possível copiar — selecione e copie manualmente");
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Share2 className="h-5 w-5" />
+            Compartilhar briefing
+          </DialogTitle>
+          <DialogDescription>
+            Quem abrir o link <strong>consulta tudo sem precisar de conta</strong>. Para
+            participar (marcar itens, comentar{role === "editor" ? ", editar" : ""}), a pessoa
+            entra ou cria uma conta e vira membro automaticamente.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Quem entrar pelo link vira</Label>
+            <Select
+              value={role}
+              onValueChange={async (v) => {
+                setRole(v);
+                // Link já ativo: atualiza o papel na hora (mesmo token)
+                if (token) {
+                  try {
+                    await briefingProService.enableShare(briefing.id, v as "viewer" | "editor");
+                    toast.success("Papel do link atualizado");
+                    onChanged();
+                  } catch {
+                    toast.error("Erro ao atualizar o papel");
+                  }
+                }
+              }}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="viewer">
+                  Visualizador — vê tudo, comenta e marca itens na execução
+                </SelectItem>
+                <SelectItem value="editor">
+                  Editor — pode alterar o conteúdo do briefing
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {token ? (
+            <>
+              <div className="space-y-2">
+                <Label>Link de compartilhamento</Label>
+                <div className="flex gap-2">
+                  <Input readOnly value={shareUrl ?? ""} className="text-xs" onFocus={(e) => e.target.select()} />
+                  <Button size="icon" variant="outline" onClick={copyLink} title="Copiar link" className="shrink-0">
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 gap-2"
+                  disabled={busy}
+                  onClick={() => enable(true)}
+                  title="Gera um novo link e invalida o atual"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Gerar novo link
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 gap-2 text-destructive hover:text-destructive"
+                  disabled={busy}
+                  onClick={disable}
+                >
+                  <X className="h-4 w-4" />
+                  Desativar link
+                </Button>
+              </div>
+            </>
+          ) : (
+            <Button className="w-full gap-2" disabled={busy} onClick={() => enable()}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LinkIcon className="h-4 w-4" />}
+              Ativar link de compartilhamento
+            </Button>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Fechar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

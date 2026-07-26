@@ -62,6 +62,8 @@ export interface Briefing {
   version: number;
   ai_generated: boolean;
   source_text: string | null;
+  share_token: string | null;
+  share_role: MemberRole;
   created_at: string;
   updated_at: string;
 }
@@ -254,6 +256,63 @@ export interface GeneratedBriefingStructure {
   }>;
   ai_generated: boolean;
   source_text: string;
+}
+
+/** Visão pública (sem login) do briefing via link compartilhado. */
+export interface PublicBriefingView {
+  share_role: MemberRole;
+  briefing: {
+    title: string;
+    client_name: string | null;
+    briefing_type: BriefingType;
+    status: BriefingStatus;
+    objective: string | null;
+    target_audience: string | null;
+    tone: string | null;
+    restrictions: string | null;
+    notes: string | null;
+    event_date: string | null;
+    event_time: string | null;
+    contacts: BriefingContact[];
+    locations: BriefingLocation[];
+    version: number;
+  };
+  sections: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    items: Array<{
+      id: string;
+      title: string;
+      description: string | null;
+      item_type: ItemType;
+      priority: ItemPriority;
+      is_required: boolean;
+      scheduled_time: string | null;
+      status: ItemStatus;
+      subitems: Array<{ id: string; title: string; status: "pending" | "done" }>;
+    }>;
+  }>;
+  deliverables: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    specs: string | null;
+    quantity: number;
+    due_date: string | null;
+    deliver_to: string | null;
+    delivery_method: string | null;
+    status: DeliverableStatus;
+  }>;
+  links: Array<{
+    id: string;
+    item_id: string | null;
+    deliverable_id: string | null;
+    label: string;
+    url: string | null;
+    storage_type: StorageType;
+    description: string | null;
+  }>;
 }
 
 /** Uma seção no formato gerado/refinado pela IA. */

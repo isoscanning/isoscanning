@@ -29,7 +29,8 @@ import {
   PieChart,
   Calculator,
   FileSignature,
-  Share2
+  Share2,
+  ClipboardList
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
@@ -640,6 +641,29 @@ export default function DashboardPage() {
                 </Link>
               </ScrollReveal>
               {/* END: Social Media Card */}
+
+              {/* START: Briefing Pro Card */}
+              <ScrollReveal delay={0.6} duration={0.4}>
+                <Link href="/dashboard/briefing-pro" className="block h-full group" id="quick-briefing-pro">
+                  <Card className="h-full border-border hover:border-rose-500/50 transition-all duration-300 hover:shadow-lg bg-card">
+                    <CardHeader>
+                      <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                        <ClipboardList className="h-6 w-6" />
+                      </div>
+                      <CardTitle className="group-hover:text-rose-500 transition-colors">Briefing Pro</CardTitle>
+                      <CardDescription>
+                        Crie briefings completos com IA, compartilhe com a equipe e acompanhe a execução em tempo real.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-end">
+                      <div className="w-8 h-8 rounded-full bg-background border flex items-center justify-center group-hover:bg-rose-500 group-hover:text-white group-hover:border-rose-500 transition-colors">
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </ScrollReveal>
+              {/* END: Briefing Pro Card */}
             </div>
           </div>
         </div>

@@ -32,6 +32,14 @@ const NOTIFICATION_TOAST_TITLES: Partial<Record<AppNotification["type"], string>
     proposal_status: "Atualização da sua proposta",
     booking_created: "Nova solicitação de agendamento!",
     booking_status: "Atualização de agendamento",
+    briefing_invite: "Você entrou em um briefing!",
+    briefing_comment: "Novo comentário no briefing",
+    briefing_item_assigned: "Item atribuído a você",
+    briefing_approval_requested: "Briefing aguardando aprovação",
+    briefing_approved: "Briefing aprovado ✓",
+    briefing_new_version: "Briefing atualizado — confirme a leitura",
+    briefing_execution_started: "Execução iniciada!",
+    briefing_incident: "Intercorrência registrada",
 };
 
 export function NotificationBell() {
@@ -151,6 +159,25 @@ export function NotificationBell() {
             router.push("/dashboard/solicitacoes");
         } else if (type === "booking_status") {
             router.push("/dashboard/agenda");
+        } else if (type === "briefing_execution_started" || type === "briefing_incident") {
+            router.push(
+                referenceId
+                    ? `/dashboard/briefing-pro/${referenceId}/execucao`
+                    : "/dashboard/briefing-pro"
+            );
+        } else if (
+            type === "briefing_invite" ||
+            type === "briefing_comment" ||
+            type === "briefing_item_assigned" ||
+            type === "briefing_approval_requested" ||
+            type === "briefing_approved" ||
+            type === "briefing_new_version"
+        ) {
+            router.push(
+                referenceId
+                    ? `/dashboard/briefing-pro/${referenceId}`
+                    : "/dashboard/briefing-pro"
+            );
         }
     };
 

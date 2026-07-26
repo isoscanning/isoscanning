@@ -24,7 +24,10 @@ import {
 import {
   ClipboardList, Plus, Users, CheckCircle2, Calendar,
   MoreVertical, Trash2, Archive, ChevronRight, Sparkles, PlayCircle,
+  Copy, Loader2,
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { briefingProService } from "@/lib/briefing-pro-service";
 import {
@@ -41,6 +44,97 @@ function formatDate(value: string | null): string {
   return `${day}/${month}/${year}`;
 }
 
+function DuplicateBriefingDialog({
+  briefing, onClose, onDuplicated,
+}: {
+  briefing: BriefingListRow;
+  onClose: () => void;
+  onDuplicated: (newId: string) => void;
+}) {
+  const [title, setTitle] = useState(`${briefing.title} (cópia)`);
+  const [clientName, setClientName] = useState(briefing.client_name ?? "");
+  const [eventDate, setEventDate] = useState("");
+  const [copyMembers, setCopyMembers] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function duplicate() {
+    setSaving(true);
+    try {
+      const copy = await briefingProService.duplicate(briefing.id, {
+        title: title.trim() || undefined,
+        client_name: clientName.trim() || undefined,
+        event_date: eventDate || undefined,
+        copy_members: copyMembers,
+      });
+      toast.success("Briefing duplicado! Você é o dono da cópia.");
+      onDuplicated(copy.id);
+    } catch (err) {
+      const msg = (err as { response?: { data?: { message?: string } } })
+        ?.response?.data?.message;
+      toast.error(msg || "Erro ao duplicar o briefing");
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Copy className="h-5 w-5" />
+            Duplicar briefing
+          </DialogTitle>
+          <DialogDescription>
+            Cria uma cópia completa (seções, itens, subitens, entregáveis, links, contatos e
+            locações) como novo rascunho seu. Se informar uma nova data, os prazos dos
+            entregáveis são remapeados automaticamente.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Título da cópia</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Cliente</Label>
+              <Input
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                placeholder="Novo cliente"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Nova data da execução</Label>
+              <Input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+            </div>
+          </div>
+          <label className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer">
+            <Checkbox
+              checked={copyMembers}
+              onCheckedChange={(v) => setCopyMembers(v === true)}
+              className="mt-0.5"
+            />
+            <span className="text-sm">
+              <span className="font-medium block">Levar a equipe junto</span>
+              <span className="text-muted-foreground text-xs">
+                Copia os membros e as atribuições de responsáveis; todos são notificados.
+              </span>
+            </span>
+          </label>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button onClick={duplicate} disabled={saving} className="gap-2">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
+            Duplicar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function BriefingProPage() {
   const router = useRouter();
   const { userProfile, loading } = useAuth();
@@ -51,6 +145,7 @@ export default function BriefingProPage() {
   const [deleteTarget, setDeleteTarget] = useState<BriefingListRow | null>(null);
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [duplicateTarget, setDuplicateTarget] = useState<BriefingListRow | null>(null);
 
   useEffect(() => {
     if (!loading && !userProfile) router.push("/login");
@@ -201,29 +296,35 @@ export default function BriefingProPage() {
                           </Badge>
                         )}
                       </div>
-                      {isOwner && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                            <DropdownMenuItem onClick={() => archiveBriefing(briefing)}>
-                              <Archive className="h-4 w-4 mr-2" />
-                              Arquivar
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => setDeleteTarget(briefing)}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Excluir
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenuItem onClick={() => setDuplicateTarget(briefing)}>
+                            <Copy className="h-4 w-4 mr-2" />
+                            Duplicar
+                          </DropdownMenuItem>
+                          {isOwner && (
+                            <>
+                              <DropdownMenuItem onClick={() => archiveBriefing(briefing)}>
+                                <Archive className="h-4 w-4 mr-2" />
+                                Arquivar
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => setDeleteTarget(briefing)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                     <CardTitle className="text-lg mt-2 group-hover:text-rose-500 transition-colors line-clamp-2">
                       {briefing.title}
@@ -279,6 +380,17 @@ export default function BriefingProPage() {
         )}
       </main>
       <Footer />
+
+      {duplicateTarget && (
+        <DuplicateBriefingDialog
+          briefing={duplicateTarget}
+          onClose={() => setDuplicateTarget(null)}
+          onDuplicated={(newId) => {
+            setDuplicateTarget(null);
+            router.push(`/dashboard/briefing-pro/${newId}`);
+          }}
+        />
+      )}
 
       <Dialog
         open={!!deleteTarget}

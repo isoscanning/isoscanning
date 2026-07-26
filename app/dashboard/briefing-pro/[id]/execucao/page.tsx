@@ -16,7 +16,10 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft, Clock, CheckCircle2, MapPin, Phone, Send,
   MessageSquare, X, SkipForward, RotateCcw, PartyPopper, Link2, HardDrive, Lock,
+  Timer, ChevronRight,
 } from "lucide-react";
+import { BriefingTimeShiftDialog } from "@/components/briefing-time-shift-dialog";
+import { BriefingIncidentsCard } from "@/components/briefing-incidents-card";
 import { toast } from "sonner";
 import { briefingProService } from "@/lib/briefing-pro-service";
 import {
@@ -65,8 +68,17 @@ export default function ExecutionModePage() {
   const [commentText, setCommentText] = useState("");
   const [commentItem, setCommentItem] = useState<BriefingItem | null>(null);
   const [sending, setSending] = useState(false);
+  const [timeShiftOpen, setTimeShiftOpen] = useState(false);
+  const [now, setNow] = useState(() => new Date());
   const feedRef = useRef<HTMLDivElement | null>(null);
   const pollingRef = useRef(false);
+  const scrolledToCurrentRef = useRef(false);
+
+  // Relógio para o marcador "Agora / A seguir"
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!loading && !userProfile) router.push("/login");
@@ -110,6 +122,38 @@ export default function ExecutionModePage() {
 
   const doneCount = allItems.filter((i) => i.status === "done" || i.status === "skipped").length;
   const progress = allItems.length ? Math.round((doneCount / allItems.length) * 100) : 0;
+
+  // "Agora": último item com horário <= agora ainda não concluído.
+  // "A seguir": primeiro item com horário > agora. Só durante a execução.
+  const { currentItemId, nextItemId } = useMemo(() => {
+    if (detail?.briefing.status !== "in_execution") {
+      return { currentItemId: null as string | null, nextItemId: null as string | null };
+    }
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const timed = allItems
+      .filter((i) => i.scheduled_time)
+      .map((i) => {
+        const [h, m] = (i.scheduled_time as string).split(":").map(Number);
+        return { id: i.id, minutes: h * 60 + (m || 0), status: i.status };
+      })
+      .sort((a, b) => a.minutes - b.minutes);
+    const current = [...timed]
+      .reverse()
+      .find((t) => t.minutes <= nowMinutes && t.status !== "done" && t.status !== "skipped");
+    const next = timed.find((t) => t.minutes > nowMinutes);
+    return { currentItemId: current?.id ?? null, nextItemId: next?.id ?? null };
+  }, [detail?.briefing.status, allItems, now]);
+
+  // Auto-scroll único até o item atual ao abrir a tela
+  useEffect(() => {
+    if (!currentItemId || scrolledToCurrentRef.current) return;
+    scrolledToCurrentRef.current = true;
+    setTimeout(() => {
+      document
+        .getElementById(`exec-item-${currentItemId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 300);
+  }, [currentItemId]);
 
   async function setItemStatus(item: BriefingItem, status: string) {
     // Otimista
@@ -203,6 +247,7 @@ export default function ExecutionModePage() {
 
   const { briefing } = detail;
   const itemById = new Map(allItems.map((i) => [i.id, i]));
+  const canEdit = detail.my_role === "owner" || detail.my_role === "editor";
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -218,13 +263,27 @@ export default function ExecutionModePage() {
             <ArrowLeft className="h-4 w-4" />
             Briefing
           </Button>
-          <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 gap-1">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
-            </span>
-            Ao vivo · atualiza a cada {POLL_MS / 1000}s
-          </Badge>
+          <div className="flex items-center gap-2">
+            {canEdit && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1"
+                title="O evento atrasou? Empurre todos os horários de uma vez"
+                onClick={() => setTimeShiftOpen(true)}
+              >
+                <Timer className="h-4 w-4" />
+                Ajustar horários
+              </Button>
+            )}
+            <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 gap-1">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
+              </span>
+              Ao vivo · atualiza a cada {POLL_MS / 1000}s
+            </Badge>
+          </div>
         </div>
 
         {/* Painel de progresso */}
@@ -323,6 +382,8 @@ export default function ExecutionModePage() {
                   {section.items.map((item) => {
                     const isDone = item.status === "done";
                     const isSkipped = item.status === "skipped";
+                    const isCurrent = item.id === currentItemId;
+                    const isNext = item.id === nextItemId;
                     const completedBy = item.completed_by
                       ? detail.profiles[item.completed_by]
                       : null;
@@ -332,7 +393,8 @@ export default function ExecutionModePage() {
                     return (
                       <div
                         key={item.id}
-                        className={`rounded-lg px-2 py-2 ${isDone || isSkipped ? "opacity-60" : ""} hover:bg-muted/50`}
+                        id={`exec-item-${item.id}`}
+                        className={`rounded-lg px-2 py-2 ${isDone || isSkipped ? "opacity-60" : ""} hover:bg-muted/50 ${isCurrent ? "ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/10" : ""}`}
                       >
                         <div className="flex items-start gap-3">
                           <Checkbox
@@ -351,6 +413,21 @@ export default function ExecutionModePage() {
                               </span>
                               {isSkipped && (
                                 <Badge variant="outline" className="text-xs">Pulado</Badge>
+                              )}
+                              {isCurrent && (
+                                <Badge className="text-xs gap-1 bg-blue-600 text-white hover:bg-blue-600">
+                                  <span className="relative flex h-1.5 w-1.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
+                                  </span>
+                                  Agora
+                                </Badge>
+                              )}
+                              {isNext && !isCurrent && (
+                                <Badge variant="outline" className="text-xs gap-1 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-700">
+                                  <ChevronRight className="h-3 w-3" />
+                                  A seguir
+                                </Badge>
                               )}
                               {item.scheduled_time && (
                                 <Badge variant="outline" className="text-xs gap-1">
@@ -491,6 +568,17 @@ export default function ExecutionModePage() {
           })}
         </div>
 
+        {/* Intercorrências */}
+        <div className="mt-4">
+          <BriefingIncidentsCard
+            briefingId={briefingId}
+            incidents={detail.incidents}
+            myRole={detail.my_role}
+            userId={userProfile?.id}
+            onChanged={() => load(true)}
+          />
+        </div>
+
         {/* Feed de comentários */}
         <Card className="mt-4">
           <CardHeader className="py-3">
@@ -541,6 +629,18 @@ export default function ExecutionModePage() {
           </CardContent>
         </Card>
       </main>
+
+      {timeShiftOpen && (
+        <BriefingTimeShiftDialog
+          briefingId={briefingId}
+          sections={detail.sections.map((s) => ({ id: s.id, title: s.title }))}
+          onClose={() => setTimeShiftOpen(false)}
+          onApplied={() => {
+            setTimeShiftOpen(false);
+            load(true);
+          }}
+        />
+      )}
 
       {/* Composer fixo */}
       <div className="fixed bottom-0 inset-x-0 border-t bg-background/95 backdrop-blur p-3">

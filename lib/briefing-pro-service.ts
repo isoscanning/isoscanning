@@ -11,6 +11,7 @@ import {
   BriefingContact,
   BriefingDeliverable,
   BriefingDetail,
+  BriefingIncident,
   BriefingItem,
   BriefingLink,
   BriefingListRow,
@@ -97,6 +98,41 @@ export const briefingProService = {
 
   async confirmRead(id: string): Promise<BriefingReadConfirmation> {
     const { data } = await apiClient.post(`/briefing-pro/${id}/confirm-read`);
+    return data;
+  },
+
+  /** Duplica o briefing como novo rascunho do usuário (com remap de datas). */
+  async duplicate(
+    id: string,
+    payload: { title?: string; client_name?: string; event_date?: string; copy_members?: boolean }
+  ): Promise<Briefing> {
+    const { data } = await apiClient.post(`/briefing-pro/${id}/duplicate`, payload);
+    return data;
+  },
+
+  async reorderSections(briefingId: string, sectionIds: string[]): Promise<void> {
+    await apiClient.post(`/briefing-pro/${briefingId}/sections/reorder`, {
+      section_ids: sectionIds,
+    });
+  },
+
+  async reorderItems(
+    briefingId: string,
+    items: Array<{ id: string; section_id: string; position: number }>
+  ): Promise<void> {
+    await apiClient.post(`/briefing-pro/${briefingId}/items/reorder`, { items });
+  },
+
+  /** Empurra/adianta todos os horários em N minutos (opcionalmente por seção). */
+  async timeShift(
+    briefingId: string,
+    minutes: number,
+    sectionIds?: string[]
+  ): Promise<{ updated: number }> {
+    const { data } = await apiClient.post(`/briefing-pro/${briefingId}/time-shift`, {
+      minutes,
+      ...(sectionIds?.length ? { section_ids: sectionIds } : {}),
+    });
     return data;
   },
 
@@ -253,6 +289,28 @@ export const briefingProService = {
 
   async deleteComment(commentId: string): Promise<void> {
     await apiClient.delete(`/briefing-pro/comments/${commentId}`);
+  },
+
+  // ─── Intercorrências ──────────────────────────────────────────────────────
+
+  async addIncident(
+    briefingId: string,
+    payload: { description: string; severity?: string; item_id?: string }
+  ): Promise<BriefingIncident> {
+    const { data } = await apiClient.post(`/briefing-pro/${briefingId}/incidents`, payload);
+    return data;
+  },
+
+  async updateIncident(
+    incidentId: string,
+    payload: { description?: string; severity?: string; resolved?: boolean; resolution?: string }
+  ): Promise<BriefingIncident> {
+    const { data } = await apiClient.patch(`/briefing-pro/incidents/${incidentId}`, payload);
+    return data;
+  },
+
+  async deleteIncident(incidentId: string): Promise<void> {
+    await apiClient.delete(`/briefing-pro/incidents/${incidentId}`);
   },
 
   // ─── IA ───────────────────────────────────────────────────────────────────

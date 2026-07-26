@@ -165,7 +165,15 @@ export interface AppNotification {
     | "proposal_received"
     | "proposal_status"
     | "booking_created"
-    | "booking_status";
+    | "booking_status"
+    | "briefing_invite"
+    | "briefing_comment"
+    | "briefing_item_assigned"
+    | "briefing_approval_requested"
+    | "briefing_approved"
+    | "briefing_new_version"
+    | "briefing_execution_started"
+    | "briefing_incident";
   referenceId?: string | null;
   isRead: boolean;
   createdAt: string;

@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import {
+  DndContext, DragEndEvent, PointerSensor, closestCenter, useSensor, useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext, arrayMove, useSortable, verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
@@ -36,7 +43,10 @@ import {
   Package, MapPin, Phone, PlayCircle, CheckCircle2, Clock,
   ShieldCheck, Loader2, Search, X, ExternalLink, HardDrive,
   MessageSquare, Send, Sparkles, Eye, Lock, CornerDownRight,
+  GripVertical, Timer, Printer,
 } from "lucide-react";
+import { BriefingTimeShiftDialog } from "@/components/briefing-time-shift-dialog";
+import { BriefingIncidentsCard } from "@/components/briefing-incidents-card";
 import { toast } from "sonner";
 import { briefingProService } from "@/lib/briefing-pro-service";
 import {
@@ -94,6 +104,105 @@ function Avatar({ profile, size = 8 }: { profile?: ProfileSummary | null; size?:
   );
 }
 
+/**
+ * Casca sortable genérica (dnd-kit): o children recebe as props do handle
+ * para espalhar no botão de arrastar (GripVertical).
+ */
+function SortableShell({
+  id, disabled, children,
+}: {
+  id: string;
+  disabled?: boolean;
+  children: (handleProps: Record<string, unknown>) => React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id, disabled });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={isDragging ? "opacity-60 relative z-10" : undefined}
+    >
+      {children({ ...attributes, ...listeners })}
+    </div>
+  );
+}
+
+/** Badge de horário com edição inline (clica no horário e digita). */
+function InlineTimeBadge({
+  item, canEdit, onSaved,
+}: {
+  item: BriefingItem;
+  canEdit: boolean;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  if (!item.scheduled_time && !canEdit) return null;
+
+  async function save(value: string) {
+    if (value === (item.scheduled_time ?? "")) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      await briefingProService.updateItem(item.id, { scheduled_time: value });
+      onSaved();
+    } catch {
+      toast.error("Erro ao salvar o horário");
+    }
+    setSaving(false);
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <input
+        type="time"
+        autoFocus
+        defaultValue={item.scheduled_time ?? ""}
+        disabled={saving}
+        className="h-6 rounded-md border bg-background px-1 text-xs"
+        onClick={(e) => e.stopPropagation()}
+        onBlur={(e) => save(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Escape") setEditing(false);
+        }}
+      />
+    );
+  }
+
+  if (item.scheduled_time) {
+    return (
+      <Badge
+        variant="outline"
+        className={`text-xs gap-1 ${canEdit ? "cursor-pointer hover:border-blue-400" : ""}`}
+        title={canEdit ? "Clique para editar o horário" : undefined}
+        onClick={(e) => {
+          if (!canEdit) return;
+          e.stopPropagation();
+          setEditing(true);
+        }}
+      >
+        <Clock className="h-3 w-3" />{item.scheduled_time}
+      </Badge>
+    );
+  }
+
+  return (
+    <button
+      className="opacity-0 group-hover/item:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
+      title="Definir horário"
+      onClick={() => setEditing(true)}
+    >
+      <Clock className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
 /** Botões de transição de status disponíveis para o papel do usuário. */
 const STATUS_ACTIONS: Array<{
   from: BriefingStatus[];
@@ -133,7 +242,12 @@ export default function BriefingDetailPage() {
   const [linkDialog, setLinkDialog] = useState<{ itemId?: string; deliverableId?: string } | null>(null);
   const [contactsDialog, setContactsDialog] = useState(false);
   const [locationsDialog, setLocationsDialog] = useState(false);
+  const [timeShiftOpen, setTimeShiftOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
 
   useEffect(() => {
     if (!loading && !userProfile) router.push("/login");
@@ -193,6 +307,52 @@ export default function BriefingDetailPage() {
       toast.error(msg || "Erro ao mudar o status");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleSectionDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !detail) return;
+    const oldIndex = detail.sections.findIndex((s) => s.id === active.id);
+    const newIndex = detail.sections.findIndex((s) => s.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const reordered = arrayMove(detail.sections, oldIndex, newIndex);
+    setDetail({ ...detail, sections: reordered });
+    try {
+      await briefingProService.reorderSections(briefingId, reordered.map((s) => s.id));
+    } catch {
+      toast.error("Erro ao reordenar as seções");
+      refresh();
+    }
+  }
+
+  async function handleItemDragEnd(sectionId: string, event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !detail) return;
+    const section = detail.sections.find((s) => s.id === sectionId);
+    if (!section) return;
+    const oldIndex = section.items.findIndex((i) => i.id === active.id);
+    const newIndex = section.items.findIndex((i) => i.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const reordered = arrayMove(section.items, oldIndex, newIndex);
+    setDetail((prev) =>
+      prev
+        ? {
+            ...prev,
+            sections: prev.sections.map((s) =>
+              s.id === sectionId ? { ...s, items: reordered } : s
+            ),
+          }
+        : prev
+    );
+    try {
+      await briefingProService.reorderItems(
+        briefingId,
+        reordered.map((item, index) => ({ id: item.id, section_id: sectionId, position: index }))
+      );
+    } catch {
+      toast.error("Erro ao reordenar os itens");
+      refresh();
     }
   }
 
@@ -271,6 +431,18 @@ export default function BriefingDetailPage() {
             Briefings
           </Button>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              title={briefing.status === "completed"
+                ? "Exportar relatório pós-execução em PDF"
+                : "Exportar briefing em PDF"}
+              onClick={() => window.open(`/dashboard/briefing-pro/${briefingId}/imprimir`, "_blank")}
+            >
+              <Printer className="h-4 w-4" />
+              {briefing.status === "completed" ? "Relatório PDF" : "Exportar PDF"}
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -417,10 +589,16 @@ export default function BriefingDetailPage() {
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Estrutura do briefing</h2>
               {canEdit && (
-                <Button variant="outline" size="sm" className="gap-1" onClick={() => setSectionDialog({})}>
-                  <Plus className="h-4 w-4" />
-                  Seção
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="gap-1" onClick={() => setTimeShiftOpen(true)}>
+                    <Timer className="h-4 w-4" />
+                    Ajustar horários
+                  </Button>
+                  <Button variant="outline" size="sm" className="gap-1" onClick={() => setSectionDialog({})}>
+                    <Plus className="h-4 w-4" />
+                    Seção
+                  </Button>
+                </div>
               )}
             </div>
 
@@ -432,15 +610,38 @@ export default function BriefingDetailPage() {
               </Card>
             )}
 
+            <DndContext
+              sensors={dndSensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleSectionDragEnd}
+            >
+            <SortableContext
+              items={detail.sections.map((s) => s.id)}
+              strategy={verticalListSortingStrategy}
+            >
+            <div className="space-y-4">
             {detail.sections.map((section) => (
-              <Card key={section.id}>
+              <SortableShell key={section.id} id={section.id} disabled={!canEdit}>
+              {(sectionHandle) => (
+              <Card>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <CardTitle className="text-base">{section.title}</CardTitle>
-                      {section.description && (
-                        <CardDescription className="mt-0.5">{section.description}</CardDescription>
+                    <div className="flex items-start gap-1 min-w-0">
+                      {canEdit && (
+                        <button
+                          {...sectionHandle}
+                          className="mt-0.5 text-muted-foreground/50 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none shrink-0"
+                          title="Arrastar para reordenar a seção"
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </button>
                       )}
+                      <div className="min-w-0">
+                        <CardTitle className="text-base">{section.title}</CardTitle>
+                        {section.description && (
+                          <CardDescription className="mt-0.5">{section.description}</CardDescription>
+                        )}
+                      </div>
                     </div>
                     {canEdit && (
                       <DropdownMenu>
@@ -486,15 +687,32 @@ export default function BriefingDetailPage() {
                   {section.items.length === 0 && (
                     <p className="text-sm text-muted-foreground py-2">Sem itens nesta seção.</p>
                   )}
+                  <DndContext
+                    sensors={dndSensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={(event) => handleItemDragEnd(section.id, event)}
+                  >
+                  <SortableContext
+                    items={section.items.map((i) => i.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
                   {section.items.map((item) => {
                     const itemLinks = detail.links.filter((l) => l.item_id === item.id);
                     const assignee = item.assigned_to ? detail.profiles[item.assigned_to] : null;
                     const isDone = item.status === "done" || item.status === "skipped";
                     return (
-                      <div
-                        key={item.id}
-                        className="flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-muted/50 group/item"
-                      >
+                      <SortableShell key={item.id} id={item.id} disabled={!canEdit}>
+                      {(itemHandle) => (
+                      <div className="flex items-start gap-2 rounded-lg px-2 py-2 hover:bg-muted/50 group/item">
+                        {canEdit && (
+                          <button
+                            {...itemHandle}
+                            className="mt-1 text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0"
+                            title="Arrastar para reordenar"
+                          >
+                            <GripVertical className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                         <Checkbox
                           checked={isDone}
                           onCheckedChange={() => toggleItem(item)}
@@ -505,11 +723,7 @@ export default function BriefingDetailPage() {
                             <span className={`text-sm font-medium ${isDone ? "line-through text-muted-foreground" : ""}`}>
                               {item.title}
                             </span>
-                            {item.scheduled_time && (
-                              <Badge variant="outline" className="text-xs gap-1">
-                                <Clock className="h-3 w-3" />{item.scheduled_time}
-                              </Badge>
-                            )}
+                            <InlineTimeBadge item={item} canEdit={canEdit} onSaved={refresh} />
                             {item.is_required && (
                               <Badge variant="secondary" className="text-xs gap-1 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
                                 <Lock className="h-3 w-3" />
@@ -591,8 +805,12 @@ export default function BriefingDetailPage() {
                           </div>
                         )}
                       </div>
+                      )}
+                      </SortableShell>
                     );
                   })}
+                  </SortableContext>
+                  </DndContext>
                   {canEdit && (
                     <Button
                       variant="ghost"
@@ -606,7 +824,12 @@ export default function BriefingDetailPage() {
                   )}
                 </CardContent>
               </Card>
+              )}
+              </SortableShell>
             ))}
+            </div>
+            </SortableContext>
+            </DndContext>
 
             {/* Entregáveis */}
             <div className="flex items-center justify-between pt-4">
@@ -908,6 +1131,15 @@ export default function BriefingDetailPage() {
               </CardContent>
             </Card>
 
+            {/* Intercorrências */}
+            <BriefingIncidentsCard
+              briefingId={briefingId}
+              incidents={detail.incidents}
+              myRole={detail.my_role}
+              userId={userProfile?.id}
+              onChanged={refresh}
+            />
+
             {/* Confirmações de leitura */}
             <Card>
               <CardHeader className="pb-2">
@@ -983,8 +1215,18 @@ export default function BriefingDetailPage() {
           sectionId={itemDialog.sectionId}
           item={itemDialog.item}
           people={allPeople}
+          sections={detail.sections.map((s) => ({ id: s.id, title: s.title }))}
           onClose={() => setItemDialog(null)}
           onSaved={() => { setItemDialog(null); refresh(); }}
+        />
+      )}
+
+      {timeShiftOpen && (
+        <BriefingTimeShiftDialog
+          briefingId={briefingId}
+          sections={detail.sections.map((s) => ({ id: s.id, title: s.title }))}
+          onClose={() => setTimeShiftOpen(false)}
+          onApplied={() => { setTimeShiftOpen(false); refresh(); }}
         />
       )}
 
@@ -1702,12 +1944,13 @@ function RefineSectionDialog({
 // ─── Dialog: item ────────────────────────────────────────────────────────────
 
 function ItemDialog({
-  briefingId, sectionId, item, people, onClose, onSaved,
+  briefingId, sectionId, item, people, sections, onClose, onSaved,
 }: {
   briefingId: string;
   sectionId: string;
   item?: BriefingItem;
   people: Array<{ id: string; profile: ProfileSummary | null }>;
+  sections: Array<{ id: string; title: string }>;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -1718,6 +1961,7 @@ function ItemDialog({
     priority: item?.priority ?? "medium",
     scheduled_time: item?.scheduled_time ?? "",
     assigned_to: item?.assigned_to ?? "none",
+    section_id: item?.section_id ?? sectionId,
   });
   const [isRequired, setIsRequired] = useState(item?.is_required ?? false);
   const [saving, setSaving] = useState(false);
@@ -1737,9 +1981,12 @@ function ItemDialog({
     };
     try {
       if (item) {
-        await briefingProService.updateItem(item.id, payload);
+        await briefingProService.updateItem(item.id, {
+          ...payload,
+          ...(form.section_id !== item.section_id ? { section_id: form.section_id } : {}),
+        });
       } else {
-        await briefingProService.createItem(briefingId, { ...payload, section_id: sectionId });
+        await briefingProService.createItem(briefingId, { ...payload, section_id: form.section_id });
       }
       onSaved();
     } catch {
@@ -1763,6 +2010,19 @@ function ItemDialog({
               placeholder="Ex: Foto do primeiro olhar, Conferir baterias..."
             />
           </div>
+          {sections.length > 1 && (
+            <div className="space-y-2">
+              <Label>Seção</Label>
+              <Select value={form.section_id} onValueChange={(v) => set("section_id", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {sections.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-2">
             <Label>Detalhes</Label>
             <Textarea rows={2} value={form.description} onChange={(e) => set("description", e.target.value)} />

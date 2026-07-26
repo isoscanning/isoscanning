@@ -177,6 +177,24 @@ export interface BriefingComment {
   profile?: ProfileSummary | null;
 }
 
+export type IncidentSeverity = "low" | "medium" | "high";
+
+export interface BriefingIncident {
+  id: string;
+  briefing_id: string;
+  item_id: string | null;
+  author_id: string;
+  severity: IncidentSeverity;
+  description: string;
+  resolved: boolean;
+  resolution: string | null;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  occurred_at: string;
+  created_at: string;
+  profile?: ProfileSummary | null;
+}
+
 export interface BriefingReadConfirmation {
   id: string;
   briefing_id: string;
@@ -194,6 +212,7 @@ export interface BriefingDetail {
   links: BriefingLink[];
   members: BriefingMember[];
   read_confirmations: BriefingReadConfirmation[];
+  incidents: BriefingIncident[];
   profiles: Record<string, ProfileSummary>;
 }
 
@@ -328,4 +347,22 @@ export const STORAGE_TYPE_LABELS: Record<StorageType, string> = {
 export const MEMBER_ROLE_LABELS: Record<MemberRole, string> = {
   editor: "Editor",
   viewer: "Visualizador",
+};
+
+export const INCIDENT_SEVERITY_CONFIG: Record<
+  IncidentSeverity,
+  { label: string; className: string }
+> = {
+  low: {
+    label: "Leve",
+    className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  },
+  medium: {
+    label: "Média",
+    className: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  },
+  high: {
+    label: "Grave",
+    className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  },
 };

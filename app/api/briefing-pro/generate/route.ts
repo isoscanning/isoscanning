@@ -190,7 +190,9 @@ export async function POST(request: NextRequest) {
   try {
     const parsed = await callGroqJson<GeneratedBriefing>({
       systemPrompt: SYSTEM_PROMPT,
-      userPrompt: buildUserPrompt(sourceText.slice(0, 16000), body.briefing_type),
+      // Cap do texto: no tier gratuito da Groq (8k tokens/min) um prompt muito
+      // grande esprene o espaço da resposta — 10k chars ≈ 3k tokens de entrada.
+      userPrompt: buildUserPrompt(sourceText.slice(0, 10000), body.briefing_type),
       temperature: 0.6,
       maxTokens: 8192,
       retries: 1,

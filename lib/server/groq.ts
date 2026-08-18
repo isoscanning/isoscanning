@@ -35,6 +35,17 @@ export class GroqError extends Error {
   }
 }
 
+// Tier gratuito da Groq: ~8.000 tokens por MINUTO por modelo, e o max_tokens
+// pedido conta no limite antes mesmo da geração. Clampamos o max_tokens para
+// prompt + saída caberem no orçamento — senão a API rejeita com 413 na hora.
+const GROQ_TPM_BUDGET = 7500;
+const MIN_COMPLETION_TOKENS = 1024;
+
+/** Estimativa conservadora p/ pt-BR (~3 chars por token). */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 3);
+}
+
 /**
  * Extrai um objeto JSON da resposta do modelo, tolerando cercas de markdown
  * e texto solto antes/depois do objeto.
@@ -79,6 +90,13 @@ export async function callGroqJson<T = Record<string, unknown>>(options: GroqJso
       ? systemPrompt
       : `${systemPrompt}\n\nATENÇÃO: a resposta anterior falhou. Responda SOMENTE com um objeto JSON válido, sem nenhum texto fora dele.`;
 
+    // Cabe no orçamento de tokens/minuto: reduz o max_tokens se o prompt for grande
+    const promptTokens = estimateTokens(attemptSystem + userPrompt);
+    const cappedMaxTokens = Math.max(
+      MIN_COMPLETION_TOKENS,
+      Math.min(maxTokens, GROQ_TPM_BUDGET - promptTokens)
+    );
+
     try {
       const response = await fetch(GROQ_API_URL, {
         method: "POST",
@@ -94,7 +112,7 @@ export async function callGroqJson<T = Record<string, unknown>>(options: GroqJso
           ],
           ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
           temperature: attemptTemperature,
-          max_tokens: maxTokens,
+          max_tokens: cappedMaxTokens,
         }),
       });
 
@@ -103,10 +121,10 @@ export async function callGroqJson<T = Record<string, unknown>>(options: GroqJso
         console.error(`Groq API error (attempt ${attempt + 1}):`, response.status, errText);
         const retryable = response.status === 429 || response.status >= 500;
         lastError = new GroqError(
-          response.status === 429
-            ? "Limite de requisições da IA atingido. Tente novamente em instantes."
+          response.status === 429 || response.status === 413
+            ? "Limite de uso da IA por minuto atingido. Aguarde um instante e tente novamente."
             : "Erro na geração pela IA",
-          response.status === 429 ? 429 : 500
+          response.status === 429 || response.status === 413 ? 429 : 500
         );
         if (retryable && attempt < retries) {
           await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));

@@ -4,7 +4,11 @@
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-export const GROQ_MODEL = "llama-3.3-70b-versatile";
+// ATENÇÃO: a Groq descontinua modelos periodicamente. Se as rotas de IA
+// começarem a retornar 500 com 404 da Groq, confira o catálogo atual em
+// GET https://api.groq.com/openai/v1/models e atualize esta constante.
+// (llama-3.3-70b-versatile foi descontinuado em 2026; migrado para gpt-oss-120b.)
+export const GROQ_MODEL = "openai/gpt-oss-120b";
 
 // Sistema agêntico da Groq com busca web nativa — usado para pesquisar
 // contas/empresas na internet (anamnese). Não suporta response_format,

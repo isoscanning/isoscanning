@@ -273,7 +273,7 @@ Você pode adicionar mais variáveis conforme necessário:
 
 ```env
 NEXT_PUBLIC_GOOGLE_ANALYTICS_ID=UA-XXXXX
-NEXT_PUBLIC_SITE_URL=https://seu-site.com
+NEXT_PUBLIC_SITE_URL=https://www.isoscanning.com   # dominio que responde 200 (o apex redireciona para o www)
 ```
 
 ---

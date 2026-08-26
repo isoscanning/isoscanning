@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser, checkOwnerPremiumSm, PREMIUM_SM_MSG } from "@/lib/server/api-auth";
 import { graphGet, MetaApiError } from "@/lib/server/meta";
 import { getSupabaseAdmin, ADMIN_MISSING_MSG } from "@/lib/server/supabase-admin";
+import { loadInstagramConnection } from "@/lib/server/instagram-connection";
 
 // Demografia dos seguidores da conta conectada (o mesmo dado do app do
 // Instagram em "Total de seguidores"): faixa etária, gênero, cidade e país.
@@ -96,11 +97,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: PREMIUM_SM_MSG, planLimit: true }, { status: 403 });
     }
 
-    const { data: connection } = await admin
-      .from("sm_instagram_accounts")
-      .select("ig_user_id, access_token, ig_username")
-      .eq("schedule_id", scheduleId)
-      .maybeSingle();
+    // Token cifrado no banco — decifrado só no servidor
+    const { connection } = await loadInstagramConnection(admin, scheduleId);
 
     if (!connection) {
       return NextResponse.json({ error: "Instagram não conectado a este cronograma." }, { status: 400 });

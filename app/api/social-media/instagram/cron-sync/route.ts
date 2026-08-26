@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin, ADMIN_MISSING_MSG } from "@/lib/server/supabase-admin";
-import { syncInstagramMonth, IgConnectionRow, InstagramSyncResult } from "@/lib/server/instagram-sync";
+import { syncInstagramMonth, InstagramSyncResult } from "@/lib/server/instagram-sync";
+import { loadAllInstagramConnections } from "@/lib/server/instagram-connection";
 
 // Sincronização automática diária de TODAS as contas de Instagram conectadas.
 // Chamada pelo Vercel Cron (ver vercel.json) — a Vercel envia automaticamente
@@ -42,9 +43,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: ADMIN_MISSING_MSG }, { status: 500 });
     }
 
-    const { data: connections, error: connErr } = await admin
-      .from("sm_instagram_accounts")
-      .select("*");
+    // Tokens vêm cifrados do banco — o helper decifra (e recifra legados) no servidor
+    const { connections, error: connErr } = await loadAllInstagramConnections(admin);
     if (connErr) {
       return NextResponse.json({ error: `Erro ao listar conexões: ${connErr.message}` }, { status: 500 });
     }
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     }
 
     const results: AccountResult[] = [];
-    for (const conn of (connections ?? []) as IgConnectionRow[]) {
+    for (const conn of connections) {
       const entry: AccountResult = {
         schedule_id: conn.schedule_id,
         ig_username: conn.ig_username,

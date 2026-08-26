@@ -64,8 +64,23 @@ interface AuthContextType {
   getRedirectUrl: () => string | null;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   updateUserAuth: (attributes: { password?: string; email?: string; data?: any }) => Promise<void>;
-  updateSubscriptionTier: (tier: 'free' | 'standard' | 'pro' | 'vip') => Promise<void>;
   refreshProfile: () => Promise<void>;
+}
+
+/**
+ * Converte um erro do axios em Error com a mensagem do backend (ex.: 429 por
+ * excesso de tentativas de login) em vez de "Request failed with status code 429".
+ */
+function toAuthError(error: unknown): Error {
+  const response = (error as { response?: { status?: number; data?: { message?: unknown } } })?.response;
+  const backendMessage = response?.data?.message;
+  if (typeof backendMessage === "string" && backendMessage.trim()) {
+    const err = new Error(backendMessage) as Error & { status?: number; cause?: unknown };
+    err.status = response?.status;
+    err.cause = error;
+    return err;
+  }
+  return error instanceof Error ? error : new Error(String(error));
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -241,7 +256,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     } catch (error) {
       console.error("[auth-context] Sign in error:", error);
-      throw error;
+      throw toAuthError(error);
     }
   };
 
@@ -272,7 +287,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     } catch (error) {
       console.error("[auth-context] Sign up error:", error);
-      throw error;
+      throw toAuthError(error);
     }
   };
 
@@ -371,34 +386,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const updateSubscriptionTier = async (tier: 'free' | 'standard' | 'pro' | 'vip') => {
-    if (!userProfile) throw new Error("Usuário não autenticado");
-
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ subscription_tier: tier })
-        .eq('id', userProfile.id);
-
-      if (error) throw error;
-
-      setUserProfile({
-        ...userProfile,
-        subscriptionTier: tier,
-        updatedAt: new Date(),
-      });
-
-      localStorage.setItem("user_profile", JSON.stringify({
-        ...userProfile,
-        subscriptionTier: tier,
-        updatedAt: new Date(),
-      }));
-
-    } catch (error) {
-      console.error("[auth-context] Update subscription error:", error);
-      throw error;
-    }
-  };
+  // O tier de assinatura é alterado SOMENTE pelo backend via webhook do Asaas
+  // (ver isoscanning-backend/docs/asaas-setup.md). A migration 58 bloqueia
+  // qualquer escrita nessa coluna vinda do cliente.
 
   // Fetches the latest profile from the API and refreshes local state.
   // Used after billing events (post-payment redirect, cancellation).
@@ -429,7 +419,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     getRedirectUrl,
     updateProfile,
     updateUserAuth,
-    updateSubscriptionTier,
     refreshProfile,
   };
 

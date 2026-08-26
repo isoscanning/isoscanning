@@ -17,7 +17,17 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import apiClient from "@/lib/api-service";
+import { formatCpfCnpj, validateCpfCnpj } from "@/lib/utils";
 
 // Maps UI plan names to the canonical plan key sent to the API
 const PLAN_KEY: Record<string, string> = {
@@ -32,6 +42,53 @@ export default function PricingPage() {
     const router = useRouter();
     const [isAnnual, setIsAnnual] = useState(false);
     const [loadingTier, setLoadingTier] = useState<string | null>(null);
+
+    // Dialog de CPF/CNPJ — o Asaas exige o documento para gerar a cobrança.
+    // Só abre se o perfil ainda não tiver CPF cadastrado.
+    const [docDialogPlan, setDocDialogPlan] = useState<string | null>(null);
+    const [docValue, setDocValue] = useState("");
+    const [docError, setDocError] = useState<string | null>(null);
+
+    const startCheckout = async (planName: string, planKey: string, cpfCnpj?: string) => {
+        setLoadingTier(planName);
+
+        try {
+            const { data } = await apiClient.post('/billing/subscribe', {
+                plan: planKey,
+                billingCycle: isAnnual ? 'annual' : 'monthly',
+                ...(cpfCnpj ? { cpfCnpj: cpfCnpj.replace(/\D/g, "") } : {}),
+            });
+
+            if (data.paymentUrl) {
+                // Redirect to Asaas checkout page
+                window.location.href = data.paymentUrl;
+            } else {
+                throw new Error('Payment URL not returned');
+            }
+        } catch (error: any) {
+            console.error('[precos] Subscribe error:', error);
+            const payload = error?.response?.data;
+
+            // Backend não encontrou documento (perfil sem CPF) → pede ao usuário
+            if (payload?.code === 'CPF_REQUIRED' || payload?.message?.code === 'CPF_REQUIRED') {
+                setDocError(null);
+                setDocDialogPlan(planName);
+                setLoadingTier(null);
+                return;
+            }
+
+            const rawMessage = typeof payload?.message === 'string'
+                ? payload.message
+                : payload?.message?.message;
+            const message = rawMessage || 'Não foi possível iniciar o pagamento. Tente novamente.';
+            toast({
+                variant: "destructive",
+                title: "Erro ao assinar plano",
+                description: message,
+            });
+            setLoadingTier(null);
+        }
+    };
 
     const handleSubscribe = async (planName: string) => {
         if (authLoading) return;
@@ -49,33 +106,27 @@ export default function PricingPage() {
             return;
         }
 
-        setLoadingTier(planName);
-
-        try {
-            const { data } = await apiClient.post('/billing/subscribe', {
-                plan: planKey,
-                billingCycle: isAnnual ? 'annual' : 'monthly',
-            });
-
-            if (data.paymentUrl) {
-                // Redirect to Asaas checkout page
-                window.location.href = data.paymentUrl;
-            } else {
-                throw new Error('Payment URL not returned');
-            }
-        } catch (error: any) {
-            console.error('[precos] Subscribe error:', error);
-            const message =
-                error?.response?.data?.message ||
-                'Não foi possível iniciar o pagamento. Tente novamente.';
-            toast({
-                variant: "destructive",
-                title: "Erro ao assinar plano",
-                description: message,
-            });
-        } finally {
-            setLoadingTier(null);
+        // Sem CPF no perfil → coleta antes de ir para o checkout
+        if (!userProfile.cpf) {
+            setDocValue("");
+            setDocError(null);
+            setDocDialogPlan(planName);
+            return;
         }
+
+        await startCheckout(planName, planKey);
+    };
+
+    const handleConfirmDocument = async () => {
+        if (!docDialogPlan) return;
+        if (!validateCpfCnpj(docValue)) {
+            setDocError("Documento inválido. Confira os dígitos do CPF ou CNPJ.");
+            return;
+        }
+        const planName = docDialogPlan;
+        const planKey = PLAN_KEY[planName.toLowerCase()];
+        setDocDialogPlan(null);
+        await startCheckout(planName, planKey, docValue);
     };
 
     const plans = [
@@ -162,6 +213,38 @@ export default function PricingPage() {
     return (
         <div className="min-h-screen flex flex-col bg-background">
             <Header />
+
+            {/* CPF/CNPJ necessário para emissão da cobrança no Asaas */}
+            <Dialog open={docDialogPlan !== null} onOpenChange={(open) => { if (!open) setDocDialogPlan(null); }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Informe seu CPF ou CNPJ</DialogTitle>
+                        <DialogDescription>
+                            Precisamos do seu documento para emitir a cobrança do plano {docDialogPlan}.
+                            Ele fica salvo no seu perfil e não será exibido publicamente.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2">
+                        <Label htmlFor="checkout-document">CPF / CNPJ</Label>
+                        <Input
+                            id="checkout-document"
+                            inputMode="numeric"
+                            autoComplete="off"
+                            placeholder="000.000.000-00"
+                            value={docValue}
+                            onChange={(e) => { setDocValue(formatCpfCnpj(e.target.value)); setDocError(null); }}
+                            onKeyDown={(e) => { if (e.key === "Enter") handleConfirmDocument(); }}
+                        />
+                        {docError && <p className="text-sm text-destructive">{docError}</p>}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDocDialogPlan(null)}>Cancelar</Button>
+                        <Button onClick={handleConfirmDocument} disabled={docValue.replace(/\D/g, "").length < 11}>
+                            Continuar para o pagamento
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <main className="flex-1">
                 <section className="relative py-20 md:py-32 overflow-hidden">
@@ -272,7 +355,7 @@ export default function PricingPage() {
                                                 variant={plan.ctaVariant}
                                                 size="lg"
                                                 onClick={() => handleSubscribe(plan.name)}
-                                                disabled
+                                                disabled={loadingTier !== null}
                                             >
                                                 {loadingTier === plan.name && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                                 {plan.cta}

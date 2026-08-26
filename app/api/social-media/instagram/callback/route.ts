@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMetaConfig, getRedirectUri, getRequestOrigin, verifyState, graphGet, MetaApiError } from "@/lib/server/meta";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
+import { sealAccessToken } from "@/lib/server/instagram-connection";
+import { isEncryptionConfigured, ENCRYPTION_KEY_MISSING_MSG } from "@/lib/server/crypto";
 
 // Callback do OAuth da Meta. Chega via redirect do Facebook (sem sessão),
 // por isso a identidade vem do `state` assinado. Fluxo:
@@ -60,6 +62,11 @@ export async function GET(request: NextRequest) {
     const admin = getSupabaseAdmin();
     if (!admin) {
       return redirectTo(origin, scheduleId, { ig: "error", reason: "service_role" });
+    }
+    // O token da Página é gravado cifrado — sem chave não há como salvar com segurança.
+    if (!isEncryptionConfigured()) {
+      console.error("instagram/callback:", ENCRYPTION_KEY_MISSING_MSG);
+      return redirectTo(origin, scheduleId, { ig: "error", reason: "config", detail: ENCRYPTION_KEY_MISSING_MSG.slice(0, 180) });
     }
 
     const redirectUri = getRedirectUri(request);
@@ -176,7 +183,7 @@ export async function GET(request: NextRequest) {
           ig_username: ig.username ?? null,
           page_id: page.id,
           page_name: page.name ?? null,
-          access_token: page.access_token!,
+          access_token: sealAccessToken(page.access_token!), // cifrado em repouso (AES-256-GCM)
           token_expires_at: null, // page token de longa duração não expira
           connected_by: state.userId,
           updated_at: new Date().toISOString(),

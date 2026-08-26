@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser, checkOwnerPremiumSm, PREMIUM_SM_MSG } from "@/lib/server/api-auth";
 import { graphGet, MetaApiError } from "@/lib/server/meta";
 import { getSupabaseAdmin, ADMIN_MISSING_MSG } from "@/lib/server/supabase-admin";
+import { loadInstagramConnection } from "@/lib/server/instagram-connection";
 
 // Feed real da conta conectada para o Simulador de Feed: últimas mídias do
 // grid (feed + reels) com URL de imagem. As URLs de mídia da Meta expiram,
@@ -64,11 +65,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: PREMIUM_SM_MSG, planLimit: true }, { status: 403 });
     }
 
-    const { data: connection } = await admin
-      .from("sm_instagram_accounts")
-      .select("ig_user_id, access_token")
-      .eq("schedule_id", scheduleId)
-      .maybeSingle();
+    // Token cifrado no banco — decifrado só no servidor
+    const { connection } = await loadInstagramConnection(admin, scheduleId);
 
     if (!connection) {
       // Sem conexão: o simulador funciona só com os posts planejados

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/server/api-auth";
 import { MetaApiError } from "@/lib/server/meta";
 import { getSupabaseAdmin, ADMIN_MISSING_MSG } from "@/lib/server/supabase-admin";
-import { syncInstagramMonth, IgConnectionRow } from "@/lib/server/instagram-sync";
+import { syncInstagramMonth } from "@/lib/server/instagram-sync";
+import { loadInstagramConnection } from "@/lib/server/instagram-connection";
 
 // Sincronização manual (botão na UI) das métricas do Instagram de um mês.
 // A lógica de matching/insights/importação vive em lib/server/instagram-sync.ts
@@ -47,12 +48,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Sem permissão para sincronizar este cronograma." }, { status: 403 });
     }
 
-    // Conexão (token nunca sai do servidor)
-    const { data: connection, error: connErr } = await admin
-      .from("sm_instagram_accounts")
-      .select("*")
-      .eq("schedule_id", scheduleId)
-      .maybeSingle();
+    // Conexão (token cifrado no banco; decifrado só aqui, nunca sai do servidor)
+    const { connection, error: connErr } = await loadInstagramConnection(admin, scheduleId);
 
     if (connErr?.code === "42P01") {
       return NextResponse.json(
@@ -66,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     const result = await syncInstagramMonth({
       admin,
-      connection: connection as IgConnectionRow,
+      connection,
       month: Number(month),
       year: Number(year),
       createdBy: auth.user.id,

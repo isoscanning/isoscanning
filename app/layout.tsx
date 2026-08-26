@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { ThemeProvider } from "@/components/theme-provider";
+import { SITE_URL } from "@/lib/site";
 
 
 const geistSans = Geist({
@@ -25,6 +26,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  // Base para canonical/OG relativos nas páginas (ex.: alternates.canonical: "/comunidade").
+  metadataBase: new URL(SITE_URL),
   title: "ISO Scanning - Marketplace para Profissionais de Fotografia",
   description:
     "Plataforma completa para profissionais de fotografia e audiovisual. Encontre profissionais, alugue equipamentos e agende serviços.",

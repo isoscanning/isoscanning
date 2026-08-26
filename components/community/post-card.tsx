@@ -8,27 +8,32 @@ import { MessageSquare, ThumbsUp, Share2 } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import api from "@/lib/api-service";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { postPath } from "@/lib/community-paths";
 
 interface Post {
     id: string;
+    /** Slug do post (SQL 60). Sem ele, cai na rota legada por id. */
+    slug?: string | null;
     title: string;
     content: string;
+    /** Resumo em texto puro; se ausente, usa o content. */
+    excerpt?: string | null;
     author: {
         name: string;
-        avatarUrl?: string;
+        avatarUrl?: string | null;
     };
     communitySlug: string;
     communityName: string;
     likesCount: number;
     commentsCount: number;
     createdAt: string;
-    mediaUrl?: string;
-    mediaType?: 'image' | 'video' | 'none';
+    mediaUrl?: string | null;
+    mediaType?: 'image' | 'video' | 'none' | null;
 }
 
 interface PostCardProps {
@@ -43,8 +48,12 @@ export function PostCard({ post, showCommunity = true }: PostCardProps) {
     const [isLiking, setIsLiking] = useState(false);
     const [hasLiked, setHasLiked] = useState(false); // Optimistic state since API doesn't return it yet
 
+    // URL canônica do post — também usada no <Link> do título, para que
+    // crawlers descubram o post a partir da página da comunidade.
+    const path = postPath(post.communitySlug, post);
+
     const handleCardClick = () => {
-        router.push(`/c/${post.communitySlug}/comments/${post.id}`);
+        router.push(path);
     };
 
     const handleLike = async (e: React.MouseEvent) => {
@@ -61,11 +70,11 @@ export function PostCard({ post, showCommunity = true }: PostCardProps) {
         setIsLiking(true);
         try {
             if (hasLiked) {
-                await api.post(`/posts/${post.id}/unlike`, { userId: userProfile.id });
+                await api.post(`/posts/${post.id}/unlike`);
                 setLikes(Math.max(0, likes - 1));
                 setHasLiked(false);
             } else {
-                await api.post(`/posts/${post.id}/like`, { userId: userProfile.id });
+                await api.post(`/posts/${post.id}/like`);
                 setLikes(likes + 1);
                 setHasLiked(true);
             }
@@ -81,7 +90,7 @@ export function PostCard({ post, showCommunity = true }: PostCardProps) {
         e.preventDefault();
         e.stopPropagation();
 
-        const url = `${window.location.origin}/c/${post.communitySlug}/comments/${post.id}`;
+        const url = `${window.location.origin}${path}`;
 
         if (navigator.share) {
             try {
@@ -105,15 +114,17 @@ export function PostCard({ post, showCommunity = true }: PostCardProps) {
         handleCardClick();
     };
 
+    const summary = (post.excerpt || post.content || "").trim();
+
     return (
         <Card className="hover:border-primary/50 transition-colors cursor-pointer" onClick={handleCardClick}>
             <CardHeader className="flex flex-row items-center gap-3 p-4 pb-2 space-y-0">
                 <Avatar className="h-8 w-8">
-                    <AvatarImage src={post.author.avatarUrl} alt={post.author.name} />
-                    <AvatarFallback>{post.author.name[0]}</AvatarFallback>
+                    <AvatarImage src={post.author.avatarUrl ?? undefined} alt={post.author.name} />
+                    <AvatarFallback>{post.author.name?.[0] || "U"}</AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col text-sm">
-                    <div className="flex items-center gap-1">
+                    <div className="flex flex-wrap items-center gap-1">
                         {showCommunity && (
                             <>
                                 <Link
@@ -130,16 +141,20 @@ export function PostCard({ post, showCommunity = true }: PostCardProps) {
                             Enviado por {post.author.name}
                         </span>
                         <span className="text-muted-foreground">•</span>
-                        <span className="text-muted-foreground">
+                        <time className="text-muted-foreground" dateTime={post.createdAt}>
                             {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true, locale: ptBR })}
-                        </span>
+                        </time>
                     </div>
                 </div>
             </CardHeader>
             <CardContent className="p-4 pt-2">
-                <h3 className="text-lg font-semibold mb-2 leading-tight">{post.title}</h3>
+                <h3 className="text-lg font-semibold mb-2 leading-tight">
+                    <Link href={path} className="hover:underline" onClick={(e) => e.stopPropagation()}>
+                        {post.title}
+                    </Link>
+                </h3>
                 <p className="text-muted-foreground line-clamp-3 mb-3 text-sm">
-                    {post.content}
+                    {summary}
                 </p>
                 {post.mediaType === 'image' && post.mediaUrl && (
                     <div className="mb-3 rounded-lg overflow-hidden max-h-96 bg-muted flex justify-center">

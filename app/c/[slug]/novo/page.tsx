@@ -14,6 +14,8 @@ import Image from "next/link"; // Not actually next/image since we just need URL
 import api from "@/lib/api-service";
 import { toast } from "sonner";
 import { uploadFile } from "@/lib/supabase-storage";
+import { postPath } from "@/lib/community-paths";
+import { revalidateCommunityPaths } from "@/app/actions/community";
 
 export default function CreatePostPage() {
     const router = useRouter();
@@ -99,9 +101,9 @@ export default function CreatePostPage() {
                 }
             }
 
-            await api.post("/posts", {
+            // authorId não é enviado: o backend usa sempre o usuário do token.
+            const res = await api.post("/posts", {
                 communityId,
-                authorId: userProfile.id,
                 title,
                 content,
                 mediaUrl,
@@ -109,7 +111,11 @@ export default function CreatePostPage() {
             });
 
             toast.success("Publicação criada com sucesso!");
-            router.push(`/c/${slug}`);
+
+            // As páginas públicas são ISR: purga o cache para o post aparecer na hora.
+            const created = res.data as { id?: string; slug?: string | null } | undefined;
+            revalidateCommunityPaths(slug, created?.slug).catch(() => {});
+            router.push(created?.id ? postPath(slug, { id: created.id, slug: created.slug }) : `/c/${slug}`);
         } catch (error: any) {
             console.error("Error creating post:", error);
             toast.error("Erro ao criar a publicação.");
@@ -139,7 +145,7 @@ export default function CreatePostPage() {
                                 <label className="text-sm font-medium">Título</label>
                                 <Input
                                     required
-                                    placeholder="Ex: Como configurar o scanner D300?"
+                                    placeholder="Ex: Qual lente usar para ensaio externo à noite?"
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                     className="w-full"
@@ -150,7 +156,7 @@ export default function CreatePostPage() {
                                 <label className="text-sm font-medium">Conteúdo</label>
                                 <Textarea
                                     required
-                                    placeholder="Escreva sua dúvida, dica ou compartilhe um resultado..."
+                                    placeholder="Escreva sua dúvida, dica ou compartilhe um resultado... (aceita Markdown: **negrito**, listas, links)"
                                     rows={6}
                                     value={content}
                                     onChange={(e) => setContent(e.target.value)}

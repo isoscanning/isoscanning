@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { uploadAvatar } from "@/lib/supabase-storage"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, CheckCircle2, EyeOff, Globe, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -662,28 +663,25 @@ export default function PerfilPage() {
     setUploadingAvatar(true)
     setErrorMsg("")
 
-    try {
-      // Create a preview and base64 using FileReader
-      const reader = new FileReader()
-      reader.onloadend = async () => {
-        const base64 = reader.result as string
-        setAvatarPreview(base64)
-        setFormData(prev => ({ ...prev, avatarUrl: base64 }))
+    // Preview imediato; a imagem NÃO vai mais em base64 para o banco — sobe
+    // comprimida para o Storage (bucket `avatars`) e só a URL é gravada.
+    const previewUrl = URL.createObjectURL(file)
+    setAvatarPreview(previewUrl)
 
-        // Auto-save to database
-        try {
-          await apiClient.put(`/profiles/${userProfile.id}`, { avatarUrl: base64 })
-          setSuccessMsg("Foto de perfil atualizada!")
-        } catch (err: any) {
-          console.error("[perfil] Error saving avatar:", err)
-          setErrorMsg("Erro ao salvar foto de perfil.")
-        } finally {
-          setUploadingAvatar(false)
-        }
-      }
-      reader.readAsDataURL(file)
-    } catch (err) {
-      setErrorMsg("Erro ao processar imagem.")
+    try {
+      const avatarUrl = await uploadAvatar(file, userProfile.id)
+      setFormData(prev => ({ ...prev, avatarUrl }))
+      setAvatarPreview(avatarUrl)
+
+      // Auto-save to database
+      await apiClient.put(`/profiles/${userProfile.id}`, { avatarUrl })
+      setSuccessMsg("Foto de perfil atualizada!")
+    } catch (err: any) {
+      console.error("[perfil] Error saving avatar:", err)
+      setAvatarPreview(null)
+      setErrorMsg(err?.message || "Erro ao salvar foto de perfil.")
+    } finally {
+      URL.revokeObjectURL(previewUrl)
       setUploadingAvatar(false)
     }
   }

@@ -47,9 +47,27 @@ function count(value: unknown): number {
   return row?.count ?? 0;
 }
 
+/**
+ * Só aceita URLs http(s) curtas para imagens renderizadas no servidor.
+ *
+ * Vários `profiles.avatar_url` em produção são imagens base64 (`data:image/...`)
+ * de 1 a 4 MB. Cada avatar aparece várias vezes no HTML + payload RSC de uma
+ * página (autor, comentários, cards), e o render acumulava >100 MB de strings —
+ * o processo estourava os 512 MB do Render (502 em cascata). Descartar aqui faz
+ * o Avatar cair no fallback de iniciais; a UI logada (API) continua igual.
+ */
+const MAX_IMAGE_URL_LENGTH = 2048;
+function safeImageUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const url = value.trim();
+  if (!url || url.length > MAX_IMAGE_URL_LENGTH) return null;
+  if (!/^https?:\/\//i.test(url)) return null;
+  return url;
+}
+
 function author(profile: unknown): PublicAuthor {
   const p = one(profile as { display_name?: string; avatar_url?: string | null } | null);
-  return { name: p?.display_name || "Usuário", avatarUrl: p?.avatar_url ?? null };
+  return { name: p?.display_name || "Usuário", avatarUrl: safeImageUrl(p?.avatar_url) };
 }
 
 const COMMUNITY_SELECT = `
@@ -79,8 +97,8 @@ function mapCommunity(row: any): PublicCommunity {
     name: row.name,
     slug: row.slug,
     description: row.description ?? "",
-    avatarUrl: row.avatar_url ?? null,
-    bannerUrl: row.banner_url ?? null,
+    avatarUrl: safeImageUrl(row.avatar_url),
+    bannerUrl: safeImageUrl(row.banner_url),
     ownerId: row.owner_id,
     ownerName: owner?.display_name || "Iso Scanning",
     rules: Array.isArray(row.rules) ? row.rules : [],
@@ -100,7 +118,7 @@ function mapPost(row: any): PublicPost {
     title: row.title,
     content: row.content ?? "",
     excerpt: row.excerpt ?? null,
-    mediaUrl: row.media_url ?? null,
+    mediaUrl: safeImageUrl(row.media_url),
     mediaType: (row.media_type as MediaType | null) ?? null,
     likesCount: row.likes_count ?? 0,
     commentsCount: row.comments_count ?? 0,

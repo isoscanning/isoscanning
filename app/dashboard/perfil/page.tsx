@@ -271,7 +271,7 @@ export default function PerfilPage() {
 
           setSelectedCountryCode(codeToSet);
 
-          let newFormData = {
+          const newFormData = {
             displayName: freshProfile.displayName || userProfile.displayName || "",
             artisticName: freshProfile.artisticName || "",
             specialties: freshProfile.specialties || [],
@@ -343,7 +343,7 @@ export default function PerfilPage() {
         } catch (error: any) {
           console.error("[perfil] Error fetching fresh profile:", error?.response?.status, error?.response?.data || error.message)
           // Fallback to cached userProfile data
-          let newFallbackData = {
+          const newFallbackData = {
             displayName: userProfile.displayName || "",
             artisticName: userProfile.artisticName || "",
             specialties: userProfile.specialties || [],
@@ -406,7 +406,7 @@ export default function PerfilPage() {
             setAvatarPreview(userProfile.avatarUrl)
           }
 
-          let isMounted = true;
+          const isMounted = true;
           await Promise.all([
             loadPortfolio(),
             loadAvailability(isMounted)

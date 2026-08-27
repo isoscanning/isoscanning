@@ -1,9 +1,10 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import DetalhesVagaPage from '../page';
-import { fetchJobOfferById, checkJobApplication, applyToJob } from '@/lib/data-service';
+import { fetchJobOfferById, fetchJobApplication, applyToJob } from '@/lib/data-service';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter, useParams } from 'next/navigation';
+import { trackEvent } from '@/lib/analytics';
 import apiClient from '@/lib/api-service';
 
 // Mock Next.js router and params
@@ -17,16 +18,29 @@ jest.mock('@/lib/auth-context', () => ({
     useAuth: jest.fn(),
 }));
 
-// Mock Data Service
+// Mock Data Service.
+// The page loads the job with fetchJobOfferById and, when a user is logged in,
+// resolves the current application with fetchJobApplication (JobApplication | null).
 jest.mock('@/lib/data-service', () => ({
     fetchJobOfferById: jest.fn(),
-    checkJobApplication: jest.fn(),
+    fetchJobApplication: jest.fn(),
     applyToJob: jest.fn(),
 }));
 
-// Mock API Client
+// Mock analytics (trackEvent is fired on job view)
+jest.mock('@/lib/analytics', () => ({
+    trackEvent: jest.fn(),
+}));
+
+// Mock API Client (default export, used for employer review stats)
 jest.mock('@/lib/api-service', () => ({
-    get: jest.fn(),
+    __esModule: true,
+    default: {
+        get: jest.fn(),
+        post: jest.fn(),
+        put: jest.fn(),
+        delete: jest.fn(),
+    },
 }));
 
 // Mock components
@@ -74,6 +88,23 @@ describe('DetalhesVagaPage', () => {
         createdAt: new Date().toISOString(),
     };
 
+    const mockApplication = {
+        id: 'app123',
+        jobOfferId: 'job123',
+        candidateId: 'candidate123',
+        status: 'pending' as const,
+        counterProposal: 750,
+        createdAt: new Date().toISOString(),
+        jobOffer: {
+            id: 'job123',
+            title: 'Vaga Publica de Teste',
+            employerId: 'employer123',
+            employerName: 'Empresa Teste',
+            jobType: 'freelance',
+            locationType: 'on_site',
+        },
+    };
+
     beforeEach(() => {
         jest.clearAllMocks();
         (useRouter as jest.Mock).mockReturnValue(mockRouter);
@@ -82,37 +113,50 @@ describe('DetalhesVagaPage', () => {
             userProfile: mockUser,
         });
         (fetchJobOfferById as jest.Mock).mockResolvedValue(mockJob);
-        (checkJobApplication as jest.Mock).mockResolvedValue(false);
+        (fetchJobApplication as jest.Mock).mockResolvedValue(null);
         (apiClient.get as jest.Mock).mockResolvedValue({ data: { averageRating: 4.5, totalReviews: 12 } });
     });
 
     it('renders job details correctly', async () => {
         render(<DetalhesVagaPage />);
 
-        await waitFor(() => {
-            expect(screen.getAllByText(/Vaga Publica de Teste/i).length).toBeGreaterThan(0);
-        });
+        expect((await screen.findAllByText(/Vaga Publica de Teste/i)).length).toBeGreaterThan(0);
+
+        expect(fetchJobOfferById).toHaveBeenCalledWith('job123');
+        expect(fetchJobApplication).toHaveBeenCalledWith('job123', 'candidate123');
+        expect(apiClient.get).toHaveBeenCalledWith('/reviews/stats/employer123');
+        expect(trackEvent).toHaveBeenCalledWith(
+            expect.objectContaining({ action: 'view_job_offer', label: 'Vaga Publica de Teste' })
+        );
 
         expect(screen.getAllByText(/Empresa Teste/i).length).toBeGreaterThan(0);
         expect(screen.getByText(/Descrição detalhada da vaga/i)).toBeInTheDocument();
         expect(screen.getByText(/São Paulo\/SP/i)).toBeInTheDocument();
+
+        // Employer review stats fetched via apiClient
+        await waitFor(() => {
+            expect(screen.getByText('4.5')).toBeInTheDocument();
+        });
+        expect(screen.getByText(/12 avaliações/i)).toBeInTheDocument();
     });
 
     it('allows a user to apply for a job', async () => {
         (applyToJob as jest.Mock).mockResolvedValue(true);
         render(<DetalhesVagaPage />);
 
-        await waitFor(() => {
-            expect(screen.getAllByText(/Vaga Publica de Teste/i).length).toBeGreaterThan(0);
-        });
+        await screen.findAllByText(/Vaga Publica de Teste/i);
 
         const applyButton = screen.getAllByRole('button', { name: /candidatar-se/i })[0];
+        expect(applyButton).toBeEnabled();
         fireEvent.click(applyButton);
 
         await waitFor(() => {
             expect(applyToJob).toHaveBeenCalledWith('job123', 'candidate123');
             expect(mockRouter.push).toHaveBeenCalledWith('/dashboard/candidaturas');
         });
+
+        // After applying the button switches to the applied state
+        expect((await screen.findAllByRole('button', { name: /já candidatado/i })).length).toBeGreaterThan(0);
     });
 
     it('redirects to login if non-authenticated user tries to apply', async () => {
@@ -122,26 +166,32 @@ describe('DetalhesVagaPage', () => {
 
         render(<DetalhesVagaPage />);
 
-        await waitFor(() => {
-            expect(screen.getAllByText(/Vaga Publica de Teste/i).length).toBeGreaterThan(0);
-        });
+        await screen.findAllByText(/Vaga Publica de Teste/i);
+
+        // No application lookup without a logged-in user
+        expect(fetchJobApplication).not.toHaveBeenCalled();
 
         const applyButton = screen.getAllByRole('button', { name: /candidatar-se/i })[0];
         fireEvent.click(applyButton);
 
         expect(mockRouter.push).toHaveBeenCalledWith('/login');
+        expect(applyToJob).not.toHaveBeenCalled();
     });
 
     it('shows "Já Candidatado" if user has already applied', async () => {
-        (checkJobApplication as jest.Mock).mockResolvedValue(true);
+        (fetchJobApplication as jest.Mock).mockResolvedValue(mockApplication);
 
         render(<DetalhesVagaPage />);
 
-        await waitFor(() => {
-            expect(screen.getAllByText(/Já Candidatado/i).length).toBeGreaterThan(0);
-        });
+        const appliedButtons = await screen.findAllByRole('button', { name: /já candidatado/i });
+        expect(appliedButtons.length).toBeGreaterThan(0);
+        appliedButtons.forEach((button) => expect(button).toBeDisabled());
 
-        const applyButton = screen.getAllByRole('button', { name: /já candidatado/i })[0];
-        expect(applyButton).toBeDisabled();
+        // The existing counter-proposal from the application is displayed
+        expect(screen.getAllByText(/Minha Proposta: R\$ 750/i).length).toBeGreaterThan(0);
+
+        // Clicking the disabled button must not re-apply
+        fireEvent.click(appliedButtons[0]);
+        expect(applyToJob).not.toHaveBeenCalled();
     });
 });

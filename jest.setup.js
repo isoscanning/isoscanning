@@ -1,5 +1,11 @@
 import '@testing-library/jest-dom'
 import * as React from 'react'
+import { TextEncoder, TextDecoder } from 'util'
+
+// jsdom não expõe TextEncoder/TextDecoder; libs como jspdf (lib/pdf-generator.ts)
+// exigem-nos no momento do import.
+if (typeof global.TextEncoder === 'undefined') global.TextEncoder = TextEncoder;
+if (typeof global.TextDecoder === 'undefined') global.TextDecoder = TextDecoder;
 
 // Provide dummy environment variables for Supabase in tests
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';

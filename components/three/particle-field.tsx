@@ -311,7 +311,7 @@ export function ParticleField() {
         const intersectionObserver = new IntersectionObserver(
             ([entry]) => {
                 inView = entry.isIntersecting
-                inView ? start() : stop()
+                if (inView) start(); else stop()
             },
             { threshold: 0 },
         )

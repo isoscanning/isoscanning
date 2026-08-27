@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/header";
@@ -49,36 +49,28 @@ export default function AgendaPage() {
     }
   }, [userProfile, loading, router]);
 
+  // Definido no escopo do componente (e não dentro do useEffect) porque os
+  // handlers de adicionar/excluir também precisam recarregar a lista.
+  const loadAvailability = useCallback(async () => {
+    if (!userProfile?.id) return;
+    setFetchingAvailability(true);
+    try {
+      const slots = await fetchAvailability(userProfile.id);
+      const todayStr = format(new Date(), "yyyy-MM-dd");
+      const futureSlots = slots.filter(slot => slot.date >= todayStr);
+      setAvailabilitySlots(futureSlots);
+    } catch (error) {
+      setErrorMsg("Erro ao carregar disponibilidade.");
+    } finally {
+      setFetchingAvailability(false);
+    }
+  }, [userProfile?.id]);
+
   useEffect(() => {
-    let isMounted = true;
-
-    const loadAvailability = async () => {
-      if (!userProfile?.id) return;
-      setFetchingAvailability(true);
-      try {
-        const slots = await fetchAvailability(userProfile.id);
-        if (!isMounted) return;
-        const todayStr = format(new Date(), "yyyy-MM-dd");
-        const futureSlots = slots.filter(slot => slot.date >= todayStr);
-        setAvailabilitySlots(futureSlots);
-      } catch (error) {
-        if (!isMounted) return;
-        setErrorMsg("Erro ao carregar disponibilidade.");
-      } finally {
-        if (isMounted) {
-          setFetchingAvailability(false);
-        }
-      }
-    };
-
     if (userProfile?.id) {
       loadAvailability();
     }
-
-    return () => {
-      isMounted = false;
-    };
-  }, [userProfile?.id]);
+  }, [userProfile?.id, loadAvailability]);
 
   // Success message timeout management
   useEffect(() => {

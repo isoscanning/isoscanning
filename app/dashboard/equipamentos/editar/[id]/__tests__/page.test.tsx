@@ -19,11 +19,26 @@ jest.mock('@/lib/data-service', () => ({
     fetchUserEquipments: jest.fn(),
     updateEquipment: jest.fn(),
     uploadEquipmentImages: jest.fn(),
+    deleteEquipmentImages: jest.fn(),
 }));
 
 jest.mock('@/components/header', () => ({ Header: () => <div /> }));
 jest.mock('@/components/footer', () => ({ Footer: () => <div /> }));
 jest.mock('@/components/scroll-reveal', () => ({ ScrollReveal: ({ children }: any) => <div>{children}</div> }));
+
+// LocationSelector fetches countries/states/cities through apiClient (axios) on mount.
+// Stub it so the suite stays offline and deterministic; the page keeps the
+// country/state/city loaded from the equipment in formData, which is what the
+// submit validation reads.
+jest.mock('@/components/location-selector', () => ({
+    LocationSelector: ({ initialCountryName, initialStateUf, initialCityName }: any) => (
+        <div data-testid="mock-location-selector">
+            <span>{initialCountryName}</span>
+            <span>{initialStateUf}</span>
+            <span>{initialCityName}</span>
+        </div>
+    ),
+}));
 
 // UI mocks
 jest.mock('@/components/ui/select', () => ({
@@ -69,6 +84,9 @@ jest.mock('@/components/ui/card', () => ({
 
 describe('EditarEquipamentoPage', () => {
     const mockRouter = { push: jest.fn(), back: jest.fn() };
+
+    // The page's submit validation requires: at least one image, description,
+    // brand, model, country, state, city and (for non-free listings) a price.
     const mockEquipment = {
         id: 'eq1',
         name: 'Existing Camera',
@@ -78,11 +96,13 @@ describe('EditarEquipamentoPage', () => {
         price: 500,
         city: 'São Paulo',
         state: 'SP',
+        country: 'Brasil',
         description: 'Existing Description',
         ownerId: 'user1',
         brand: 'Canon',
         model: 'EOS R5',
         isAvailable: true,
+        imageUrls: ['https://cdn.example.com/eq1/photo-1.jpg'],
     };
 
     beforeEach(() => {
@@ -100,9 +120,28 @@ describe('EditarEquipamentoPage', () => {
 
         render(<EditarEquipamentoPage />);
 
-        await waitFor(() => {
-            expect(screen.getByDisplayValue('Existing Camera')).toBeInTheDocument();
-        });
+        expect(await screen.findByDisplayValue('Existing Camera')).toBeInTheDocument();
+        expect(fetchUserEquipments).toHaveBeenCalledWith('user1');
+        expect(screen.getByAltText('Preview 1')).toHaveAttribute('src', mockEquipment.imageUrls[0]);
+    });
+
+    it('shows a validation error and does not update when required fields are missing', async () => {
+        // No images and no country: the page must block the update.
+        (fetchUserEquipments as jest.Mock).mockResolvedValue([
+            { ...mockEquipment, imageUrls: [], country: '' },
+        ]);
+
+        const { container } = render(<EditarEquipamentoPage />);
+
+        await screen.findByDisplayValue('Existing Camera');
+
+        fireEvent.submit(container.querySelector('form')!);
+
+        expect(await screen.findByText(/campos são obrigatórios/i)).toHaveTextContent(
+            'pelo menos uma foto'
+        );
+        expect(updateEquipment).not.toHaveBeenCalled();
+        expect(mockRouter.push).not.toHaveBeenCalled();
     });
 
     it('updates equipment successfully', async () => {
@@ -111,18 +150,34 @@ describe('EditarEquipamentoPage', () => {
 
         const { container } = render(<EditarEquipamentoPage />);
 
-        await waitFor(() => {
-            expect(screen.getByDisplayValue('Existing Camera')).toBeInTheDocument();
-        });
+        await screen.findByDisplayValue('Existing Camera');
 
         fireEvent.change(container.querySelector('#name')!, { target: { value: 'Updated Name' } });
 
-        const form = container.querySelector('form');
-        fireEvent.submit(form!);
+        fireEvent.submit(container.querySelector('form')!);
 
-        // Increase timeout to 3s to account for the 1.5s redirect delay
         await waitFor(() => {
             expect(updateEquipment).toHaveBeenCalledWith('eq1', expect.objectContaining({ name: 'Updated Name' }));
+        });
+
+        // Existing images are kept (no new files, so no upload) and the
+        // location loaded from the equipment is sent back unchanged.
+        expect(uploadEquipmentImages).not.toHaveBeenCalled();
+        expect(updateEquipment).toHaveBeenCalledWith(
+            'eq1',
+            expect.objectContaining({
+                imageUrls: mockEquipment.imageUrls,
+                country: 'Brasil',
+                state: 'SP',
+                city: 'São Paulo',
+                price: 500,
+            })
+        );
+
+        expect(await screen.findByText(/atualizado com sucesso/i)).toBeInTheDocument();
+
+        // The page redirects 1.5s after a successful update.
+        await waitFor(() => {
             expect(mockRouter.push).toHaveBeenCalledWith('/dashboard/equipamentos');
         }, { timeout: 3000 });
     });

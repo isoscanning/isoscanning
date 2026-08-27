@@ -49,7 +49,7 @@ jest.mock('@/components/typing-text', () => ({
 
 // Mock SearchBar to test integration without needing full DOM for it
 jest.mock('@/components/search-bar', () => ({
-    SearchBar: ({ onSearch }: { onSearch: Function }) => (
+    SearchBar: ({ onSearch }: { onSearch: (filters: Record<string, unknown>) => void }) => (
         <div>
             <input
                 placeholder="Mock City Input"

@@ -134,12 +134,16 @@ export function PortfolioGallery({
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {portfolioItems.map((item) => (
+                        {portfolioItems.map((item) => {
+                            // PortfolioItem guarda um array `media`; a galeria mostra a capa (1º item).
+                            const cover = item.media?.[0];
+                            const coverUrl = cover?.url || "/placeholder.svg";
+                            return (
                             <div key={item.id} className="group relative aspect-square rounded-xl overflow-hidden border bg-black shadow-sm hover:shadow-md transition-all">
-                                {item.mediaType === "video" ? (
-                                    <video src={item.mediaUrl} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                                {cover?.type === "video" ? (
+                                    <video src={coverUrl} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                                 ) : (
-                                    <img src={(item as any).mediaUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                    <img src={coverUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                 )}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
                                     <div className="absolute bottom-0 left-0 right-0 p-4">
@@ -149,7 +153,7 @@ export function PortfolioGallery({
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
                                             <Button size="sm" variant="secondary" className="h-7 text-[10px] uppercase tracking-wider font-bold" asChild>
-                                                <a href={item.mediaUrl} target="_blank" rel="noopener noreferrer">
+                                                <a href={coverUrl} target="_blank" rel="noopener noreferrer">
                                                     <Eye className="h-3 w-3 mr-1" /> Ver
                                                 </a>
                                             </Button>
@@ -157,7 +161,8 @@ export function PortfolioGallery({
                                     </div>
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </CardContent>

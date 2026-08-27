@@ -72,7 +72,7 @@ export default function MinhasVagasPage() {
 
     const handleToggleActive = async (vaga: JobOffer) => {
         try {
-            let newStatus: 'open' | 'paused' | 'closed' = vaga.status === 'open' ? 'paused' : 'open';
+            const newStatus: 'open' | 'paused' | 'closed' = vaga.status === 'open' ? 'paused' : 'open';
             const newIsActive = newStatus === 'open';
 
             await updateJobStatus(vaga.id, newStatus);
@@ -156,7 +156,7 @@ export default function MinhasVagasPage() {
 
                 setVagas(vagas.map(v => selectedJobIds.includes(v.id) ? { ...v, status, isActive: status === 'open' } : v));
 
-                let actionName = action === 'conclude' ? 'concluídas' : action === 'pause' ? 'pausadas' : 'reativadas';
+                const actionName = action === 'conclude' ? 'concluídas' : action === 'pause' ? 'pausadas' : 'reativadas';
                 toast({ title: "Sucesso", description: `${selectedJobIds.length} vagas foram ${actionName}.` });
             }
             setSelectedJobIds([]);

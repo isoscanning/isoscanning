@@ -388,7 +388,7 @@ export default function VagasPublicasPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {filteredVagas.map((vaga, index) => {
                                     const isMatch = userProfile?.userType === "professional" &&
-                                        (userProfile.specialty === vaga.category || userProfile.specialties?.includes(vaga.category));
+                                        !!userProfile.specialties?.includes(vaga.category);
                                     
                                     return (
                                     <motion.div

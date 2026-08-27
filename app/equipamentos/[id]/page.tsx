@@ -363,7 +363,7 @@ export default function EquipmentDetailsPage() {
                             } else {
                               const phone = equipment.ownerPhone || '';
                               const isInternational = phone.startsWith('+');
-                              let cleanPhone = phone.replace(/\D/g, '');
+                              const cleanPhone = phone.replace(/\D/g, '');
                               if (!isInternational && cleanPhone.length <= 11) {
                                 cleanNumber = `55${cleanPhone}`;
                               } else {

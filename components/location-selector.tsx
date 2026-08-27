@@ -85,22 +85,32 @@ export function LocationSelector({
     const [openState, setOpenState] = React.useState(false)
     const [openCity, setOpenCity] = React.useState(false)
 
-    // Fetch countries if onCountryChange is provided
+    // Os pais costumam zerar state/city no onCountryChange/onStateChange (faz
+    // sentido numa troca manual, mas também dispara na hidratação inicial).
+    // Guardamos aqui os valores iniciais ainda não hidratados para que a
+    // cadeia país -> estado -> cidade consiga restaurar tudo mesmo assim.
+    const pendingStateUf = React.useRef<string | undefined>(undefined);
+    const pendingCityName = React.useRef<string | undefined>(undefined);
+
+    // Fetch countries (uma vez) se o seletor de país estiver habilitado.
+    // Depende do booleano, não da identidade do callback: pais passam arrow
+    // functions inline e a identidade muda a cada render, o que refazia a
+    // requisição a cada tecla digitada no formulário.
+    const hasCountrySelector = !!onCountryChange;
     React.useEffect(() => {
-        if (onCountryChange) {
-            setLoadingCountries(true);
-            apiClient.get('/locations/countries')
-                .then(response => {
-                    setCountries(response.data);
-                })
-                .catch(error => {
-                    console.error('Error fetching countries:', error);
-                })
-                .finally(() => {
-                    setLoadingCountries(false);
-                });
-        }
-    }, [onCountryChange]);
+        if (!hasCountrySelector) return;
+        setLoadingCountries(true);
+        apiClient.get('/locations/countries')
+            .then(response => {
+                setCountries(Array.isArray(response.data) ? response.data : []);
+            })
+            .catch(error => {
+                console.error('Error fetching countries:', error);
+            })
+            .finally(() => {
+                setLoadingCountries(false);
+            });
+    }, [hasCountrySelector]);
 
     // Fetch states when country changes
     React.useEffect(() => {
@@ -152,33 +162,40 @@ export function LocationSelector({
                 country = countries.find(c => c.name.toLowerCase() === 'brazil' || c.name.toLowerCase() === 'brasil');
             }
 
-            if (country) {
-                onCountryChange(country.id, country.name);
-            } else {
+            if (!country && initialCountryName === 'Brazil') {
                 // Try to Find Brazil as default if nothing else matches and initial was empty or defaulted
-                if (initialCountryName === 'Brazil') {
-                    const brazil = countries.find(c => c.name.toLowerCase() === 'brazil' || c.name.toLowerCase() === 'brasil');
-                    if (brazil) onCountryChange(brazil.id, brazil.name);
-                }
+                country = countries.find(c => c.name.toLowerCase() === 'brazil' || c.name.toLowerCase() === 'brasil');
+            }
+
+            if (country) {
+                // Preserva estado/cidade iniciais antes de avisar o pai (que pode zerá-los).
+                if (initialStateUf) pendingStateUf.current = initialStateUf;
+                if (initialCityName) pendingCityName.current = initialCityName;
+                onCountryChange(country.id, country.name);
             }
         }
-    }, [initialCountryName, countries, selectedCountryId, onCountryChange]);
+    }, [initialCountryName, countries, selectedCountryId, onCountryChange, initialStateUf, initialCityName]);
 
     // Hydrate state ID from initial UF
     React.useEffect(() => {
-        if (initialStateUf && states.length > 0 && !selectedStateId) {
-            const state = states.find(s => s.uf.toLowerCase() === initialStateUf.toLowerCase());
+        const uf = initialStateUf || pendingStateUf.current;
+        if (uf && states.length > 0 && !selectedStateId) {
+            const state = states.find(s => s.uf.toLowerCase() === uf.toLowerCase());
             if (state) {
+                pendingStateUf.current = undefined;
+                if (initialCityName) pendingCityName.current = initialCityName;
                 onStateChange(state.id, state.name, state.uf);
             }
         }
-    }, [initialStateUf, states, selectedStateId, onStateChange]);
+    }, [initialStateUf, initialCityName, states, selectedStateId, onStateChange]);
 
     // Hydrate city ID from initial name
     React.useEffect(() => {
-        if (initialCityName && cities.length > 0 && selectedStateId && !selectedCityId) {
-            const city = cities.find(c => c.name.toLowerCase() === initialCityName.toLowerCase());
+        const cityName = initialCityName || pendingCityName.current;
+        if (cityName && cities.length > 0 && selectedStateId && !selectedCityId) {
+            const city = cities.find(c => c.name.toLowerCase() === cityName.toLowerCase());
             if (city) {
+                pendingCityName.current = undefined;
                 onCityChange(city.id, city.name, city.ddd);
             }
         }

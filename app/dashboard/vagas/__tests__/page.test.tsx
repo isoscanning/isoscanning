@@ -226,7 +226,7 @@ describe('MinhasVagasPage', () => {
 
         await waitFor(() => {
             // bulkUpdateJobStatus specifically
-            const { bulkUpdateJobStatus: mockBulkUpdate } = require('@/lib/data-service');
+            const { bulkUpdateJobStatus: mockBulkUpdate } = jest.requireMock('@/lib/data-service');
             expect(mockBulkUpdate).toHaveBeenCalled();
         });
     });

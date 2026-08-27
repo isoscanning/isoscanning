@@ -144,20 +144,20 @@ describe('CandidatosVagaPage', () => {
         expect(screen.getByText('Pendente')).toBeInTheDocument();
     });
 
-    it('approves a candidate', async () => {
-        (updateJobApplicationStatus as jest.Mock).mockResolvedValue(true);
+    it('starts the agreement flow when approving a candidate', async () => {
+        // Aprovar um candidato não muda o status direto: leva para a tela de acordo
+        // (/dashboard/vagas/:id/acordo/:applicationId), onde o valor é definido.
         render(<CandidatosVagaPage />);
 
         await waitFor(() => {
             expect(screen.getByText(/João Silva/i)).toBeInTheDocument();
         });
 
-        const approveButton = screen.getByRole('button', { name: /aprovar/i });
-        fireEvent.click(approveButton);
+        const agreementButton = screen.getByRole('button', { name: /gerar acordo/i });
+        fireEvent.click(agreementButton);
 
-        await waitFor(() => {
-            expect(updateJobApplicationStatus).toHaveBeenCalledWith('app1', 'accepted');
-        });
+        expect(mockRouter.push).toHaveBeenCalledWith('/dashboard/vagas/job123/acordo/app1');
+        expect(updateJobApplicationStatus).not.toHaveBeenCalled();
     });
 
     it('rejects a candidate', async () => {
@@ -172,7 +172,8 @@ describe('CandidatosVagaPage', () => {
         fireEvent.click(rejectButton);
 
         await waitFor(() => {
-            expect(updateJobApplicationStatus).toHaveBeenCalledWith('app1', 'rejected');
+            // 3º argumento é o valor acordado — só existe no fluxo de aprovação.
+            expect(updateJobApplicationStatus).toHaveBeenCalledWith('app1', 'rejected', undefined);
         });
     });
 

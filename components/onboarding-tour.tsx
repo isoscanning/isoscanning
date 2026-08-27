@@ -99,7 +99,7 @@ export function OnboardingTour({ steps, onComplete, onSkip }: OnboardingTourProp
         const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1000;
 
         // Default: Bottom centered
-        let top = targetRect.bottom + padding + window.scrollY; // Absolute from top of doc? 
+        const top = targetRect.bottom + padding + window.scrollY; // Absolute from top of doc? 
         // Wait, fixed position is easier for overlay.
         // targetRect is relative to viewport.
 

@@ -222,7 +222,9 @@ export function PersonalDataForm({
                 <div className="space-y-2">
                     <Label>Locais</Label>
                     <LocationSelector
-                        key={localCountryId} // Remount if country changes to ensure clean state if needed, or rely on internal logic
+                        // Sem `key={localCountryId}`: o remount na hidratação inicial descartava
+                        // o estado/cidade salvos. O próprio seletor já recarrega estados/cidades
+                        // quando selectedCountryId/selectedStateId mudam.
                         initialCountryName={formData.country || "Brazil"} // Default to Brazil if not set? Or pass "Brazil" as initial
                         initialStateUf={formData.state}
                         initialCityName={formData.city}
@@ -232,26 +234,41 @@ export function PersonalDataForm({
                         selectedCityId={localCityId}
 
                         onCountryChange={(id, name) => {
+                            // Só zera estado/cidade numa troca manual de país; na hidratação
+                            // inicial (localCountryId ainda null) preserva os valores salvos.
+                            const isManualChange = localCountryId !== null && localCountryId !== id;
                             setLocalCountryId(id);
-                            setFormData({ ...formData, country: name, state: "", city: "" });
-                            setLocalStateId(null);
-                            setLocalCityId(null);
+                            setFormData((prev: typeof formData) => ({
+                                ...prev,
+                                country: name,
+                                ...(isManualChange ? { state: "", city: "" } : {}),
+                            }));
+                            if (isManualChange) {
+                                setLocalStateId(null);
+                                setLocalCityId(null);
+                            }
                         }}
                         onStateChange={(id, name, uf) => {
+                            const isManualChange = localStateId !== null && localStateId !== id;
                             setLocalStateId(id);
-                            setFormData({ ...formData, state: uf, city: "" });
-                            setLocalCityId(null);
+                            setFormData((prev: typeof formData) => ({
+                                ...prev,
+                                state: uf,
+                                ...(isManualChange ? { city: "" } : {}),
+                            }));
+                            if (isManualChange) setLocalCityId(null);
                         }}
                         onCityChange={(id, name, ddd) => {
                             setLocalCityId(id);
 
-                            // If we have a DDD and phone is empty, pre-fill it
-                            let newPhone = formData.phone;
-                            if (ddd && (!newPhone || newPhone.trim() === "")) {
-                                newPhone = `(${ddd}) `;
-                            }
-
-                            setFormData({ ...formData, city: name, phone: newPhone });
+                            setFormData((prev: typeof formData) => {
+                                // If we have a DDD and phone is empty, pre-fill it
+                                let newPhone = prev.phone;
+                                if (ddd && (!newPhone || newPhone.trim() === "")) {
+                                    newPhone = `(${ddd}) `;
+                                }
+                                return { ...prev, city: name, phone: newPhone };
+                            });
                         }}
 
                         className="md:grid-cols-3"

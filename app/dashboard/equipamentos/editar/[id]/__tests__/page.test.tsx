@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import EditarEquipamentoPage from '../page';
 import { useAuth } from '@/lib/auth-context';
-import { fetchUserEquipments, updateEquipment, uploadEquipmentImages } from '@/lib/data-service';
+import { fetchEquipmentById, updateEquipment, uploadEquipmentImages } from '@/lib/data-service';
 import { useRouter, useParams } from 'next/navigation';
 
 // Mocks
@@ -16,10 +16,16 @@ jest.mock('@/lib/auth-context', () => ({
 }));
 
 jest.mock('@/lib/data-service', () => ({
-    fetchUserEquipments: jest.fn(),
+    fetchEquipmentById: jest.fn(),
     updateEquipment: jest.fn(),
     uploadEquipmentImages: jest.fn(),
     deleteEquipmentImages: jest.fn(),
+}));
+
+// A página envolve o PUT com withStorageRollback (limpeza de imagens órfãs).
+jest.mock('@/lib/storage-cleanup', () => ({
+    withStorageRollback: jest.fn((_bucket: string, _urls: string[], op: () => Promise<any>) => op()),
+    removeStorageFiles: jest.fn(),
 }));
 
 jest.mock('@/components/header', () => ({ Header: () => <div /> }));
@@ -116,20 +122,21 @@ describe('EditarEquipamentoPage', () => {
     });
 
     it('loads and displays equipment data', async () => {
-        (fetchUserEquipments as jest.Mock).mockResolvedValue([mockEquipment]);
+        (fetchEquipmentById as jest.Mock).mockResolvedValue(mockEquipment);
 
         render(<EditarEquipamentoPage />);
 
         expect(await screen.findByDisplayValue('Existing Camera')).toBeInTheDocument();
-        expect(fetchUserEquipments).toHaveBeenCalledWith('user1');
+        // Busca direta pelo id: a listagem esconde anúncios pausados.
+        expect(fetchEquipmentById).toHaveBeenCalledWith('eq1');
         expect(screen.getByAltText('Preview 1')).toHaveAttribute('src', mockEquipment.imageUrls[0]);
     });
 
     it('shows a validation error and does not update when required fields are missing', async () => {
         // No images and no country: the page must block the update.
-        (fetchUserEquipments as jest.Mock).mockResolvedValue([
-            { ...mockEquipment, imageUrls: [], country: '' },
-        ]);
+        (fetchEquipmentById as jest.Mock).mockResolvedValue({
+            ...mockEquipment, imageUrls: [], country: '',
+        });
 
         const { container } = render(<EditarEquipamentoPage />);
 
@@ -144,8 +151,17 @@ describe('EditarEquipamentoPage', () => {
         expect(mockRouter.push).not.toHaveBeenCalled();
     });
 
+    it('loads a paused listing instead of claiming it does not exist', async () => {
+        (fetchEquipmentById as jest.Mock).mockResolvedValue({ ...mockEquipment, isAvailable: false });
+
+        render(<EditarEquipamentoPage />);
+
+        expect(await screen.findByDisplayValue('Existing Camera')).toBeInTheDocument();
+        expect(screen.queryByText(/não tem permissão/i)).not.toBeInTheDocument();
+    });
+
     it('updates equipment successfully', async () => {
-        (fetchUserEquipments as jest.Mock).mockResolvedValue([mockEquipment]);
+        (fetchEquipmentById as jest.Mock).mockResolvedValue(mockEquipment);
         (updateEquipment as jest.Mock).mockResolvedValue({ ...mockEquipment, name: 'Updated Name' });
 
         const { container } = render(<EditarEquipamentoPage />);

@@ -61,6 +61,7 @@ import { ScrollReveal } from "@/components/scroll-reveal";
 import { usePlan } from "@/lib/plans/use-plan";
 import { PLAN_LIMITS, isPlanErrorBody } from "@/lib/plans/plan-limits";
 import { PlanPaywall, UpgradeButton } from "@/components/plan/plan-gate";
+import { removeStorageFiles, withStorageRollback } from "@/lib/storage-cleanup";
 
 export default function PortfolioPage() {
   const { userProfile, loading } = useAuth();
@@ -254,7 +255,13 @@ export default function PortfolioPage() {
     await processFiles(files);
   };
 
+  /** Libera o blob da prévia — com vídeos de 150 MB, esquecer isso segura a memória até o reload. */
+  const revokePreview = (url?: string | null) => {
+    if (url && url.startsWith("blob:")) URL.revokeObjectURL(url);
+  };
+
   const handleRemoveMedia = (index: number) => {
+    revokePreview(portfolioPreviews[index]?.url);
     setPortfolioFiles(prev => prev.filter((_, i) => i !== index));
     setPortfolioPreviews(prev => prev.filter((_, i) => i !== index));
   };
@@ -275,32 +282,43 @@ export default function PortfolioPage() {
       setErrorMsg("");
       setSuccessMsg("");
 
-      // Upload files
-      const newMediaList = await Promise.all(
-        portfolioFiles.map(async (file, index) => {
-          const url = await uploadPortfolioItemImage(file, userProfile.id);
-          return { url, type: portfolioPreviews[index].type };
-        })
+      // Só os arquivos enviados NESTA operação entram no rollback: os que já
+      // estavam salvos no álbum (`existingMedia`) jamais podem ser apagados
+      // porque a gravação falhou. O array é preenchido durante o upload, então
+      // uma falha no meio do Promise.all também é limpa.
+      const uploadedNow: string[] = [];
+
+      await withStorageRollback("portfolio", uploadedNow, async () => {
+        // Upload files
+        const newMediaList = await Promise.all(
+          portfolioFiles.map(async (file, index) => {
+            const url = await uploadPortfolioItemImage(file, userProfile.id);
+            uploadedNow.push(url);
+            return { url, type: portfolioPreviews[index].type };
+          })
+        );
+
+        const finalMediaPayload = [...existingMedia, ...newMediaList];
+
+        if (editingItemId) {
+          // Update portfolio item
+          await updatePortfolioItem(editingItemId, {
+            title: newPortfolioItem.title,
+            media: finalMediaPayload
+          });
+        } else {
+          // Create portfolio item
+          await createPortfolioItem({
+            title: newPortfolioItem.title,
+            media: finalMediaPayload,
+            professionalId: userProfile.id
+          });
+        }
+      });
+
+      setSuccessMsg(
+        editingItemId ? "Álbum atualizado com sucesso!" : "Item adicionado ao portfólio!"
       );
-
-      const finalMediaPayload = [...existingMedia, ...newMediaList];
-
-      if (editingItemId) {
-        // Update portfolio item
-        await updatePortfolioItem(editingItemId, {
-          title: newPortfolioItem.title,
-          media: finalMediaPayload
-        });
-        setSuccessMsg("Álbum atualizado com sucesso!");
-      } else {
-        // Create portfolio item
-        await createPortfolioItem({
-          title: newPortfolioItem.title,
-          media: finalMediaPayload,
-          professionalId: userProfile.id
-        });
-        setSuccessMsg("Item adicionado ao portfólio!");
-      }
 
       await loadPortfolio();
 
@@ -370,6 +388,7 @@ export default function PortfolioPage() {
   };
 
   const cancelEdit = () => {
+    portfolioPreviews.forEach(preview => revokePreview(preview.url));
     setEditingItemId(null);
     setExistingMedia([]);
     setNewPortfolioItem({ title: "" });
@@ -401,6 +420,12 @@ export default function PortfolioPage() {
         title: albumToEdit.title,
         media: finalMedia
       });
+
+      // Só depois de o álbum ser gravado sem as mídias é que elas podem sair
+      // do bucket — se a gravação falhar, os arquivos continuam válidos.
+      if (mediaToDelete.length > 0) {
+        await removeStorageFiles("portfolio", mediaToDelete);
+      }
 
       await loadPortfolio();
       setSuccessMsg("Álbum atualizado com sucesso.");

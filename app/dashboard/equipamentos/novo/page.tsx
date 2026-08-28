@@ -28,6 +28,7 @@ import {
 import { AlertCircle, CheckCircle2, ChevronLeft, Upload, X } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { createEquipment, uploadEquipmentImages } from "@/lib/data-service";
+import { withStorageRollback } from "@/lib/storage-cleanup";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { isPlanErrorBody } from "@/lib/plans/plan-limits";
 
@@ -170,18 +171,22 @@ export default function NovoEquipamentoPage() {
       // Create equipment
       try {
         console.log("Criando equipamento...");
-        await createEquipment({
-          ...formData,
-          negotiationType: formData.negotiationType as "sale" | "rent" | "free",
-          condition: formData.condition as "new" | "refurbished" | "used",
-          rentPeriod: formData.rentPeriod as "day" | "week" | "month",
-          price: formData.price ? Number.parseFloat(formData.price) : undefined,
-          imageUrls: imageUrls,
-          ownerId: userProfile?.id || "",
-          ownerName: userProfile?.displayName || "",
-          country: formData.country,
-          isAvailable: true,
-        });
+        // As imagens já estão no Storage: se o POST falhar (403 de plano,
+        // validação, RLS) elas viram órfãs — o rollback as apaga do bucket.
+        await withStorageRollback("equipments", imageUrls, () =>
+          createEquipment({
+            ...formData,
+            negotiationType: formData.negotiationType as "sale" | "rent" | "free",
+            condition: formData.condition as "new" | "refurbished" | "used",
+            rentPeriod: formData.rentPeriod as "day" | "week" | "month",
+            price: formData.price ? Number.parseFloat(formData.price) : undefined,
+            imageUrls: imageUrls,
+            ownerId: userProfile?.id || "",
+            ownerName: userProfile?.displayName || "",
+            country: formData.country,
+            isAvailable: true,
+          })
+        );
         console.log("Equipamento criado com sucesso!");
 
         setSuccess(true);

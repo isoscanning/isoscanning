@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import NovoEquipamentoPage from '../page';
 import { useAuth } from '@/lib/auth-context';
 import { createEquipment, uploadEquipmentImages } from '@/lib/data-service';
+import { withStorageRollback } from '@/lib/storage-cleanup';
 import { useRouter } from 'next/navigation';
 
 // Mock dependencies
@@ -17,6 +18,13 @@ jest.mock('@/lib/auth-context', () => ({
 jest.mock('@/lib/data-service', () => ({
     createEquipment: jest.fn(),
     uploadEquipmentImages: jest.fn(),
+}));
+
+// O create é envolvido por withStorageRollback: se o POST falha, as imagens
+// já enviadas ao bucket são apagadas em vez de virarem órfãs.
+jest.mock('@/lib/storage-cleanup', () => ({
+    withStorageRollback: jest.fn((_bucket: string, _urls: string[], op: () => Promise<any>) => op()),
+    removeStorageFiles: jest.fn(),
 }));
 
 jest.mock('@/components/header', () => ({ Header: () => <div /> }));
@@ -194,5 +202,12 @@ describe('NovoEquipamentoPage', () => {
         expect(await screen.findByText(/Erro ao salvar equipamento: Erro ao criar/i)).toBeInTheDocument();
         expect(createEquipment).toHaveBeenCalledTimes(1);
         expect(mockRouter.push).not.toHaveBeenCalled();
+
+        // As imagens já subidas passam pelo rollback do bucket "equipments"
+        expect(withStorageRollback).toHaveBeenCalledWith(
+            'equipments',
+            ['img1.jpg'],
+            expect.any(Function)
+        );
     });
 });

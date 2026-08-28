@@ -68,6 +68,7 @@ describe('EquipamentosPage', () => {
             imageUrl: 'https://example.com/cam.jpg',
             ownerId: 'owner1',
             ownerName: 'João',
+            ownerVerified: true,
             isAvailable: true,
         },
         {
@@ -87,6 +88,14 @@ describe('EquipamentosPage', () => {
         },
     ];
 
+    /** GET /equipments devolve { data, total, limit, offset }. */
+    const page = (items: any[], total = items.length) => ({
+        data: items,
+        total,
+        limit: 24,
+        offset: 0,
+    });
+
     beforeEach(() => {
         jest.clearAllMocks();
     });
@@ -105,7 +114,7 @@ describe('EquipamentosPage', () => {
     });
 
     it('renders equipments after loading', async () => {
-        (fetchEquipments as jest.Mock).mockResolvedValue(mockEquipments);
+        (fetchEquipments as jest.Mock).mockResolvedValue(page(mockEquipments));
 
         render(<EquipamentosPage />);
 
@@ -118,8 +127,8 @@ describe('EquipamentosPage', () => {
         expect(screen.getByText('R$ 8.500,00')).toBeInTheDocument();
     });
 
-    it('filters equipments by search term', async () => {
-        (fetchEquipments as jest.Mock).mockResolvedValue(mockEquipments);
+    it('sends the search term to the API (debounced) instead of filtering locally', async () => {
+        (fetchEquipments as jest.Mock).mockResolvedValue(page(mockEquipments));
 
         render(<EquipamentosPage />);
 
@@ -127,17 +136,64 @@ describe('EquipamentosPage', () => {
             expect(screen.getByText('Camera Sony A7III')).toBeInTheDocument();
         });
 
+        (fetchEquipments as jest.Mock).mockResolvedValue(page([mockEquipments[0]], 1));
+
         const searchInput = screen.getByPlaceholderText(/Buscar equipamentos/i);
         fireEvent.change(searchInput, { target: { value: 'Sony' } });
 
+        // Debounce: nada é disparado imediatamente
+        expect(fetchEquipments).toHaveBeenCalledTimes(1);
+
         await waitFor(() => {
-            expect(screen.getByText('Camera Sony A7III')).toBeInTheDocument();
+            expect(fetchEquipments).toHaveBeenCalledWith(
+                expect.objectContaining({ query: 'Sony', offset: 0, availableOnly: true })
+            );
+        });
+
+        await waitFor(() => {
             expect(screen.queryByText('Lente Canon 50mm')).not.toBeInTheDocument();
         });
     });
 
+    it('shows the verified badge only for owners on a paid plan', async () => {
+        (fetchEquipments as jest.Mock).mockResolvedValue(page(mockEquipments));
+
+        render(<EquipamentosPage />);
+
+        await waitFor(() => {
+            expect(screen.getByText('Camera Sony A7III')).toBeInTheDocument();
+        });
+
+        expect(screen.getAllByLabelText('Perfil verificado')).toHaveLength(1);
+    });
+
+    it('paginates with the API total instead of loading everything at once', async () => {
+        (fetchEquipments as jest.Mock).mockResolvedValue(page([mockEquipments[0]], 2));
+
+        render(<EquipamentosPage />);
+
+        const loadMore = await screen.findByRole('button', { name: /Carregar mais/i });
+
+        (fetchEquipments as jest.Mock).mockResolvedValue({
+            data: [mockEquipments[1]],
+            total: 2,
+            limit: 24,
+            offset: 1,
+        });
+
+        fireEvent.click(loadMore);
+
+        await waitFor(() => {
+            expect(fetchEquipments).toHaveBeenCalledWith(expect.objectContaining({ offset: 1 }));
+            expect(screen.getByText('Lente Canon 50mm')).toBeInTheDocument();
+        });
+
+        // Chegou ao total: o botão some
+        expect(screen.queryByRole('button', { name: /Carregar mais/i })).not.toBeInTheDocument();
+    });
+
     it('opens filters panel when button is clicked', async () => {
-        (fetchEquipments as jest.Mock).mockResolvedValue(mockEquipments);
+        (fetchEquipments as jest.Mock).mockResolvedValue(page(mockEquipments));
 
         render(<EquipamentosPage />);
 
@@ -151,7 +207,7 @@ describe('EquipamentosPage', () => {
     });
 
     it('shows empty state when no equipments match', async () => {
-        (fetchEquipments as jest.Mock).mockResolvedValue([]);
+        (fetchEquipments as jest.Mock).mockResolvedValue(page([]));
 
         render(<EquipamentosPage />);
 

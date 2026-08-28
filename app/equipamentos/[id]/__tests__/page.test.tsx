@@ -55,7 +55,7 @@ describe('EquipamentoDetalhesPage', () => {
         description: 'Amazing camera',
         ownerId: 'owner1',
         ownerName: 'João Owner',
-        available: true,
+        isAvailable: true,
         imageUrls: ['/img1.jpg'],
     };
 
@@ -117,6 +117,29 @@ describe('EquipamentoDetalhesPage', () => {
         expect(await screen.findByRole('heading', { name: 'Super Camera' })).toBeInTheDocument();
         expect(screen.queryByText(/Fazer Proposta na Plataforma/i)).not.toBeInTheDocument();
         expect(screen.queryByText(/Faça login para negociar/i)).not.toBeInTheDocument();
+    });
+
+    it('shows the negotiate CTA and no "Indisponível" badge for an active listing', async () => {
+        (useAuth as jest.Mock).mockReturnValue({ userProfile: { id: 'buyer1' } });
+        (apiClient.get as jest.Mock).mockResolvedValue({ data: mockEquipment });
+
+        render(<EquipamentoDetalhesPage />);
+
+        expect(await screen.findByRole('heading', { name: 'Super Camera' })).toBeInTheDocument();
+        // A API devolve `isAvailable`; o selo só aparece quando o anúncio está pausado.
+        expect(screen.queryByText('Indisponível')).not.toBeInTheDocument();
+    });
+
+    it('marks a paused listing as unavailable and hides the negotiate CTA', async () => {
+        (useAuth as jest.Mock).mockReturnValue({ userProfile: { id: 'buyer1' } });
+        (apiClient.get as jest.Mock).mockResolvedValue({
+            data: { ...mockEquipment, isAvailable: false },
+        });
+
+        render(<EquipamentoDetalhesPage />);
+
+        expect(await screen.findByText('Indisponível')).toBeInTheDocument();
+        expect(screen.queryByText(/Fazer Proposta na Plataforma/i)).not.toBeInTheDocument();
     });
 
     it('handles an empty payload as not found', async () => {

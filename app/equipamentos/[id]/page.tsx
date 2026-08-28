@@ -38,7 +38,7 @@ interface EquipmentDetails {
   /** Contato direto — o backend só preenche quando o dono está em plano pago. */
   ownerContactPhone?: string | null
   ownerWhatsappUrl?: string | null
-  available: boolean
+  isAvailable: boolean
   additionalConditions?: string
 }
 
@@ -231,7 +231,7 @@ export default function EquipmentDetailsPage() {
 
                   {/* Status Badge Overlay */}
                   <div className="absolute top-4 left-4 z-10">
-                    {!equipment.available && (
+                    {!equipment.isAvailable && (
                       <Badge variant="destructive" className="text-sm px-3 py-1 shadow-lg">Indisponível</Badge>
                     )}
                   </div>
@@ -393,7 +393,7 @@ export default function EquipmentDetailsPage() {
                         </a>
                       )}
 
-                      {userProfile && userProfile.id !== equipment.ownerId && equipment.available ? (
+                      {userProfile && userProfile.id !== equipment.ownerId && equipment.isAvailable ? (
                         <Link href={`/negociar-equipamento/${equipment.id}`} className="block" onClick={() => {
                           trackEvent({
                             action: 'negotiate_equipment_click',

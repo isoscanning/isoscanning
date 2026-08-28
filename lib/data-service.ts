@@ -209,37 +209,116 @@ export interface AppNotification {
 }
 
 /**
- * Fetch all available equipments (for public marketplace)
+ * Filtros aceitos por GET /equipments (SearchEquipmentDto do backend).
+ * Atenção: `condition` NÃO é filtrável na API — refine no cliente.
  */
-export async function fetchEquipments(): Promise<Equipment[]> {
+export interface EquipmentFilters {
+  query?: string;
+  ownerId?: string;
+  category?: string;
+  negotiationType?: "sale" | "rent" | "free";
+  state?: string;
+  city?: string;
+  /** Default do backend é `true` (só anúncios ativos). */
+  availableOnly?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface EquipmentSearchResult {
+  data: Equipment[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** Máximo aceito pelo DTO do backend (`@Max(100)`). */
+export const EQUIPMENTS_MAX_LIMIT = 100;
+
+function buildEquipmentQuery(filters: EquipmentFilters): string {
+  const params = new URLSearchParams();
+  const limit = Math.min(filters.limit ?? 24, EQUIPMENTS_MAX_LIMIT);
+
+  if (filters.query?.trim()) params.set("query", filters.query.trim());
+  if (filters.ownerId) params.set("ownerId", filters.ownerId);
+  if (filters.category) params.set("category", filters.category);
+  if (filters.negotiationType) params.set("negotiationType", filters.negotiationType);
+  if (filters.state) params.set("state", filters.state);
+  if (filters.city?.trim()) params.set("city", filters.city.trim());
+  if (filters.availableOnly !== undefined) params.set("availableOnly", String(filters.availableOnly));
+  params.set("limit", String(limit));
+  params.set("offset", String(filters.offset ?? 0));
+
+  return params.toString();
+}
+
+/**
+ * Busca paginada de equipamentos. Os filtros vão para a API (o marketplace
+ * não pode filtrar só o array local — passando do `limit` o resto sumiria).
+ */
+export async function fetchEquipments(
+  filters: EquipmentFilters = {}
+): Promise<EquipmentSearchResult> {
+  const limit = Math.min(filters.limit ?? 24, EQUIPMENTS_MAX_LIMIT);
+  const offset = filters.offset ?? 0;
+
   try {
-    const response = await apiClient.get(
-      "/equipments?limit=100&availableOnly=true"
-    );
-    const equipments = response.data.data || response.data;
-    return equipments;
+    const response = await apiClient.get(`/equipments?${buildEquipmentQuery(filters)}`);
+    const body = response.data;
+
+    // Tolerante a backends antigos que devolviam só o array
+    if (Array.isArray(body)) {
+      return { data: body, total: body.length, limit, offset };
+    }
+
+    const data: Equipment[] = Array.isArray(body?.data) ? body.data : [];
+    return {
+      data,
+      total: typeof body?.total === "number" ? body.total : data.length,
+      limit: typeof body?.limit === "number" ? body.limit : limit,
+      offset: typeof body?.offset === "number" ? body.offset : offset,
+    };
   } catch (error) {
     console.error("[data-service] Error fetching equipments:", error);
-    throw new Error("Erro ao buscar equipamentos");
+    throw backendError(error, "Erro ao buscar equipamentos");
   }
 }
 
 /**
- * Fetch all equipments for a specific user
+ * Equipamentos do usuário — inclusive os pausados (`availableOnly: false`),
+ * senão o dono não enxerga no painel o anúncio que ele mesmo despublicou.
  */
 export async function fetchUserEquipments(
   userId: string
 ): Promise<Equipment[]> {
   try {
-    const response = await apiClient.get(
-      `/equipments?limit=100&ownerId=${userId}`
-    );
-    const equipments = response.data.data || response.data;
-    return equipments;
+    const result = await fetchEquipments({
+      ownerId: userId,
+      availableOnly: false,
+      limit: EQUIPMENTS_MAX_LIMIT,
+    });
+    return result.data;
   } catch (error) {
     console.error("[data-service] Error fetching user equipments:", error);
-    throw new Error("Erro ao buscar equipamentos do usuário");
+    throw backendError(error, "Erro ao buscar equipamentos do usuário");
   }
+}
+
+/**
+ * Detalhe de um equipamento (GET /equipments/:id). Usado pela edição: filtrar
+ * a listagem escondia anúncios pausados e virava "sem permissão".
+ */
+export async function fetchEquipmentById(equipmentId: string): Promise<Equipment> {
+  let data: Equipment | null = null;
+  try {
+    const response = await apiClient.get(`/equipments/${equipmentId}`);
+    data = response.data ?? null;
+  } catch (error) {
+    console.error("[data-service] Error fetching equipment:", error);
+    throw backendError(error, "Erro ao buscar equipamento");
+  }
+  if (!data) throw new Error("Equipamento não encontrado");
+  return data;
 }
 
 /**
@@ -284,7 +363,8 @@ export async function updateEquipment(
       throw error;
     }
     console.error("[data-service] Error updating equipment:", error);
-    throw new Error("Erro ao atualizar equipamento");
+    // Preserva mensagem e `code` do backend (403 de permissão/plano)
+    throw backendError(error, "Erro ao atualizar equipamento");
   }
 }
 
@@ -296,7 +376,7 @@ export async function deleteEquipment(equipmentId: string): Promise<void> {
     await apiClient.delete(`/equipments/${equipmentId}`);
   } catch (error) {
     console.error("[data-service] Error deleting equipment:", error);
-    throw new Error("Erro ao excluir equipamento");
+    throw backendError(error, "Erro ao excluir equipamento");
   }
 }
 
@@ -384,27 +464,20 @@ export async function uploadEquipmentImages(
 }
 
 /**
- * Delete equipment images through backend API
- * 
- * TODO: Backend endpoint não implementado ainda
+ * Remove imagens de um anúncio: o backend tira as URLs do registro E apaga os
+ * objetos do bucket `equipments` (só o dono pode).
  */
 export async function deleteEquipmentImages(
+  equipmentId: string,
   imageUrls: string[]
 ): Promise<void> {
-  console.warn("[data-service] Delete de imagens não implementado no backend");
-  // Não faz nada por enquanto
-  return;
-
-  /* Código para quando backend implementar:
+  if (!equipmentId || imageUrls.length === 0) return;
   try {
-    await apiClient.post("/equipments/delete-images", {
-      imageUrls,
-    });
+    await apiClient.post(`/equipments/${equipmentId}/images/delete`, { imageUrls });
   } catch (error) {
     console.error("[data-service] Error deleting equipment images:", error);
-    throw new Error("Erro ao excluir imagens");
+    throw backendError(error, "Erro ao excluir imagens do equipamento");
   }
-  */
 }
 
 /**

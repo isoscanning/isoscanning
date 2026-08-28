@@ -21,6 +21,44 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import apiClient from "@/lib/api-service";
 import type { Equipment } from "@/lib/data-service";
 import { trackEvent } from "@/lib/analytics";
+import { isPlanErrorBody } from "@/lib/plans/plan-limits";
+
+/**
+ * O backend recusa proposta em anúncio indisponível ou no próprio anúncio
+ * (400/403). Traduzimos para algo que o usuário entenda em vez de repassar a
+ * mensagem crua da API.
+ */
+function friendlyProposalError(err: any): string {
+  const raw = err?.response?.data?.message;
+  const backendMessage = Array.isArray(raw) ? raw.join(", ") : typeof raw === "string" ? raw : "";
+  const normalized = backendMessage
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+
+  if (normalized.includes("indisponi") || normalized.includes("unavailable") || normalized.includes("not available")) {
+    return "Este anúncio não está mais disponível — o dono já fechou negócio ou tirou o equipamento do ar. Veja outros equipamentos em /equipamentos.";
+  }
+
+  if (
+    normalized.includes("proprio") ||
+    normalized.includes("own equipment") ||
+    normalized.includes("your own") ||
+    normalized.includes("seu proprio")
+  ) {
+    return "Você não pode enviar uma proposta para um anúncio seu.";
+  }
+
+  const status = err?.response?.status;
+  if (status === 403) {
+    return backendMessage || "Você não tem permissão para enviar uma proposta para este anúncio.";
+  }
+  if (status === 400) {
+    return backendMessage || "Não foi possível enviar a proposta: confira os dados preenchidos.";
+  }
+
+  return backendMessage || "Erro ao enviar proposta. Tente novamente.";
+}
 
 export default function NegociarEquipamentoPage() {
   const params = useParams();
@@ -82,18 +120,17 @@ export default function NegociarEquipamentoPage() {
     }
 
     try {
+      // `sellerId`, `equipmentName` e `status` são derivados do equipamento
+      // pelo backend — enviá-los aqui só criaria uma segunda fonte de verdade.
       const response = await apiClient.post("/proposals", {
         equipmentId,
-        equipmentName: equipment?.name,
         buyerId: userProfile?.id,
         buyerName: userProfile?.displayName,
-        sellerId: equipment?.ownerId,
         message,
         proposedPrice: proposedPrice ? parseFloat(proposedPrice) : null,
         startDate: startDate || null,
         endDate: endDate || null,
         contactPhone,
-        status: "pending",
       });
 
       console.log("[negociar-equipamento] Proposal created:", response.data);
@@ -106,14 +143,14 @@ export default function NegociarEquipamentoPage() {
       });
 
       setTimeout(() => {
-        router.push("/equipamentos");
+        router.push("/dashboard/propostas");
       }, 2000);
     } catch (err: any) {
       console.error("[negociar-equipamento] Error creating proposal:", err);
-      setError(
-        err.response?.data?.message ||
-        "Erro ao enviar proposta. Tente novamente."
-      );
+      // 403 de plano: o interceptor do apiClient já abriu o modal de upgrade —
+      // não duplicamos com um alerta destrutivo aqui.
+      if (isPlanErrorBody(err?.response?.data)) return;
+      setError(friendlyProposalError(err));
     } finally {
       setSubmitting(false);
     }
@@ -146,6 +183,45 @@ export default function NegociarEquipamentoPage() {
     );
   }
 
+  // O backend recusa proposta em anúncio indisponível ou no próprio anúncio.
+  // Avisamos antes do usuário escrever a proposta inteira.
+  const isUnavailable = equipment.isAvailable === false;
+  const isOwnListing = !!userProfile?.id && equipment.ownerId === userProfile.id;
+  const blockedReason = isOwnListing
+    ? "Este anúncio é seu — as propostas que você receber aparecem em Minhas Propostas."
+    : isUnavailable
+      ? "Este anúncio não está mais disponível: o dono já fechou negócio ou tirou o equipamento do ar."
+      : null;
+
+  if (blockedReason) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 flex items-center justify-center px-4 py-12">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <CardTitle>Não dá para negociar este equipamento</CardTitle>
+              <CardDescription>{blockedReason}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col sm:flex-row gap-2">
+              <Button className="flex-1" onClick={() => router.push("/equipamentos")}>
+                Ver outros equipamentos
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => router.push("/dashboard/propostas")}
+              >
+                Minhas propostas
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -163,7 +239,7 @@ export default function NegociarEquipamentoPage() {
             <Alert className="mb-6 border-green-200 bg-green-50">
               <CheckCircle2 className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">
-                Proposta enviada com sucesso! Redirecionando...
+                Proposta enviada com sucesso! Levando você para Minhas Propostas...
               </AlertDescription>
             </Alert>
           )}

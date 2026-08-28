@@ -15,6 +15,7 @@ import {
     DialogFooter
 } from "@/components/ui/dialog";
 import { type PortfolioItem } from "@/lib/data-service";
+import { PlanPaywall } from "@/components/plan/plan-gate";
 
 interface PortfolioGalleryProps {
     portfolioItems: PortfolioItem[];
@@ -26,6 +27,12 @@ interface PortfolioGalleryProps {
     handleAddPortfolioItem: () => void;
     portfolioPreview: string | null;
     fileError: string | null;
+    /** Cota de arquivos do plano estourada (contando `media`, não álbuns). */
+    limitReached?: boolean;
+    /** "3/4 arquivos · 0/1 vídeos · plano Free" */
+    usageLabel?: string;
+    /** Fechar/cancelar o formulário: libera a prévia (URL.revokeObjectURL). */
+    onCancelForm?: () => void;
 }
 
 export function PortfolioGallery({
@@ -37,7 +44,10 @@ export function PortfolioGallery({
     handlePortfolioFileChange,
     handleAddPortfolioItem,
     portfolioPreview,
-    fileError
+    fileError,
+    limitReached = false,
+    usageLabel,
+    onCancelForm
 }: PortfolioGalleryProps) {
     return (
         <Card className="border-2 shadow-sm">
@@ -45,10 +55,13 @@ export function PortfolioGallery({
                 <div className="space-y-1">
                     <CardTitle className="text-2xl">Seu Portfólio</CardTitle>
                     <CardDescription className="text-base">Imagens e vídeos dos seus melhores trabalhos</CardDescription>
+                    {usageLabel && (
+                        <p className="text-xs text-muted-foreground font-medium">{usageLabel}</p>
+                    )}
                 </div>
-                <Dialog>
+                <Dialog onOpenChange={(open) => { if (!open) onCancelForm?.(); }}>
                     <DialogTrigger asChild>
-                        <Button className="flex items-center gap-2">
+                        <Button className="flex items-center gap-2" disabled={limitReached}>
                             <Plus className="h-4 w-4" /> Adicionar Item
                         </Button>
                     </DialogTrigger>
@@ -108,7 +121,7 @@ export function PortfolioGallery({
                             <Button
                                 onClick={handleAddPortfolioItem}
                                 className="w-full sm:w-auto"
-                                disabled={loadingPortfolio || !portfolioPreview || !newPortfolioItem.title}
+                                disabled={loadingPortfolio || limitReached || !portfolioPreview || !newPortfolioItem.title}
                             >
                                 {loadingPortfolio ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Adicionando...</> : "Adicionar ao Portfólio"}
                             </Button>
@@ -116,7 +129,10 @@ export function PortfolioGallery({
                     </DialogContent>
                 </Dialog>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
+                {limitReached && (
+                    <PlanPaywall feature="portfolioMediaFiles" compact />
+                )}
                 {loadingPortfolio && portfolioItems.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12">
                         <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />

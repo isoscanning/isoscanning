@@ -49,6 +49,9 @@ import {
   type AvailabilitySlot,
   type Specialty
 } from "@/lib/data-service"
+import { usePlan } from "@/lib/plans/use-plan"
+import { isPlanErrorBody } from "@/lib/plans/plan-limits"
+import { withStorageRollback } from "@/lib/storage-cleanup"
 import { PersonalDataForm } from "./components/personal-data-form"
 import { PortfolioGallery } from "./components/portfolio-gallery"
 import { AvailabilityManager } from "./components/availability-manager"
@@ -64,6 +67,10 @@ const ESTADOS = [
 export default function PerfilPage() {
   const router = useRouter()
   const { userProfile, loading, updateProfile } = useAuth()
+  // Limites do plano efetivo (fonte: backend em GET /auth/me). Contamos
+  // ARQUIVOS (soma de `media`), não álbuns — o limite antigo de "9 itens"
+  // ignorava o plano e divergia de /dashboard/portfolio.
+  const plan = usePlan()
 
   // Profile Form State
   const [formData, setFormData] = useState({
@@ -620,6 +627,13 @@ export default function PerfilPage() {
       console.log('[Portfolio] Setting mediaType to image')
       setNewPortfolioItem(prev => ({ ...prev, mediaType: 'image' }))
     } else if (isVideo) {
+      if (portfolioVideoLimitReached) {
+        setFileError(
+          `Seu plano ${plan.label} permite ${maxPortfolioVideos} vídeo(s) no portfólio.`
+        )
+        return
+      }
+
       if (file.size > 150 * 1024 * 1024) {
         setFileError("Vídeos devem ter no máximo 150MB.")
         return
@@ -634,6 +648,9 @@ export default function PerfilPage() {
       console.log('[Portfolio] Setting mediaType to video')
       setNewPortfolioItem(prev => ({ ...prev, mediaType: 'video' }))
     }
+
+    // Troca de arquivo: libera o blob da prévia anterior antes de criar a nova.
+    revokePortfolioPreview()
 
     const previewUrl = URL.createObjectURL(file)
     console.log('[Portfolio] Created preview URL:', previewUrl)
@@ -686,14 +703,54 @@ export default function PerfilPage() {
     }
   }
 
+  // --- Limites de portfólio do plano (contando ARQUIVOS, não álbuns) ---
+  const maxPortfolioMedia = plan.limitOf("portfolioMediaFiles")
+  const maxPortfolioVideos = plan.limitOf("portfolioVideos")
+  const totalPortfolioMedia = portfolioItems.reduce(
+    (acc, item) => acc + (item.media?.length || 0),
+    0
+  )
+  const totalPortfolioVideos = portfolioItems.reduce(
+    (acc, item) => acc + (item.media?.filter(m => m.type === "video").length || 0),
+    0
+  )
+  const portfolioLimitReached = !plan.allows("portfolioMediaFiles", totalPortfolioMedia)
+  const portfolioVideoLimitReached = !plan.allows("portfolioVideos", totalPortfolioVideos)
+  const portfolioUsageLabel =
+    `${totalPortfolioMedia}/${maxPortfolioMedia === null ? "∞" : maxPortfolioMedia} arquivos` +
+    ` · ${totalPortfolioVideos}/${maxPortfolioVideos === null ? "∞" : maxPortfolioVideos} vídeos` +
+    ` · plano ${plan.label}`
+
+  /** Libera o blob da prévia (vídeos de até 150MB ficariam presos na memória). */
+  const revokePortfolioPreview = () => {
+    if (portfolioPreview && portfolioPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(portfolioPreview)
+    }
+  }
+
+  /** Cancelar/fechar o formulário: limpa estado e libera a prévia. */
+  const resetPortfolioForm = () => {
+    revokePortfolioPreview()
+    setNewPortfolioItem({ title: "", mediaUrl: "", mediaType: "image" })
+    setPortfolioFile(null)
+    setPortfolioPreview(null)
+    setFileError(null)
+  }
+
   const handleAddPortfolioItem = async () => {
     if (!userProfile?.id || !newPortfolioItem.title || !portfolioFile) {
       setErrorMsg("Preencha o título e selecione um arquivo.")
       return
     }
 
-    if (portfolioItems.length >= 9) {
-      setErrorMsg("Você já atingiu o limite de 9 itens no portfólio.")
+    // Limite do plano (arquivos). O paywall já está visível na galeria, então
+    // não repetimos a mensagem em alerta destrutivo.
+    if (portfolioLimitReached) return
+
+    if (newPortfolioItem.mediaType === "video" && portfolioVideoLimitReached) {
+      setFileError(
+        `Seu plano ${plan.label} permite ${maxPortfolioVideos} vídeo(s) no portfólio. Remova um vídeo ou faça upgrade.`
+      )
       return
     }
 
@@ -701,28 +758,36 @@ export default function PerfilPage() {
       setLoadingPortfolio(true)
       setErrorMsg("")
 
-      // Upload file to Supabase Storage
-      const mediaUrl = await uploadPortfolioItemImage(portfolioFile, userProfile.id)
+      // O upload acontece ANTES da gravação: se o POST falhar (403 de plano,
+      // validação), o arquivo tem que sair do bucket — senão vira órfão.
+      const uploadedNow: string[] = []
 
-      // Create portfolio item with the uploaded URL
-      await createPortfolioItem({
-        title: newPortfolioItem.title,
-        media: [{ url: mediaUrl, type: newPortfolioItem.mediaType as 'image' | 'video' }],
-        professionalId: userProfile.id
+      await withStorageRollback("portfolio", uploadedNow, async () => {
+        const mediaUrl = await uploadPortfolioItemImage(portfolioFile, userProfile.id)
+        uploadedNow.push(mediaUrl)
+
+        await createPortfolioItem({
+          title: newPortfolioItem.title,
+          media: [{ url: mediaUrl, type: newPortfolioItem.mediaType as 'image' | 'video' }],
+          professionalId: userProfile.id
+        })
       })
 
       await loadPortfolio()
 
       // Reset form
-      setNewPortfolioItem({ title: "", mediaUrl: "", mediaType: "image" })
-      setPortfolioFile(null)
-      setPortfolioPreview(null)
-      setFileError(null)
+      resetPortfolioForm()
 
       setSuccessMsg("Item adicionado ao portfólio!")
     } catch (err: any) {
       console.error("[perfil] Error adding portfolio item:", err)
-      setErrorMsg(err.message || "Erro ao adicionar item ao portfólio.")
+      // 403 de plano: o interceptor do apiClient já abriu o modal de upgrade —
+      // só ressincroniza a galeria, sem alerta duplicado.
+      if (isPlanErrorBody(err?.response?.data)) {
+        await loadPortfolio()
+      } else {
+        setErrorMsg(err.message || "Erro ao adicionar item ao portfólio.")
+      }
     } finally {
       setLoadingPortfolio(false)
     }
@@ -1002,6 +1067,9 @@ export default function PerfilPage() {
                 handleAddPortfolioItem={handleAddPortfolioItem}
                 portfolioPreview={portfolioPreview}
                 fileError={fileError}
+                limitReached={portfolioLimitReached}
+                usageLabel={portfolioUsageLabel}
+                onCancelForm={resetPortfolioForm}
               />
             </TabsContent>
 

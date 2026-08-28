@@ -27,8 +27,10 @@ import {
 } from "@/components/ui/select";
 import { AlertCircle, CheckCircle2, ChevronLeft, Upload, X, Star } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { updateEquipment, fetchUserEquipments, uploadEquipmentImages, deleteEquipmentImages } from "@/lib/data-service";
+import { updateEquipment, fetchEquipmentById, uploadEquipmentImages, deleteEquipmentImages } from "@/lib/data-service";
+import { withStorageRollback, removeStorageFiles } from "@/lib/storage-cleanup";
 import { ScrollReveal } from "@/components/scroll-reveal";
+import { isPlanErrorBody } from "@/lib/plans/plan-limits";
 
 import { LocationSelector } from "@/components/location-selector";
 
@@ -80,6 +82,8 @@ export default function EditarEquipamentoPage() {
   }
 
   const [items, setItems] = useState<ImageItem[]>([]);
+  /** Fotos que já estavam no anúncio — as removidas saem do bucket após o PUT. */
+  const [originalImageUrls, setOriginalImageUrls] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -159,13 +163,12 @@ export default function EditarEquipamentoPage() {
 
     setLoadingEquipment(true);
     try {
-      const equipments = await fetchUserEquipments(userProfile.id);
-      const equipment = equipments.find((eq) => eq.id === equipmentId);
+      // Busca direta pelo id: filtrar a listagem escondia anúncios pausados e
+      // virava um falso "você não tem permissão".
+      const equipment = await fetchEquipmentById(equipmentId);
 
-      if (!equipment) {
-        setError(
-          "Equipamento não encontrado ou você não tem permissão para editá-lo."
-        );
+      if (equipment.ownerId && equipment.ownerId !== userProfile.id) {
+        setError("Você não tem permissão para editar este equipamento.");
         return;
       }
 
@@ -193,6 +196,7 @@ export default function EditarEquipamentoPage() {
           isExisting: true
         }));
         setItems(existingItems);
+        setOriginalImageUrls(equipment.imageUrls);
       }
     } catch (err: any) {
       setError(err.message || "Erro ao carregar equipamento.");
@@ -262,24 +266,40 @@ export default function EditarEquipamentoPage() {
       // Update equipment
       try {
         console.log("Atualizando equipamento...");
-        await updateEquipment(equipmentId, {
-          name: formData.name,
-          category: formData.category,
-          negotiationType: formData.negotiationType as "sale" | "rent" | "free",
-          condition: formData.condition as "new" | "refurbished" | "used",
-          description: formData.description,
-          brand: formData.brand,
-          model: formData.model,
-          price: formData.price ? Number.parseFloat(formData.price) : undefined,
-          rentPeriod:
-            formData.negotiationType === "rent" ? (formData.rentPeriod as "day" | "week" | "month") : undefined,
-          city: formData.city,
-          state: formData.state,
-          country: formData.country,
-          additionalConditions: formData.additionalConditions,
-          imageUrls: finalImageUrls,
-        });
+        // Se o PUT falhar, as imagens recém-enviadas não ficam órfãs no bucket.
+        await withStorageRollback("equipments", uploadedUrls, () =>
+          updateEquipment(equipmentId, {
+            name: formData.name,
+            category: formData.category,
+            negotiationType: formData.negotiationType as "sale" | "rent" | "free",
+            condition: formData.condition as "new" | "refurbished" | "used",
+            description: formData.description,
+            brand: formData.brand,
+            model: formData.model,
+            price: formData.price ? Number.parseFloat(formData.price) : undefined,
+            rentPeriod:
+              formData.negotiationType === "rent" ? (formData.rentPeriod as "day" | "week" | "month") : undefined,
+            city: formData.city,
+            state: formData.state,
+            country: formData.country,
+            additionalConditions: formData.additionalConditions,
+            imageUrls: finalImageUrls,
+          })
+        );
         console.log("Equipamento atualizado com sucesso!");
+
+        // Só depois do PUT: apaga do bucket as fotos que o usuário removeu.
+        const removedUrls = originalImageUrls.filter((url) => !finalImageUrls.includes(url));
+        if (removedUrls.length > 0) {
+          try {
+            await deleteEquipmentImages(equipmentId, removedUrls);
+          } catch (cleanupError) {
+            console.warn("Falha ao remover imagens antigas pelo backend:", cleanupError);
+            // Best-effort: tenta limpar direto no Storage (nunca lança)
+            await removeStorageFiles("equipments", removedUrls);
+          }
+          setOriginalImageUrls(finalImageUrls);
+        }
 
         setSuccess(true);
         setTimeout(() => {
@@ -287,6 +307,13 @@ export default function EditarEquipamentoPage() {
         }, 1500);
       } catch (equipmentError: any) {
         console.error("Erro ao atualizar equipamento:", equipmentError);
+        // As imagens novas já foram removidas pelo rollback: o usuário
+        // precisa reenviá-las antes de tentar de novo.
+        if (uploadedUrls.length > 0) {
+          setItems((prev) => prev.filter((item) => item.isExisting));
+        }
+        // 403 de plano (ex.: reativar acima da cota) já abriu o modal de upgrade.
+        if (isPlanErrorBody(equipmentError?.response?.data)) return;
         setError(`Erro ao salvar equipamento: ${equipmentError.message}`);
       }
     } catch (err: any) {

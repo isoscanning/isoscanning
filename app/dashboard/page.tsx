@@ -31,7 +31,8 @@ import {
   FileSignature,
   Share2,
   ClipboardList,
-  Clock
+  Clock,
+  Handshake
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
@@ -481,6 +482,29 @@ export default function DashboardPage() {
                 </Link>
               </ScrollReveal>
               {/* END: Equipments Card */}
+
+              {/* START: Proposals Card */}
+              <ScrollReveal delay={0.225} duration={0.4}>
+                <Link href="/dashboard/propostas" className="block h-full group" id="quick-proposals">
+                  <Card className="h-full border-border hover:border-amber-500/50 transition-all duration-300 hover:shadow-lg bg-card">
+                    <CardHeader>
+                      <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                        <Handshake className="h-6 w-6" />
+                      </div>
+                      <CardTitle className="group-hover:text-amber-500 transition-colors">Minhas Propostas</CardTitle>
+                      <CardDescription>
+                        Responda às propostas recebidas nos seus anúncios e acompanhe as que você enviou.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-end">
+                      <div className="w-8 h-8 rounded-full bg-background border flex items-center justify-center group-hover:bg-amber-500 group-hover:text-white group-hover:border-amber-500 transition-colors">
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </ScrollReveal>
+              {/* END: Proposals Card */}
 
               {/* START: Requests Card */}
               <ScrollReveal delay={0.25} duration={0.4}>

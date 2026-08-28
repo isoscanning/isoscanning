@@ -10,16 +10,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, Package, ImageIcon, MoreHorizontal, Camera, Loader2 } from "lucide-react";
+import { Plus, Edit, Trash2, Package, ImageIcon, MoreHorizontal, Camera, Loader2, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import {
   fetchUserEquipments,
   deleteEquipment,
   deleteEquipmentImages,
+  updateEquipment,
 } from "@/lib/data-service";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePlan } from "@/lib/plans/use-plan";
+import { isPlanErrorBody } from "@/lib/plans/plan-limits";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +33,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+/** 403 de plano → o modal de upgrade já foi aberto pelo interceptor do apiClient. */
+const isPlanError = (error: unknown) => isPlanErrorBody((error as any)?.response?.data);
 
 interface Equipment {
   id: string;
@@ -49,10 +55,13 @@ export default function MeusEquipamentosPage() {
   const [loadingEquipments, setLoadingEquipments] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [equipmentToDelete, setEquipmentToDelete] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  // Anúncios ativos × limite do plano (null = ilimitado → sem dica)
+  // Anúncios ativos × limite do plano (null = ilimitado → sem dica).
+  // A cota do backend conta só `is_available = true`, então pausados não somam.
   const plan = usePlan();
   const equipmentLimit = plan.limitOf("equipmentListings");
+  const activeCount = equipments.filter((e) => e.isAvailable).length;
 
   const fetchEquipments = useCallback(async () => {
     if (!userProfile) return;
@@ -93,23 +102,57 @@ export default function MeusEquipamentosPage() {
     setEquipmentToDelete(id);
   };
 
+  /** Pausa (`isAvailable: false`) ou reativa o anúncio pelo backend. */
+  const handleToggleAvailability = async (equipment: Equipment) => {
+    const next = !equipment.isAvailable;
+    setTogglingId(equipment.id);
+    try {
+      // Reativar revalida a cota do plano: um 403 aqui abre o modal de upgrade.
+      await updateEquipment(equipment.id, { isAvailable: next });
+      setEquipments((prev) =>
+        prev.map((e) => (e.id === equipment.id ? { ...e, isAvailable: next } : e))
+      );
+      toast.success(next ? "Anúncio reativado" : "Anúncio pausado", {
+        description: next
+          ? "Ele voltou a aparecer no marketplace."
+          : "Ele saiu do marketplace, mas continua aqui no seu painel.",
+      });
+    } catch (error) {
+      console.error("[dashboard/equipamentos] Erro ao alterar disponibilidade:", error);
+      // Limite do plano ao reativar → só o modal de upgrade, sem toast duplicado.
+      if (isPlanError(error)) return;
+      toast.error(
+        (error as Error)?.message || "Não foi possível alterar a disponibilidade do anúncio."
+      );
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
   const confirmDelete = async () => {
     if (!equipmentToDelete) return;
 
     setIsDeleting(true);
     try {
-      // Find equipment to get image URLs
+      // As fotos saem do bucket antes do registro (o diálogo promete isso).
       const equipment = equipments.find((e) => e.id === equipmentToDelete);
       if (equipment?.imageUrls && equipment.imageUrls.length > 0) {
-        await deleteEquipmentImages(equipment.imageUrls);
+        try {
+          await deleteEquipmentImages(equipmentToDelete, equipment.imageUrls);
+        } catch (imageError) {
+          // Falha na limpeza não pode impedir a exclusão do anúncio
+          console.warn("[dashboard/equipamentos] Falha ao remover imagens:", imageError);
+        }
       }
 
       await deleteEquipment(equipmentToDelete);
       setEquipments(equipments.filter((e) => e.id !== equipmentToDelete));
       setEquipmentToDelete(null);
     } catch (error) {
-      console.error("[v0] Error deleting equipment:", error);
-      alert("Erro ao excluir equipamento");
+      console.error("[dashboard/equipamentos] Erro ao excluir equipamento:", error);
+      if (!isPlanError(error)) {
+        toast.error((error as Error)?.message || "Erro ao excluir equipamento");
+      }
     } finally {
       setIsDeleting(false);
     }
@@ -183,12 +226,14 @@ export default function MeusEquipamentosPage() {
                 {equipmentLimit !== null && (
                   <p
                     className={`mt-2 text-xs font-medium ${
-                      equipments.length >= equipmentLimit
+                      activeCount >= equipmentLimit
                         ? "text-amber-600 dark:text-amber-400"
                         : "text-muted-foreground"
                     }`}
                   >
-                    {equipments.length}/{equipmentLimit} equipamentos anunciados no plano {plan.label}
+                    {activeCount}/{equipmentLimit} equipamentos ativos no plano {plan.label}
+                    {equipments.length > activeCount &&
+                      ` · ${equipments.length - activeCount} pausado(s)`}
                   </p>
                 )}
               </div>
@@ -256,8 +301,8 @@ export default function MeusEquipamentosPage() {
 
                       {/* Status Pills */}
                       <div className="absolute top-3 left-3 flex flex-col gap-2 scale-95 group-hover:scale-100 transition-transform">
-                        <Badge variant={equip.isAvailable ? "default" : "destructive"}>
-                          {equip.isAvailable ? "Disponível" : "Indisponível"}
+                        <Badge variant={equip.isAvailable ? "default" : "secondary"}>
+                          {equip.isAvailable ? "Publicado" : "Pausado"}
                         </Badge>
                       </div>
                     </div>
@@ -295,8 +340,26 @@ export default function MeusEquipamentosPage() {
                         </Link>
                         <Button
                           variant="outline"
+                          className="px-3 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+                          onClick={() => handleToggleAvailability(equip)}
+                          disabled={togglingId === equip.id}
+                          title={equip.isAvailable ? "Pausar anúncio" : "Reativar anúncio"}
+                          aria-label={equip.isAvailable ? "Pausar anúncio" : "Reativar anúncio"}
+                        >
+                          {togglingId === equip.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : equip.isAvailable ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
                           className="px-3 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors"
                           onClick={() => handleDeleteClick(equip.id)}
+                          title="Excluir anúncio"
+                          aria-label="Excluir anúncio"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -311,6 +374,7 @@ export default function MeusEquipamentosPage() {
       </main>
 
       <Footer />
+
 
       <AlertDialog open={equipmentToDelete !== null} onOpenChange={(open) => !open && !isDeleting && setEquipmentToDelete(null)}>
         <AlertDialogContent>

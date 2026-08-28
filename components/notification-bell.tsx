@@ -154,7 +154,9 @@ export function NotificationBell() {
         } else if (type === "application_status") {
             router.push("/dashboard/candidaturas");
         } else if (type === "proposal_received" || type === "proposal_status") {
-            router.push(referenceId ? `/equipamentos/${referenceId}` : "/equipamentos");
+            // A página pública do equipamento não mostra proposta alguma — o
+            // vendedor precisa da tela onde dá para aceitar/recusar.
+            router.push("/dashboard/propostas");
         } else if (type === "booking_created") {
             router.push("/dashboard/solicitacoes");
         } else if (type === "booking_status") {

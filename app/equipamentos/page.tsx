@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import Image from "next/image"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -11,9 +11,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Search, MapPin, Filter, X, Package, Camera, Sparkles, ArrowRight, ShoppingBag, Tag, Zap } from "lucide-react"
+import { Search, MapPin, Filter, X, Package, Camera, Sparkles, ArrowRight, ShoppingBag, Tag, Zap, BadgeCheck, Loader2 } from "lucide-react"
 import Link from "next/link"
-import { fetchEquipments } from "@/lib/data-service"
+import { fetchEquipments, type EquipmentFilters } from "@/lib/data-service"
 import { ParticleBackground } from "@/components/particle-background"
 import { ScrollReveal } from "@/components/scroll-reveal"
 import { CountUp } from "@/components/typing-text"
@@ -33,8 +33,16 @@ interface Equipment {
   imageUrls?: string[]
   ownerId: string
   ownerName: string
+  /** Dono em plano pago — selo "Perfil verificado" no card. */
+  ownerVerified?: boolean
   isAvailable: boolean
 }
+
+/** Quantos anúncios por página no "Carregar mais". */
+const PAGE_SIZE = 24
+
+/** Atraso do debounce dos campos de texto (busca e cidade). */
+const SEARCH_DEBOUNCE_MS = 400
 
 const CATEGORIAS = [
   "Todas",
@@ -52,51 +60,116 @@ const ESTADOS = [
   "Todos", "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
 ]
 
+/** Normaliza a capa: os cards usam `imageUrl`, a API devolve `imageUrls`. */
+function mapEquipments(items: any[]): Equipment[] {
+  return (items || []).map((item: any) => ({
+    ...item,
+    imageUrl: item.imageUrls?.[0] || item.imageUrl,
+  })) as Equipment[]
+}
+
 export default function EquipamentosPage() {
   const [equipments, setEquipments] = useState<Equipment[]>([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [loadError, setLoadError] = useState("")
   const [showFilters, setShowFilters] = useState(false)
 
   // Filters
   const [searchTerm, setSearchTerm] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("Todas")
   const [selectedNegotiation, setSelectedNegotiation] = useState("all")
   const [selectedCondition, setSelectedCondition] = useState("all")
   const [selectedState, setSelectedState] = useState("Todos")
   const [selectedCity, setSelectedCity] = useState("")
+  const [debouncedCity, setDebouncedCity] = useState("")
+
+  // Descarta respostas de buscas antigas (o usuário digita mais rápido que a API)
+  const requestId = useRef(0)
+
+  // Debounce dos campos de texto — sem isso cada tecla vira um GET /equipments
+  useEffect(() => {
+    const timeoutId = setTimeout(() => setDebouncedSearch(searchTerm.trim()), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm])
 
   useEffect(() => {
-    loadEquipments()
-  }, [])
+    const timeoutId = setTimeout(() => setDebouncedCity(selectedCity.trim()), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timeoutId)
+  }, [selectedCity])
 
-  const loadEquipments = async () => {
+  // Filtros que a API entende (o DTO do backend não aceita `condition`)
+  const serverFilters = useMemo<EquipmentFilters>(
+    () => ({
+      query: debouncedSearch || undefined,
+      category: selectedCategory !== "Todas" ? selectedCategory : undefined,
+      negotiationType:
+        selectedNegotiation !== "all" ? (selectedNegotiation as "sale" | "rent" | "free") : undefined,
+      state: selectedState !== "Todos" ? selectedState : undefined,
+      city: debouncedCity || undefined,
+      availableOnly: true,
+      limit: PAGE_SIZE,
+    }),
+    [debouncedSearch, selectedCategory, selectedNegotiation, selectedState, debouncedCity]
+  )
+
+  // Toda mudança de filtro reinicia a paginação na API
+  useEffect(() => {
+    const id = ++requestId.current
     setLoading(true)
+    setLoadError("")
+
+    fetchEquipments({ ...serverFilters, offset: 0 })
+      .then((result) => {
+        if (id !== requestId.current) return
+        setEquipments(mapEquipments(result.data))
+        setTotal(result.total)
+      })
+      .catch((error) => {
+        if (id !== requestId.current) return
+        console.error("[equipamentos] Erro ao carregar equipamentos:", error)
+        setEquipments([])
+        setTotal(0)
+        setLoadError("Não foi possível carregar os equipamentos. Tente novamente.")
+      })
+      .finally(() => {
+        if (id === requestId.current) setLoading(false)
+      })
+  }, [serverFilters])
+
+  const loadMore = async () => {
+    const id = requestId.current
+    setLoadingMore(true)
     try {
-      const data = await fetchEquipments()
-      const mappedData = data.map((item: any) => ({
-        ...item,
-        imageUrl: item.imageUrls?.[0] || item.imageUrl,
-      }))
-      setEquipments(mappedData as any)
+      const result = await fetchEquipments({ ...serverFilters, offset: equipments.length })
+      if (id !== requestId.current) return
+      setEquipments((prev) => {
+        const seen = new Set(prev.map((e) => e.id))
+        return [...prev, ...mapEquipments(result.data).filter((e) => !seen.has(e.id))]
+      })
+      setTotal(result.total)
+      trackEvent({ action: "filter", category: "Equipment", label: `Load More: ${equipments.length}` })
     } catch (error) {
-      console.error("[v0] Error loading equipments:", error)
+      console.error("[equipamentos] Erro ao carregar mais equipamentos:", error)
     } finally {
-      setLoading(false)
+      if (id === requestId.current) setLoadingMore(false)
     }
   }
 
-  const filteredEquipments = equipments.filter((equip) => {
-    const matchesSearch =
-      searchTerm === "" ||
-      equip.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      equip.category?.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = selectedCategory === "Todas" || equip.category === selectedCategory
-    const matchesNegotiation = selectedNegotiation === "all" || equip.negotiationType === selectedNegotiation
-    const matchesCondition = selectedCondition === "all" || equip.condition === selectedCondition
-    const matchesState = selectedState === "Todos" || equip.state === selectedState
-    const matchesCity = selectedCity === "" || equip.city?.toLowerCase().includes(selectedCity.toLowerCase())
-    return matchesSearch && matchesCategory && matchesNegotiation && matchesCondition && matchesState && matchesCity
-  })
+  // `condition` não é filtrável na API — refinamos o que já veio
+  const filteredEquipments = useMemo(
+    () =>
+      selectedCondition === "all"
+        ? equipments
+        : equipments.filter((equip) => equip.condition === selectedCondition),
+    [equipments, selectedCondition]
+  )
+
+  const hasMore = equipments.length < total
+  // Só esqueleto na 1ª carga; nas refiltragens mantemos a lista atual esmaecida
+  const showSkeletons = loading && equipments.length === 0
 
   const clearFilters = () => {
     setSearchTerm("")
@@ -298,6 +371,9 @@ export default function EquipamentosPage() {
                         <SelectItem value="used">Usado</SelectItem>
                       </SelectContent>
                     </Select>
+                    <p className="text-[11px] text-muted-foreground">
+                      Aplicado aos anúncios já carregados
+                    </p>
                   </div>
 
                   <div className="space-y-2">
@@ -349,7 +425,11 @@ export default function EquipamentosPage() {
                     Equipamentos Disponíveis
                   </h2>
                   <p className="text-muted-foreground">
-                    {loading ? "Carregando..." : `${filteredEquipments.length} equipamentos encontrados`}
+                    {loading
+                      ? "Carregando..."
+                      : selectedCondition !== "all"
+                        ? `${filteredEquipments.length} de ${equipments.length} carregados`
+                        : `${total} ${total === 1 ? "equipamento encontrado" : "equipamentos encontrados"}`}
                   </p>
                 </div>
 
@@ -381,7 +461,7 @@ export default function EquipamentosPage() {
             </ScrollReveal>
 
             {/* Loading State */}
-            {loading ? (
+            {showSkeletons ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
                   <Card key={i} className="animate-pulse border-2 overflow-hidden">
@@ -401,10 +481,12 @@ export default function EquipamentosPage() {
                   <div className="h-24 w-24 mx-auto mb-6 rounded-full bg-muted flex items-center justify-center">
                     <Package className="h-10 w-10 text-muted-foreground" />
                   </div>
-                  <h3 className="text-xl font-semibold mb-2">Nenhum equipamento encontrado</h3>
+                  <h3 className="text-xl font-semibold mb-2">
+                    {loadError ? "Não foi possível carregar" : "Nenhum equipamento encontrado"}
+                  </h3>
                   <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                    Não encontramos equipamentos com os filtros selecionados.
-                    Tente ajustar sua busca.
+                    {loadError ||
+                      "Não encontramos equipamentos com os filtros selecionados. Tente ajustar sua busca."}
                   </p>
                   <Button variant="outline" onClick={clearFilters} className="rounded-full">
                     Limpar Filtros
@@ -413,7 +495,9 @@ export default function EquipamentosPage() {
               </ScrollReveal>
             ) : (
               /* Equipment Cards Grid */
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div
+                className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity ${loading ? "opacity-50" : ""}`}
+              >
                 {filteredEquipments.map((equip, index) => (
                   <motion.div
                     key={equip.id}
@@ -489,13 +573,42 @@ export default function EquipamentosPage() {
                               <MapPin className="h-3.5 w-3.5" />
                               <span>{equip.city}, {equip.state}</span>
                             </div>
-                            <span className="text-xs">Por: {equip.ownerName}</span>
+                            <span className="text-xs inline-flex items-center gap-1">
+                              Por: {equip.ownerName}
+                              {equip.ownerVerified && (
+                                <span title="Perfil verificado" aria-label="Perfil verificado" role="img">
+                                  <BadgeCheck className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                </span>
+                              )}
+                            </span>
                           </div>
                         </CardContent>
                       </Link>
                     </Card>
                   </motion.div>
                 ))}
+              </div>
+            )}
+
+            {/* Paginação: o backend devolve `total`, então só mostramos se sobrou algo */}
+            {!loading && hasMore && (
+              <div className="flex justify-center mt-10">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="rounded-full px-8"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Carregando...
+                    </>
+                  ) : (
+                    `Carregar mais (${equipments.length} de ${total})`
+                  )}
+                </Button>
               </div>
             )}
           </div>

@@ -23,7 +23,9 @@ import {
   MessageCircle,
   Plus,
   BadgeCheck,
-  Loader2
+  Loader2,
+  Instagram,
+  Sparkles
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -52,6 +54,18 @@ interface PortfolioItem {
   description?: string;
   media: { url: string; type: 'image' | 'video' }[];
   category?: string;
+}
+
+/** "@handle", "handle" ou "https://instagram.com/handle/" → "handle". */
+function normalizeInstagramHandle(value?: string | null): string | null {
+  if (!value) return null;
+  const handle = value
+    .trim()
+    .replace(/^https?:\/\/(www\.)?instagram\.com\//i, "")
+    .replace(/^@/, "")
+    .replace(/[/?#].*$/, "")
+    .trim();
+  return handle || null;
 }
 
 function PortfolioThumbnail({ item, onClick }: { item: PortfolioItem; onClick: () => void }) {
@@ -181,8 +195,11 @@ export default function ProfessionalProfilePage() {
   const fetchProfessionalData = async () => {
     setLoading(true);
     try {
-      // Fetch professional profile
-      const profResponse = await apiClient.get(`/profiles/${professionalId}`);
+      // Fetch professional profile. O 403 de limite de visualizações é tratado
+      // pelo card dedicado abaixo, então não abrimos também o modal global.
+      const profResponse = await apiClient.get(`/profiles/${professionalId}`, {
+        headers: { "X-Skip-Plan-Modal": "1" },
+      });
       setProfessional(profResponse.data);
       setPlanLimitError(null);
 
@@ -407,6 +424,14 @@ export default function ProfessionalProfilePage() {
     );
   }
 
+  // Selo/destaque vêm do backend (tier efetivo); fallback pelo tier bruto.
+  const isVerified =
+    professional.verified ??
+    ["standard", "pro", "vip"].includes(professional.subscriptionTier ?? "");
+  const isFeatured = professional.searchRank === 3;
+  const instagramHandle = normalizeInstagramHandle(professional.instagram);
+  const whatsappUrl = professional.contactWhatsappUrl || null;
+
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors duration-300">
       <Header />
@@ -431,14 +456,23 @@ export default function ProfessionalProfilePage() {
 
             {/* Info */}
             <div className="space-y-4">
-              <div className="flex items-center justify-center gap-2">
+              <div className="flex flex-wrap items-center justify-center gap-2">
                 <h1 className="text-4xl font-bold text-foreground tracking-tight">
                   {professional.artisticName || professional.displayName}
                 </h1>
-                {(professional.subscriptionTier === 'standard' || professional.subscriptionTier === 'pro' || professional.subscriptionTier === 'vip') && (
+                {isVerified && (
                   <div title="Perfil Verificado">
                     <BadgeCheck className="h-6 w-6 text-blue-500 fill-blue-500/10" />
                   </div>
+                )}
+                {isFeatured && (
+                  <span
+                    title="Profissional em destaque nas buscas"
+                    className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    Destaque
+                  </span>
                 )}
               </div>
 
@@ -501,6 +535,48 @@ export default function ProfessionalProfilePage() {
                 </Button>
               )}
 
+              {/* Contato direto — o backend só envia estes campos quando o dono está em plano pago */}
+              {(whatsappUrl || instagramHandle) && (
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  {whatsappUrl && (
+                    <a
+                      href={whatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() =>
+                        trackEvent({
+                          action: "contact_professional",
+                          category: "Professionals",
+                          label: professional.displayName,
+                        })
+                      }
+                    >
+                      <Button className="rounded-full px-6 h-11 gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white shadow-lg hover:shadow-[#25D366]/20 transition-all duration-300">
+                        <MessageCircle className="h-5 w-5" />
+                        <span className="font-bold">Chamar no WhatsApp</span>
+                      </Button>
+                    </a>
+                  )}
+                  {instagramHandle && (
+                    <a
+                      href={`https://instagram.com/${instagramHandle}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-4 h-11 text-sm font-semibold text-foreground hover:border-pink-500/50 hover:text-pink-600 dark:hover:text-pink-400 transition-colors"
+                      onClick={() =>
+                        trackEvent({
+                          action: "click_social",
+                          category: "Professionals",
+                          label: professional.displayName,
+                        })
+                      }
+                    >
+                      <Instagram className="h-4 w-4" />
+                      @{instagramHandle}
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

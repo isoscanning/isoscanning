@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
+import { PlanUpgradeProvider } from "@/components/plan/upgrade-modal";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SITE_URL } from "@/lib/site";
 
@@ -99,7 +100,9 @@ fbq('track', 'PageView');`,
           storageKey="iso-theme-preference"
         >
           <AuthProvider>
-            {children}
+            <PlanUpgradeProvider>
+              {children}
+            </PlanUpgradeProvider>
           </AuthProvider>
         </ThemeProvider>
         <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID || ""} />

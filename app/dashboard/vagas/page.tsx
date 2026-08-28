@@ -34,6 +34,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { JobCard } from "./components/job-card";
 import { BulkActionBar } from "./components/bulk-action-bar";
+import { usePlan } from "@/lib/plans/use-plan";
+import { isPlanErrorBody, startOfCurrentMonth } from "@/lib/plans/plan-limits";
+
+/** 403 de plano → o modal de upgrade já foi aberto pelo interceptor do apiClient. */
+const isPlanError = (error: unknown) => isPlanErrorBody((error as any)?.response?.data);
 
 export default function MinhasVagasPage() {
     const router = useRouter();
@@ -48,6 +53,12 @@ export default function MinhasVagasPage() {
     const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
     const [isBulkProcessing, setIsBulkProcessing] = useState(false);
     const { toast } = useToast();
+
+    // Uso do mês × limite do plano (null = ilimitado → sem dica)
+    const plan = usePlan();
+    const jobLimit = plan.limitOf("jobOffersPerMonth");
+    const monthStart = startOfCurrentMonth().getTime();
+    const jobsThisMonth = vagas.filter((v) => new Date(v.createdAt).getTime() >= monthStart).length;
 
     const fetchVagas = useCallback(async () => {
         if (!userProfile) return;
@@ -86,7 +97,9 @@ export default function MinhasVagasPage() {
             });
         } catch (error) {
             console.error("Erro ao alterar status da vaga:", error);
-            toast({ variant: "destructive", title: "Erro", description: "Erro ao alterar status da vaga" });
+            if (!isPlanError(error)) {
+                toast({ variant: "destructive", title: "Erro", description: "Erro ao alterar status da vaga" });
+            }
         }
     };
 
@@ -135,7 +148,9 @@ export default function MinhasVagasPage() {
             setIsConcludeDialogOpen(false);
         } catch (error) {
             console.error("Erro ao concluir vaga:", error);
-            toast({ variant: "destructive", title: "Erro", description: "Não foi possível concluir a vaga." });
+            if (!isPlanError(error)) {
+                toast({ variant: "destructive", title: "Erro", description: "Não foi possível concluir a vaga." });
+            }
         } finally {
             setVagaToConclude(null);
         }
@@ -162,7 +177,9 @@ export default function MinhasVagasPage() {
             setSelectedJobIds([]);
         } catch (error) {
             console.error("Erro na ação em massa:", error);
-            toast({ variant: "destructive", title: "Erro", description: "Falha ao processar ação em massa." });
+            if (!isPlanError(error)) {
+                toast({ variant: "destructive", title: "Erro", description: "Falha ao processar ação em massa." });
+            }
         } finally {
             setIsBulkProcessing(false);
         }
@@ -198,6 +215,17 @@ export default function MinhasVagasPage() {
                             <p className="text-muted-foreground mt-1">
                                 Gerencie suas oportunidades publicadas e acompanhe candidatos.
                             </p>
+                            {jobLimit !== null && !loadingVagas && (
+                                <p
+                                    className={`mt-2 text-xs font-medium ${
+                                        jobsThisMonth >= jobLimit
+                                            ? "text-amber-600 dark:text-amber-400"
+                                            : "text-muted-foreground"
+                                    }`}
+                                >
+                                    {jobsThisMonth}/{jobLimit} vagas este mês no plano {plan.label}
+                                </p>
+                            )}
                         </div>
                         <Button asChild className="shadow-sm">
                             <Link href="/dashboard/vagas/nova">

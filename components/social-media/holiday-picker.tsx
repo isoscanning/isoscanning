@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { notifyPlanLimit } from "@/lib/plans/plan-events";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -186,7 +187,11 @@ export function HolidayPicker({ month, year, value, onChange }: Props) {
       headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
       body: JSON.stringify({ month, year }),
     })
-      .then((r) => r.json())
+      .then(async (r) => {
+        const d = await r.json();
+        if (r.status === 403) notifyPlanLimit(d);
+        return d;
+      })
       .then((d) => setAiEvents(d.events ?? []))
       .catch(() => setAiEvents([]))
       .finally(() => setAiEventsLoading(false));
@@ -209,6 +214,7 @@ export function HolidayPicker({ month, year, value, onChange }: Props) {
           body: JSON.stringify({ query: searchQuery }),
         });
         const data = await res.json();
+        if (res.status === 403) notifyPlanLimit(data);
         const allDates: SearchDate[] = data.dates ?? [];
         setSearchResults(allDates.filter((d) => {
           const full = d.date.length === 10 ? d.date : `${year}-${d.date}`;
@@ -270,7 +276,11 @@ export function HolidayPicker({ month, year, value, onChange }: Props) {
         headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
         body: JSON.stringify({ cityName, state: selectedState, year }),
       })
-        .then((r) => r.json())
+        .then(async (r) => {
+          const d = await r.json();
+          if (r.status === 403) notifyPlanLimit(d);
+          return d;
+        })
         .then((d) => setCityAiHolidays((prev) => ({ ...prev, [cityName]: d.holidays ?? [] })))
         .catch(() => setCityAiHolidays((prev) => ({ ...prev, [cityName]: [] })))
         .finally(() => setCityHolidaysLoading((prev) => prev.filter((c) => c !== cityName)));

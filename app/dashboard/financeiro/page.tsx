@@ -7,7 +7,11 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Plus, DollarSign, WalletCards, AlertCircle, Calendar, Pencil, Trash2, Check } from "lucide-react";
+import { FileText, Plus, DollarSign, WalletCards, AlertCircle, Calendar, Pencil, Trash2, Check, Download } from "lucide-react";
+import { usePlan } from "@/lib/plans/use-plan";
+import { PlanBadge } from "@/components/plan/plan-gate";
+import { notifyPlanLimit } from "@/lib/plans/plan-events";
+import { buildPlanFeatureBody } from "@/lib/plans/plan-limits";
 import { fetchFinancialRecords, fetchFinancialSummary, fetchAnnualSummary, deleteFinancialRecord, updateFinancialRecord, FinancialRecord, FinancialSummary, AnnualSummary } from "@/lib/finances-service";
 import { useToast } from "@/components/ui/use-toast";
 import { ScrollReveal } from "@/components/scroll-reveal";
@@ -18,6 +22,9 @@ export default function FinancesDashboardPage() {
     const router = useRouter();
     const { userProfile, loading } = useAuth();
     const { toast } = useToast();
+    // Exportação do financeiro (CSV) — recurso Pro+
+    const plan = usePlan();
+    const canExport = plan.can("financeExport");
     
     const [records, setRecords] = useState<FinancialRecord[]>([]);
     const [summary, setSummary] = useState<FinancialSummary | null>(null);
@@ -64,6 +71,48 @@ export default function FinancesDashboardPage() {
 
     const handlePrint = () => {
         window.print();
+    };
+
+    // Exporta os lançamentos listados (mês/ano selecionados) em CSV — UTF-8 com BOM, separador ";"
+    const handleExportCsv = () => {
+        if (!canExport) {
+            notifyPlanLimit(buildPlanFeatureBody("financeExport", plan.tier));
+            return;
+        }
+        if (records.length === 0) {
+            toast({ title: "Nada para exportar", description: "Não há lançamentos neste período." });
+            return;
+        }
+        const SOURCE_LABELS: Record<string, string> = { internal: "Plataforma", external: "Externo" };
+        const STATUS_LABELS: Record<string, string> = { pending: "Pendente", received: "Recebido", cancelled: "Cancelado" };
+        const NF_LABELS: Record<string, string> = { not_applicable: "Não se aplica", pending: "Pendente", issued: "Emitida" };
+        const formatDate = (value: string) => {
+            const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+            return m ? `${m[3]}/${m[2]}/${m[1]}` : new Date(value).toLocaleDateString("pt-BR");
+        };
+        const escapeCell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+        const header = ["Data", "Título", "Descrição", "Valor (R$)", "Origem", "Status", "Exige NF", "Status NF", "Detalhes NF"];
+        const rows = records.map((r) => [
+            formatDate(r.date),
+            r.title,
+            r.description ?? "",
+            Number(r.amount).toFixed(2).replace(".", ","),
+            SOURCE_LABELS[r.source] ?? r.source,
+            STATUS_LABELS[r.status] ?? r.status,
+            r.requiresNf ? "Sim" : "Não",
+            NF_LABELS[r.nfStatus] ?? r.nfStatus,
+            r.nfDetails ?? "",
+        ]);
+        const csv = "\uFEFF" + [header, ...rows].map((row) => row.map(escapeCell).join(";")).join("\r\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `financeiro-${year}-${String(month).padStart(2, "0")}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
     };
 
     const handleOpenNewModal = () => {
@@ -147,6 +196,10 @@ export default function FinancesDashboardPage() {
                             </p>
                         </div>
                         <div className="flex gap-2">
+                            <Button variant="outline" onClick={handleExportCsv} className="border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-500">
+                                <Download className="mr-2 h-4 w-4" /> Exportar CSV
+                                {!canExport && <PlanBadge className="ml-2" />}
+                            </Button>
                             <Button variant="outline" onClick={handlePrint} className="border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-500">
                                 <FileText className="mr-2 h-4 w-4" /> Relatório PDF
                             </Button>

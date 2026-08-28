@@ -21,6 +21,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
+import { usePlan } from "@/lib/plans/use-plan";
+import { PlanBadge } from "@/components/plan/plan-gate";
+import { notifyPlanLimit } from "@/lib/plans/plan-events";
+import { buildPlanFeatureBody } from "@/lib/plans/plan-limits";
 
 interface Template {
   id: string;
@@ -46,6 +50,14 @@ export default function NovoContratoPage() {
   const router = useRouter();
   const { userProfile, loading } = useAuth();
   const [path, setPath] = useState<CreationPath>("choose");
+  // Contratos personalizados (do zero, upload de PDF, modelos próprios) — recurso Pro+.
+  // Modelos do sistema continuam livres. O backend também valida na criação/envio.
+  const plan = usePlan();
+  const customAllowed = plan.can("customContractTemplates");
+  const requireCustom = (next: () => void) => {
+    if (customAllowed) next();
+    else notifyPlanLimit(buildPlanFeatureBody("customContractTemplates", plan.tier));
+  };
   const [templates, setTemplates] = useState<Template[]>([]);
   const [userTemplates, setUserTemplates] = useState<Template[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
@@ -168,14 +180,15 @@ export default function NovoContratoPage() {
                   </div>
 
                   {/* Opção 2: Criar do zero */}
-                  <div role="button" tabIndex={0} onClick={() => setPath("blank")} onKeyDown={(e) => e.key === 'Enter' && setPath('blank')} className="text-left group cursor-pointer">
+                  <div role="button" tabIndex={0} onClick={() => requireCustom(() => setPath("blank"))} onKeyDown={(e) => e.key === 'Enter' && requireCustom(() => setPath("blank"))} className="text-left group cursor-pointer">
                     <Card className="h-full border-2 border-transparent hover:border-purple-500/60 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-background to-purple-500/5">
                       <CardHeader>
                         <div className="w-12 h-12 rounded-2xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                           <PenLine className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                         </div>
-                        <CardTitle className="group-hover:text-purple-600 transition-colors">
+                        <CardTitle className="group-hover:text-purple-600 transition-colors flex items-center gap-2">
                           Criar do zero
+                          {!customAllowed && <PlanBadge />}
                         </CardTitle>
                         <CardDescription>
                           Comece com uma tela em branco e escreva o contrato do jeito que quiser, com editor de texto completo.
@@ -190,14 +203,15 @@ export default function NovoContratoPage() {
                   </div>
 
                   {/* Opção 3: Fazer upload de PDF */}
-                  <div role="button" tabIndex={0} onClick={() => setPath("upload")} onKeyDown={(e) => e.key === 'Enter' && setPath('upload')} className="text-left group cursor-pointer">
+                  <div role="button" tabIndex={0} onClick={() => requireCustom(() => setPath("upload"))} onKeyDown={(e) => e.key === 'Enter' && requireCustom(() => setPath("upload"))} className="text-left group cursor-pointer">
                     <Card className="h-full border-2 border-transparent hover:border-teal-500/60 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-background to-teal-500/5">
                       <CardHeader>
                         <div className="w-12 h-12 rounded-2xl bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                           <Upload className="h-6 w-6 text-teal-600 dark:text-teal-400" />
                         </div>
-                        <CardTitle className="group-hover:text-teal-600 transition-colors">
+                        <CardTitle className="group-hover:text-teal-600 transition-colors flex items-center gap-2">
                           Enviar PDF pronto
+                          {!customAllowed && <PlanBadge />}
                         </CardTitle>
                         <CardDescription>
                           Já tem um contrato pronto? Faça o upload em PDF e envie para assinatura digital das partes.
@@ -302,14 +316,15 @@ export default function NovoContratoPage() {
 
                     {userTemplates.length > 0 && (
                       <div>
-                        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
                           Meus Modelos
+                          {!customAllowed && <PlanBadge />}
                         </h2>
                         <div className="grid md:grid-cols-2 gap-4">
                           {userTemplates.map((tpl) => (
                             <button
                               key={tpl.id}
-                              onClick={() => setSelectedTemplate(tpl)}
+                              onClick={() => requireCustom(() => setSelectedTemplate(tpl))}
                               className={`text-left p-4 rounded-xl border-2 transition-all duration-200 ${
                                 selectedTemplate?.id === tpl.id
                                   ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"

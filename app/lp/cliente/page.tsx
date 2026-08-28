@@ -484,7 +484,7 @@ export default function LpCliente() {
                   Cadastre-se de graça e explore a plataforma. Faça upgrade quando precisar de mais.
                 </p>
                 <p className="text-sm text-blue-400 font-medium pt-1">
-                  🎉 Aproveite a versão completa por tempo limitado, basta criar sua conta
+                  🎉 Todo cadastro novo ganha 14 dias do Pro grátis, sem cartão.
                 </p>
               </div>
             </ScrollReveal>
@@ -493,82 +493,80 @@ export default function LpCliente() {
               {[
                 {
                   name: "Free",
-                  description: "Para quem está começando a explorar novas oportunidades",
+                  description: "Para publicar sua primeira vaga e conhecer a plataforma",
                   price: "R$ 0",
                   period: "/mês",
                   cta: "Começar Grátis",
+                  href: "/cadastro",
                   ctaVariant: "outline" as const,
                   popular: false,
                   icon: Zap,
                   iconColor: "text-muted-foreground",
                   features: [
-                    "5 candidaturas em vagas por mês",
-                    "Até 10 visualizações de perfil por mês",
-                    "Publique até 1 vaga por mês",
-                    "Anuncie 1 equipamento",
-                    "Envie até 4 arquivos no portfólio",
-                    "Gestão de 1 conta de social media",
-                    "1 calendário com IA por mês",
+                    "Publique 1 vaga por mês",
+                    "10 visualizações de perfil por mês",
+                    "1 briefing por mês (até 2 membros)",
+                    "1 contrato por mês com modelos do sistema",
+                    "3 cálculos de rota por mês",
+                    "10 créditos de IA por mês",
+                    "Chat ilimitado com profissionais",
+                    "Suporte pela comunidade",
                   ],
                   notIncluded: [
-                    "Envio de contrapropostas",
-                    "Destaque no marketplace",
-                    "Suporte prioritário",
+                    "Contrapropostas em vagas",
+                    "Refinar briefing com IA",
+                    "Exportação do financeiro",
                   ],
                 },
                 {
-                  name: "Standard",
-                  description: "Perfeito para profissionais ativos e demandas regulares",
-                  price: "R$ 49,90",
+                  name: "Pro",
+                  description: "Para quem contrata com frequência e quer agilidade",
+                  price: "R$ 59,90",
                   period: "/mês",
-                  cta: "Assinar Standard",
+                  cta: "Assinar Pro",
+                  href: "/precos",
                   ctaVariant: "default" as const,
                   popular: true,
                   icon: Crown,
                   iconColor: "text-primary",
                   features: [
-                    "10 candidaturas em vagas por mês",
-                    "Até 30 visualizações de perfil por mês",
                     "Publique até 3 vagas por mês",
-                    "Envie 3 contrapropostas por job",
-                    "Anuncie até 5 equipamentos",
-                    "Envie até 10 arquivos no portfólio",
-                    "Selo de Perfil Verificado",
-                    "Contato direto via WhatsApp",
-                    "Visualização do Instagram do profissional",
-                    "Gestão de até 5 contas de social media",
-                    "Calendários com IA ilimitados",
+                    "3 contrapropostas por vaga",
+                    "30 visualizações de perfil por mês",
+                    "WhatsApp e Instagram no seu perfil público",
+                    "Selo Perfil Verificado e prioridade nas buscas",
+                    "10 briefings por mês, refinar com IA, até 10 membros",
+                    "10 contratos por mês com editor e modelos próprios",
+                    "300 créditos de IA e 50 cálculos de rota por mês",
+                    "Financeiro completo com exportação",
+                    "Suporte por e-mail",
                   ],
                   notIncluded: [
-                    "Candidaturas ilimitadas",
-                    "Destaque ouro nas buscas",
+                    "Equipe de social media",
+                    "White-label",
                   ],
                 },
                 {
-                  name: "Pro",
-                  description: "Sem limites para agências e power users",
-                  price: "R$ 99,90",
+                  name: "Ultra",
+                  description: "Para agências e produtoras que contratam em escala",
+                  price: "R$ 159,90",
                   period: "/mês",
-                  cta: "Ser Profissional Pro",
+                  cta: "Assinar Ultra",
+                  href: "/precos",
                   ctaVariant: "outline" as const,
                   popular: false,
                   icon: Shield,
                   iconColor: "text-purple-500",
                   features: [
-                    "Candidaturas ILIMITADAS",
-                    "Visualizações de perfil ILIMITADAS",
-                    "Publique vagas ILIMITADAS",
-                    "Contrapropostas livres",
-                    "Equipamentos ILIMITADOS",
-                    "Envie até 150 arquivos no portfólio",
-                    "Selo de Perfil Verificado",
-                    "Contato direto via WhatsApp",
-                    "Visualização do Instagram do profissional",
+                    "Vagas, contrapropostas e visualizações ilimitadas",
                     "Destaque máximo nas buscas",
-                    "Suporte VIP Prioritário",
-                    "Contas de social media ILIMITADAS",
-                    "Calendários com IA ilimitados",
-                    "Até 5 membros de equipe por conta para gestão de social media",
+                    "Briefings ilimitados",
+                    "Contratos ilimitados",
+                    "1.500 créditos de IA por mês",
+                    "200 cálculos de rota por mês",
+                    "Equipe de até 5 membros por conta",
+                    "Relatórios e links públicos sem marca IsoScanning (white-label)",
+                    "Suporte prioritário por WhatsApp",
                   ],
                   notIncluded: [],
                 },
@@ -622,30 +620,16 @@ export default function LpCliente() {
                         ))}
                       </div>
 
-                      {plan.cta === "Começar Grátis" ? (
-                        <Link href="/precos" className="mt-auto pt-1">
-                          <Button
-                            variant={plan.ctaVariant}
-                            className={`w-full h-10 md:h-11 text-xs md:text-sm ${
-                              plan.popular ? "shadow-md hover:shadow-lg hover:shadow-primary/20" : ""
-                            }`}
-                          >
-                            {plan.cta}
-                          </Button>
-                        </Link>
-                      ) : (
-                        <div className="mt-auto pt-1">
-                          <Button
-                            variant={plan.ctaVariant}
-                            className={`w-full h-10 md:h-11 text-xs md:text-sm ${
-                              plan.popular ? "shadow-md hover:shadow-lg hover:shadow-primary/20" : ""
-                            }`}
-                            disabled
-                          >
-                            {plan.cta}
-                          </Button>
-                        </div>
-                      )}
+                      <Link href={plan.href} className="mt-auto pt-1">
+                        <Button
+                          variant={plan.ctaVariant}
+                          className={`w-full h-10 md:h-11 text-xs md:text-sm ${
+                            plan.popular ? "shadow-md hover:shadow-lg hover:shadow-primary/20" : ""
+                          }`}
+                        >
+                          {plan.cta}
+                        </Button>
+                      </Link>
                     </CardContent>
                   </Card>
                 </ScrollReveal>

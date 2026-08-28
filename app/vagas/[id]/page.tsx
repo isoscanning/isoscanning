@@ -54,6 +54,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion } from "framer-motion";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { useToast } from "@/components/ui/use-toast";
+import { usePlan } from "@/lib/plans/use-plan";
+import { isPlanErrorBody } from "@/lib/plans/plan-limits";
+import { PlanBadge, UpgradeButton } from "@/components/plan/plan-gate";
 
 export default function DetalhesVagaPage() {
     const params = useParams();
@@ -69,6 +72,31 @@ export default function DetalhesVagaPage() {
     const [proposalAmount, setProposalAmount] = useState<string>("");
     const [proposalMessage, setProposalMessage] = useState<string>("");
     const [employerStats, setEmployerStats] = useState<{ averageRating: number; totalReviews: number }>({ averageRating: 0, totalReviews: 0 });
+
+    // Contrapropostas por vaga no plano do usuário (Free: 0 → campo bloqueado;
+    // Pro: N; Ultra: null = ilimitado). Visitante deslogado cai no fluxo de login.
+    const plan = usePlan();
+    const counterLimit = plan.limitOf("counterProposalsPerJob");
+    const counterBlocked = plan.authenticated && counterLimit === 0;
+
+    const renderProposalPlanHint = () => {
+        if (counterBlocked) {
+            return (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground flex-1">Contrapropostas a partir do plano Pro.</p>
+                    <UpgradeButton size="sm" />
+                </div>
+            );
+        }
+        if (plan.authenticated && counterLimit !== null && counterLimit > 0) {
+            return (
+                <p className="text-xs text-muted-foreground">
+                    Até {counterLimit} contrapropostas por vaga no plano {plan.label}.
+                </p>
+            );
+        }
+        return null;
+    };
 
     useEffect(() => {
         const loadData = async () => {
@@ -168,6 +196,8 @@ export default function DetalhesVagaPage() {
             });
             router.push("/dashboard/candidaturas");
         } catch (error: any) {
+            // 403 de plano: o modal de upgrade já foi aberto pelo apiClient.
+            if (isPlanErrorBody(error?.response?.data)) return;
             toast({
                 title: "Erro ao candidatar",
                 description:
@@ -209,6 +239,8 @@ export default function DetalhesVagaPage() {
             return;
         }
 
+        if (counterBlocked) return; // campo desabilitado no plano Free
+
         setApplying(true);
         try {
             await applyToJob(vaga!.id, userProfile.id, proposalMessage, parseFloat(proposalAmount));
@@ -221,6 +253,11 @@ export default function DetalhesVagaPage() {
             });
             router.push("/dashboard/candidaturas");
         } catch (error: any) {
+            // 403 de plano: o modal de upgrade já foi aberto pelo apiClient.
+            if (isPlanErrorBody(error?.response?.data)) {
+                setIsProposalModalOpen(false);
+                return;
+            }
             toast({
                 title: "Erro ao enviar",
                 description:
@@ -529,6 +566,7 @@ export default function DetalhesVagaPage() {
                                                 <DialogTrigger asChild>
                                                     <Button variant="outline" className="w-full border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 mt-2">
                                                         Fazer contraproposta
+                                                        {counterBlocked && <PlanBadge tier="pro" className="ml-2" />}
                                                     </Button>
                                                 </DialogTrigger>
                                                 <DialogContent className="sm:max-w-[425px]">
@@ -540,10 +578,14 @@ export default function DetalhesVagaPage() {
                                                     </DialogHeader>
                                                     <div className="grid gap-4 py-4">
                                                         <div className="grid gap-2">
-                                                            <Label htmlFor="amount">Valor Sugerido (R$)</Label>
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <Label htmlFor="amount">Valor Sugerido (R$)</Label>
+                                                                {counterBlocked && <PlanBadge tier="pro" />}
+                                                            </div>
                                                             <Input
                                                                 id="amount"
                                                                 type="number"
+                                                                disabled={counterBlocked}
                                                                 min="0"
                                                                 placeholder="Ex: 600"
                                                                 value={proposalAmount}
@@ -556,6 +598,7 @@ export default function DetalhesVagaPage() {
                                                                     setProposalAmount(val);
                                                                 }}
                                                             />
+                                                            {renderProposalPlanHint()}
                                                         </div>
                                                         <div className="grid gap-2">
                                                             <Label htmlFor="message">Mensagem (Opcional)</Label>
@@ -564,11 +607,12 @@ export default function DetalhesVagaPage() {
                                                                 placeholder="Explique o motivo da sua proposta..."
                                                                 value={proposalMessage}
                                                                 onChange={(e) => setProposalMessage(e.target.value)}
+                                                                disabled={counterBlocked}
                                                             />
                                                         </div>
                                                     </div>
                                                     <DialogFooter>
-                                                        <Button onClick={handleCounterProposal} disabled={applying}>
+                                                        <Button onClick={handleCounterProposal} disabled={applying || counterBlocked}>
                                                             {applying ? "Enviando..." : "Enviar Proposta"}
                                                         </Button>
                                                     </DialogFooter>
@@ -626,10 +670,14 @@ export default function DetalhesVagaPage() {
                                     </DialogHeader>
                                     <div className="grid gap-4 py-4">
                                         <div className="grid gap-2">
-                                            <Label htmlFor="amount-mobile">Valor Sugerido (R$)</Label>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <Label htmlFor="amount-mobile">Valor Sugerido (R$)</Label>
+                                                {counterBlocked && <PlanBadge tier="pro" />}
+                                            </div>
                                             <Input
                                                 id="amount-mobile"
                                                 type="number"
+                                                disabled={counterBlocked}
                                                 min="0"
                                                 placeholder="Ex: 600"
                                                 value={proposalAmount}
@@ -642,10 +690,11 @@ export default function DetalhesVagaPage() {
                                                     setProposalAmount(val);
                                                 }}
                                             />
+                                            {renderProposalPlanHint()}
                                         </div>
                                     </div>
                                     <DialogFooter>
-                                        <Button className="w-full" onClick={handleCounterProposal} disabled={applying}>
+                                        <Button className="w-full" onClick={handleCounterProposal} disabled={applying || counterBlocked}>
                                             {applying ? "Enviando..." : "Enviar"}
                                         </Button>
                                     </DialogFooter>

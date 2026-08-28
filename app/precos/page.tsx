@@ -4,13 +4,17 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, X, Zap, Crown, Shield } from "lucide-react";
+import { Check, X, Zap, Crown, Shield, Clock } from "lucide-react";
 import { ParticleBackground } from "@/components/particle-background";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { GradientBackground, FloatingParticles } from "@/components/video-background";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from "next/link";
-import { useState } from "react";
+import { Fragment, useState } from "react";
+import { usePlan } from "@/lib/plans/use-plan";
+import { FEATURE_LABELS, PLAN_LIMITS, TRIAL_DAYS, type PlanLimits, type SubscriptionTier } from "@/lib/plans/plan-limits";
+import { SUPPORT_CHANNEL_LABELS } from "@/lib/plans/support";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
@@ -36,8 +40,99 @@ const PLAN_KEY: Record<string, string> = {
     ultra: 'vip',
 };
 
+// ---- Tabela "Comparar planos" (dirigida por PLAN_LIMITS) ----
+const COMPARE_TIERS: { tier: SubscriptionTier; label: string }[] = [
+    { tier: "free", label: "Free" },
+    { tier: "pro", label: "Pro" },
+    { tier: "vip", label: "Ultra" },
+];
+
+type CompareRow = { key: keyof PlanLimits; label?: string };
+
+const COMPARE_SECTIONS: { title: string; rows: CompareRow[] }[] = [
+    {
+        title: "Marketplace",
+        rows: [
+            { key: "jobApplicationsPerMonth" },
+            { key: "counterProposalsPerJob" },
+            { key: "profileViewsPerMonth" },
+            { key: "jobOffersPerMonth" },
+            { key: "equipmentListings" },
+        ],
+    },
+    {
+        title: "Perfil e portfólio",
+        rows: [
+            { key: "portfolioMediaFiles" },
+            { key: "portfolioVideos" },
+            { key: "verifiedBadge" },
+            { key: "directContact", label: "WhatsApp e Instagram no perfil público" },
+            { key: "searchRank" },
+        ],
+    },
+    {
+        title: "Social media com IA",
+        rows: [
+            { key: "socialMediaAccounts" },
+            { key: "aiCalendarsPerMonth" },
+            { key: "aiCreditsPerMonth" },
+            { key: "smPremiumReports", label: "Simulador de Feed, Relatório mensal com IA e demografia" },
+            { key: "competitorAnalysis" },
+            { key: "teamMembersPerAccount", label: "Equipe de social media (membros por conta)" },
+            { key: "whiteLabel", label: "Relatórios e links públicos sem marca IsoScanning (white-label)" },
+        ],
+    },
+    {
+        title: "Briefings e contratos",
+        rows: [
+            { key: "briefingsPerMonth" },
+            { key: "briefingMembers" },
+            { key: "briefingAiRefine" },
+            { key: "contractsPerMonth" },
+            { key: "customContractTemplates", label: "Editor de contratos e modelos próprios" },
+        ],
+    },
+    {
+        title: "Ferramentas e suporte",
+        rows: [
+            { key: "routeCalculationsPerMonth" },
+            { key: "financeExport", label: "Financeiro completo + exportação" },
+            { key: "supportChannel" },
+        ],
+    },
+];
+
+const SEARCH_RANK_LABELS: Record<number, string> = {
+    1: "Padrão",
+    2: "Prioridade",
+    3: "Destaque máximo",
+};
+
+function capitalize(s: string): string {
+    return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function CompareValue({ feature, value }: { feature: keyof PlanLimits; value: PlanLimits[keyof PlanLimits] }) {
+    if (feature === "searchRank") {
+        return <span>{SEARCH_RANK_LABELS[value as number] ?? String(value)}</span>;
+    }
+    if (feature === "supportChannel") {
+        return <span>{SUPPORT_CHANNEL_LABELS[value as keyof typeof SUPPORT_CHANNEL_LABELS] ?? String(value)}</span>;
+    }
+    if (value === null) {
+        return <span className="font-semibold text-primary">Ilimitado</span>;
+    }
+    if (typeof value === "boolean" || value === 0) {
+        return value
+            ? <Check className="h-4 w-4 text-green-500 mx-auto" aria-label="Incluído" />
+            : <X className="h-4 w-4 text-muted-foreground/50 mx-auto" aria-label="Não incluído" />;
+    }
+    return <span className="tabular-nums">{Number(value).toLocaleString("pt-BR")}</span>;
+}
+
 export default function PricingPage() {
     const { userProfile, loading: authLoading } = useAuth();
+    const plan = usePlan();
     const { toast } = useToast();
     const router = useRouter();
     const [isAnnual, setIsAnnual] = useState(false);
@@ -132,22 +227,33 @@ export default function PricingPage() {
     const plans = [
         {
             name: "Free",
-            description: "Para quem está começando a explorar novas oportunidades",
+            tagline: "Ser encontrado",
+            description: "Para criar seu perfil, montar o portfólio e receber as primeiras oportunidades",
             price: 0,
             annualPrice: 0,
             features: [
-                "5 candidaturas em vagas por mês",
-                "Até 10 visualizações de perfil por mês",
-                "Publique até 1 vaga por mês",
-                "Anuncie 1 equipamento",
-                "Envie até 4 arquivos no portfólio",
-                "Gestão de 1 conta de social media",
-                "1 calendário com IA por mês"
+                "5 candidaturas por mês",
+                "10 visualizações de perfil por mês",
+                "1 vaga publicada por mês",
+                "1 equipamento anunciado",
+                "4 arquivos no portfólio",
+                "1 conta de social media",
+                "1 calendário com IA por mês",
+                "10 créditos de IA por mês",
+                "1 briefing por mês (até 2 membros)",
+                "1 contrato por mês (modelos do sistema)",
+                "3 cálculos de rota por mês",
+                "Chat ilimitado",
+                "Suporte pela comunidade"
             ],
             notIncluded: [
-                "Envio de contrapropostas",
-                "Destaque no marketplace",
-                "Suporte prioritário"
+                "Contrapropostas em vagas",
+                "Selo Perfil Verificado",
+                "WhatsApp e Instagram no perfil",
+                "Simulador de Feed e Relatório com IA",
+                "Análise de concorrentes",
+                "Refinar briefing com IA",
+                "Exportação do financeiro"
             ],
             cta: "Começar Grátis",
             ctaVariant: "outline" as const,
@@ -156,25 +262,34 @@ export default function PricingPage() {
         },
         {
             name: "Pro",
-            description: "Perfeito para profissionais ativos e demandas regulares",
+            tagline: "Trabalhar",
+            description: "Para profissionais ativos: mais visibilidade, contato direto e IA no dia a dia",
             price: 59.90,
             annualPrice: 47.90,
             features: [
-                "10 candidaturas em vagas por mês",
-                "Até 30 visualizações de perfil por mês",
-                "Publique até 3 vagas por mês",
-                "Envie 3 contrapropostas por job",
-                "Anuncie até 5 equipamentos",
-                "Envie até 10 arquivos no portfólio",
-                "Selo de Perfil Verificado",
-                "Contato direto via WhatsApp",
-                "Visualização do Instagram do profissional",
-                "Gestão de até 5 contas de social media",
-                "Calendários com IA ilimitados"
+                "10 candidaturas por mês",
+                "3 contrapropostas por vaga",
+                "30 visualizações de perfil por mês",
+                "3 vagas publicadas por mês",
+                "5 equipamentos anunciados",
+                "20 arquivos no portfólio (5 vídeos)",
+                "Selo Perfil Verificado",
+                "WhatsApp e Instagram no seu perfil público",
+                "Prioridade nas buscas",
+                "5 contas de social media",
+                "Calendários com IA ilimitados",
+                "300 créditos de IA por mês",
+                "Simulador de Feed, Relatório mensal com IA e demografia",
+                "Análise de concorrentes",
+                "10 briefings por mês, refinar com IA, até 10 membros",
+                "10 contratos por mês, editor e modelos próprios",
+                "50 cálculos de rota por mês",
+                "Financeiro completo + exportação",
+                "Suporte por e-mail"
             ],
             notIncluded: [
-                "Candidaturas ilimitadas",
-                "Destaque ouro nas buscas"
+                "Equipe de social media",
+                "White-label"
             ],
             cta: "Assinar Pro",
             ctaVariant: "default" as const,
@@ -183,27 +298,28 @@ export default function PricingPage() {
         },
         {
             name: "Ultra",
-            description: "Sem limites para agências e power users",
+            tagline: "Escalar",
+            description: "Para agências e power users: sem limites no marketplace, equipe e white-label",
             price: 159.90,
             annualPrice: 127.90,
             features: [
-                "Candidaturas ILIMITADAS",
-                "Visualizações de perfil ILIMITADAS",
-                "Publique vagas ILIMITADAS",
-                "Contrapropostas livres",
-                "Equipamentos ILIMITADOS",
-                "Envie até 150 arquivos no portfólio",
-                "Selo de Perfil Verificado",
-                "Contato direto via WhatsApp",
-                "Visualização do Instagram do profissional",
+                "Tudo ilimitado no marketplace: candidaturas, contrapropostas, visualizações, vagas e equipamentos",
+                "150 arquivos no portfólio (20 vídeos)",
+                "Selo Perfil Verificado e contato direto no perfil",
                 "Destaque máximo nas buscas",
-                "Suporte VIP Prioritário",
-                "Contas de social media ILIMITADAS",
-                "Calendários com IA ilimitados",
-                "Até 5 membros de equipe por conta para gestão de social media"
+                "Contas de social media ilimitadas",
+                "Equipe de até 5 membros por conta",
+                "1.500 créditos de IA por mês",
+                "Simulador de Feed, Relatório com IA e análise de concorrentes",
+                "Relatórios e links públicos sem marca IsoScanning (white-label)",
+                "Briefings ilimitados",
+                "Contratos ilimitados",
+                "200 cálculos de rota por mês",
+                "Financeiro completo + exportação",
+                "Suporte prioritário por WhatsApp"
             ],
             notIncluded: [],
-            cta: "Ser Profissional Ultra",
+            cta: "Assinar Ultra",
             ctaVariant: "outline" as const,
             popular: false,
             icon: Shield
@@ -296,8 +412,15 @@ export default function PricingPage() {
                             </ScrollReveal>
 
                             <p className="mt-4 text-sm text-center text-blue-400 font-medium">
-                                🎉 Aproveite a versão completa por tempo limitado, basta criar sua conta
+                                🎉 Todo cadastro novo ganha {TRIAL_DAYS} dias do Pro grátis, sem cartão.
                             </p>
+
+                            {plan.isTrial && plan.trialDaysLeft !== null && (
+                                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-700 dark:text-amber-300">
+                                    <Clock className="h-4 w-4 shrink-0" />
+                                    Você está no teste do Pro — {plan.trialDaysLeft} dia{plan.trialDaysLeft === 1 ? "" : "s"} restante{plan.trialDaysLeft === 1 ? "" : "s"}
+                                </div>
+                            )}
                         </div>
 
 
@@ -320,7 +443,10 @@ export default function PricingPage() {
                                                 <div className={`p-2.5 rounded-xl ${plan.popular ? "bg-primary/10 text-primary" : "bg-muted text-foreground"}`}>
                                                     <plan.icon className="h-6 w-6" />
                                                 </div>
-                                                <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
+                                                <div>
+                                                    <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
+                                                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{plan.tagline}</p>
+                                                </div>
                                             </div>
                                             <CardDescription className="min-h-[40px] text-sm">{plan.description}</CardDescription>
                                         </CardHeader>
@@ -381,7 +507,71 @@ export default function PricingPage() {
                     </div>
                 </section>
 
-                {/* Feature Comparison Section could go here for more detail */}
+                {/* Comparar planos — dirigido por PLAN_LIMITS */}
+                <section className="py-16 md:py-20 border-t border-border/60">
+                    <div className="container mx-auto px-4">
+                        <ScrollReveal>
+                            <div className="text-center mb-10 space-y-3">
+                                <h2 className="text-3xl md:text-4xl font-bold">Comparar planos</h2>
+                                <p className="text-muted-foreground max-w-2xl mx-auto">
+                                    Todos os limites lado a lado. As cotas mensais renovam no início de cada mês.
+                                </p>
+                            </div>
+                        </ScrollReveal>
+
+                        <ScrollReveal delay={0.1}>
+                            <Card className="max-w-5xl mx-auto overflow-hidden border-border bg-card/50">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="hover:bg-transparent">
+                                            <TableHead className="w-[46%] min-w-[220px] text-sm font-semibold">Recurso</TableHead>
+                                            {COMPARE_TIERS.map((t) => (
+                                                <TableHead
+                                                    key={t.tier}
+                                                    className={`text-center text-sm font-semibold ${t.tier === "pro" ? "bg-primary/5 text-primary" : ""}`}
+                                                >
+                                                    {t.label}
+                                                </TableHead>
+                                            ))}
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {COMPARE_SECTIONS.map((section) => (
+                                            <Fragment key={section.title}>
+                                                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                                                    <TableCell colSpan={COMPARE_TIERS.length + 1} className="py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                                        {section.title}
+                                                    </TableCell>
+                                                </TableRow>
+                                                {section.rows.map((row) => (
+                                                    <TableRow key={row.key}>
+                                                        <TableCell className="text-sm">
+                                                            {row.label ?? capitalize(FEATURE_LABELS[row.key])}
+                                                        </TableCell>
+                                                        {COMPARE_TIERS.map((t) => (
+                                                            <TableCell
+                                                                key={t.tier}
+                                                                className={`text-center text-sm ${t.tier === "pro" ? "bg-primary/5" : ""}`}
+                                                            >
+                                                                <CompareValue feature={row.key} value={PLAN_LIMITS[t.tier][row.key]} />
+                                                            </TableCell>
+                                                        ))}
+                                                    </TableRow>
+                                                ))}
+                                            </Fragment>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </Card>
+                        </ScrollReveal>
+
+                        <ScrollReveal delay={0.2}>
+                            <p className="mt-6 text-center text-xs text-muted-foreground">
+                                Todo cadastro novo ganha {TRIAL_DAYS} dias do Pro grátis, sem cartão. Ao final do teste, sua conta volta para o Free sem custo.
+                            </p>
+                        </ScrollReveal>
+                    </div>
+                </section>
 
                 <GradientBackground variant="blue" className="py-20">
                     <FloatingParticles count={10} />
@@ -389,8 +579,10 @@ export default function PricingPage() {
                         <h2 className="text-3xl font-bold mb-8 text-white">Dúvidas Frequentes</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto text-left">
                             {[
-                                { q: "Posso cancelar a qualquer momento?", a: "Sim, todos os planos mensais podem ser cancelados a qualquer momento sem multa." },
-                                { q: "Como funcionam os créditos?", a: "Os créditos são usados para se candidatar a vagas e desbloquear contatos. Eles renovam mensalmente." },
+                                { q: "Como funciona o teste grátis do Pro?", a: `Todo cadastro novo ganha ${TRIAL_DAYS} dias do plano Pro, sem cartão. Ao final do teste, sua conta volta para o Free automaticamente — assine quando quiser para manter os recursos.` },
+                                { q: "Como funcionam os créditos de IA?", a: "Os créditos de IA são consumidos pelas ferramentas com inteligência artificial: calendários de social media, relatórios, análise de concorrentes e refinamento de briefing. Cada plano tem uma cota mensal (10 no Free, 300 no Pro e 1.500 no Ultra) que renova todo mês." },
+                                { q: "Posso cancelar a qualquer momento?", a: "Sim, todos os planos mensais podem ser cancelados a qualquer momento sem multa. Seu acesso continua até o fim do período pago." },
+                                { q: "O que acontece quando atinjo um limite?", a: "Você recebe um aviso na hora e pode fazer upgrade sem perder nada. Os limites mensais renovam no início de cada mês." },
                                 { q: "Tenho desconto no plano anual?", a: "Sim! Ao assinar o plano anual você economiza 20% em comparação ao plano mensal." },
                                 { q: "Quais métodos de pagamento aceitam?", a: "Aceitamos todos os principais cartões de crédito, PIX e Boleto Bancário." }
                             ].map((faq, i) => (

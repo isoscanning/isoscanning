@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/server/api-auth";
+import { requireUser, consumeAiCredits } from "@/lib/server/api-auth";
 import { GROQ_MODEL } from "@/lib/server/groq";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
@@ -20,12 +20,17 @@ export async function POST(request: NextRequest) {
     if (!groqKey) return NextResponse.json({ holidays: [] });
 
     // Rota proxia a chave Groq — exige usuário autenticado
-    if (!(await requireUser(request))) {
+    const auth = await requireUser(request);
+    if (!auth) {
       return NextResponse.json({ error: "Não autorizado. Faça login novamente." }, { status: 401 });
     }
 
     const { cityName, state, year } = await request.json();
     if (!cityName || !state) return NextResponse.json({ holidays: [] });
+
+    // Plano: debita créditos de IA (após validar a entrada, antes da Groq)
+    const denied = await consumeAiCredits(auth, "city-holidays");
+    if (denied) return denied;
 
     const stateName = STATE_NAMES[state] ?? state;
 

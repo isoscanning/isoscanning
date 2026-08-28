@@ -107,7 +107,7 @@ const allFeatures = [
     icon: Camera,
     title: "Portfólio Profissional",
     description:
-      "Mostre seu trabalho com um portfólio online bonito e organizado. Upload ilimitado de fotos, vídeos e projetos para impressionar seus futuros clientes.",
+      "Mostre seu trabalho com um portfólio online bonito e organizado. Portfólio com até 150 arquivos entre fotos, vídeos e projetos para impressionar seus futuros clientes.",
     color: "from-blue-500 to-blue-600",
     shadow: "shadow-blue-500/25",
   },
@@ -239,7 +239,7 @@ const faqs = [
   },
   {
     q: "É totalmente gratuito para se cadastrar?",
-    a: "Sim! O cadastro é 100% gratuito. Você pode criar seu perfil, adicionar seu portfólio e explorar a plataforma sem custo algum. Oferecemos planos pagos para quem quer visibilidade máxima e uploads ilimitados, mas você pode começar gratuitamente.",
+    a: "Sim! O cadastro é 100% gratuito e todo cadastro novo ganha 14 dias do plano Pro grátis, sem cartão. Você pode criar seu perfil, adicionar seu portfólio e explorar a plataforma sem custo algum. Os planos pagos ampliam os limites: o Free permite até 4 arquivos no portfólio, o Pro até 20 e o Ultra até 150.",
   },
   {
     q: "Como funciona a Gestão Financeira (FinMEI)?",
@@ -251,7 +251,7 @@ const faqs = [
   },
   {
     q: "Existe algum limite para as imagens e vídeos do meu portfólio?",
-    a: "O Portfólio Profissional nativo da IsoScanning foi feito para impressionar clientes. Enquanto o plano Free possui envios limitados, ao assinar planos como Pro ou Ultra, você não tem restrições: faça uploads ilimitados para expor todo o seu potencial criativo.",
+    a: "O Portfólio Profissional nativo da IsoScanning foi feito para impressionar clientes. O plano Free permite até 4 arquivos, o Pro até 20 arquivos (sendo 5 vídeos) e o Ultra até 150 arquivos (sendo 20 vídeos) — espaço de sobra para expor todo o seu potencial criativo.",
   },
   {
     q: "Como encontro e me candidato a novas oportunidades e vagas?",
@@ -787,7 +787,7 @@ export default function LpProfissional() {
                   Sem contratos de longo prazo. Cancele quando quiser.
                 </p>
                 <p className="text-sm text-blue-400 font-medium pt-1">
-                  🎉 Aproveite a versão completa por tempo limitado, basta criar sua conta
+                  🎉 Todo cadastro novo ganha 14 dias do Pro grátis, sem cartão.
                 </p>
               </div>
             </ScrollReveal>
@@ -796,82 +796,80 @@ export default function LpProfissional() {
               {[
                 {
                   name: "Free",
-                  description: "Para quem está começando a explorar novas oportunidades",
+                  description: "Ser encontrado: perfil, portfólio e primeiras oportunidades",
                   price: "R$ 0",
                   period: "/mês",
                   cta: "Começar Grátis",
+                  href: "/cadastro",
                   ctaVariant: "outline" as const,
                   popular: false,
                   icon: Zap,
                   iconColor: "text-muted-foreground",
                   features: [
                     "5 candidaturas em vagas por mês",
-                    "Até 10 visualizações de perfil por mês",
-                    "Publique até 1 vaga por mês",
-                    "Anuncie 1 equipamento",
-                    "Envie até 4 arquivos no portfólio",
-                    "Gestão de 1 conta de social media",
-                    "1 calendário com IA por mês",
+                    "10 visualizações de perfil por mês",
+                    "1 equipamento anunciado",
+                    "4 arquivos no portfólio",
+                    "1 conta de social media e 1 calendário com IA por mês",
+                    "10 créditos de IA por mês",
+                    "1 briefing e 1 contrato por mês",
+                    "Chat ilimitado e suporte pela comunidade",
                   ],
                   notIncluded: [
-                    "Envio de contrapropostas",
-                    "Destaque no marketplace",
-                    "Suporte prioritário",
+                    "Contrapropostas em vagas",
+                    "Selo verificado e contato direto no perfil",
                   ],
                 },
                 {
                   name: "Pro",
-                  description: "Perfeito para profissionais ativos e demandas regulares",
+                  description: "Trabalhar: mais visibilidade, contato direto e IA no dia a dia",
                   price: "R$ 59,90",
                   period: "/mês",
                   cta: "Assinar Pro",
+                  href: "/precos",
                   ctaVariant: "default" as const,
                   popular: true,
                   icon: Crown,
                   iconColor: "text-primary",
                   features: [
-                    "10 candidaturas em vagas por mês",
-                    "Até 30 visualizações de perfil por mês",
-                    "Publique até 3 vagas por mês",
-                    "Envie 3 contrapropostas por job",
-                    "Anuncie até 5 equipamentos",
-                    "Envie até 10 arquivos no portfólio",
-                    "Selo de Perfil Verificado",
-                    "Contato direto via WhatsApp",
-                    "Visualização do Instagram do profissional",
-                    "Gestão de até 5 contas de social media",
-                    "Calendários com IA ilimitados",
+                    "10 candidaturas e 3 contrapropostas por vaga",
+                    "30 visualizações de perfil por mês",
+                    "Até 5 equipamentos anunciados",
+                    "20 arquivos no portfólio (5 vídeos)",
+                    "Selo Perfil Verificado e prioridade nas buscas",
+                    "WhatsApp e Instagram no seu perfil público",
+                    "5 contas de social media e calendários com IA ilimitados",
+                    "300 créditos de IA, Simulador de Feed e Relatório com IA",
+                    "10 briefings e 10 contratos por mês com modelos próprios",
+                    "Financeiro completo com exportação e suporte por e-mail",
                   ],
                   notIncluded: [
-                    "Candidaturas ilimitadas",
-                    "Destaque ouro nas buscas",
+                    "Equipe de social media",
+                    "White-label",
                   ],
                 },
                 {
                   name: "Ultra",
-                  description: "Sem limites para agências e power users",
+                  description: "Escalar: sem limites no marketplace, equipe e white-label",
                   price: "R$ 159,90",
                   period: "/mês",
-                  cta: "Ser Profissional Ultra",
+                  cta: "Assinar Ultra",
+                  href: "/precos",
                   ctaVariant: "outline" as const,
                   popular: false,
                   icon: Shield,
                   iconColor: "text-purple-500",
                   features: [
-                    "Candidaturas ILIMITADAS",
-                    "Visualizações de perfil ILIMITADAS",
-                    "Publique vagas ILIMITADAS",
-                    "Contrapropostas livres",
-                    "Equipamentos ILIMITADOS",
-                    "Envie até 150 arquivos no portfólio",
-                    "Selo de Perfil Verificado",
-                    "Contato direto via WhatsApp",
-                    "Visualização do Instagram do profissional",
+                    "Candidaturas, vagas, visualizações e equipamentos ilimitados",
+                    "150 arquivos no portfólio (20 vídeos)",
                     "Destaque máximo nas buscas",
-                    "Suporte VIP Prioritário",
-                    "Contas de social media ILIMITADAS",
-                    "Calendários com IA ilimitados",
-                    "Até 5 membros de equipe por conta para gestão de social media",
+                    "Contas de social media ilimitadas",
+                    "Equipe de até 5 membros por conta",
+                    "1.500 créditos de IA por mês",
+                    "Relatórios e links públicos sem marca IsoScanning (white-label)",
+                    "Briefings e contratos ilimitados",
+                    "200 cálculos de rota por mês",
+                    "Suporte prioritário por WhatsApp",
                   ],
                   notIncluded: [],
                 },
@@ -929,30 +927,16 @@ export default function LpProfissional() {
                         ))}
                       </div>
 
-                      {plan.cta === "Começar Grátis" ? (
-                        <Link href="/precos" className="mt-auto pt-1">
-                          <Button
-                            variant={plan.ctaVariant}
-                            className={`w-full h-10 md:h-11 text-xs md:text-sm ${
-                              plan.popular ? "shadow-md hover:shadow-lg hover:shadow-primary/20" : ""
-                            }`}
-                          >
-                            {plan.cta}
-                          </Button>
-                        </Link>
-                      ) : (
-                        <div className="mt-auto pt-1">
-                          <Button
-                            variant={plan.ctaVariant}
-                            className={`w-full h-10 md:h-11 text-xs md:text-sm ${
-                              plan.popular ? "shadow-md hover:shadow-lg hover:shadow-primary/20" : ""
-                            }`}
-                            disabled
-                          >
-                            {plan.cta}
-                          </Button>
-                        </div>
-                      )}
+                      <Link href={plan.href} className="mt-auto pt-1">
+                        <Button
+                          variant={plan.ctaVariant}
+                          className={`w-full h-10 md:h-11 text-xs md:text-sm ${
+                            plan.popular ? "shadow-md hover:shadow-lg hover:shadow-primary/20" : ""
+                          }`}
+                        >
+                          {plan.cta}
+                        </Button>
+                      </Link>
                     </CardContent>
                   </Card>
                 </ScrollReveal>
@@ -961,7 +945,7 @@ export default function LpProfissional() {
 
             <ScrollReveal delay={0.4}>
               <p className="text-center text-xs md:text-sm text-muted-foreground mt-4 md:mt-4 pb-2 md:pb-4">
-                Quer ver todos os detalhes?{" "}
+                Todo cadastro novo ganha 14 dias do Pro grátis, sem cartão. Quer ver todos os detalhes?{" "}
                 <Link href="/precos" className="text-primary font-semibold hover:underline">
                   Consulte a página completa de preços →
                 </Link>

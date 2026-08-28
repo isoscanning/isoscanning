@@ -30,6 +30,8 @@ interface SharedSchedule {
 interface SharedCalendarData {
   schedule: SharedSchedule;
   posts: SocialMediaPost[];
+  /** Dono no plano Ultra (white-label): visualização sem a marca IsoScanning */
+  whiteLabel?: boolean;
 }
 
 function buildCalendarDays(month: number, year: number) {
@@ -314,7 +316,7 @@ export default function SharedCalendarPage() {
 
         {/* Footer note */}
         <p className="text-center text-[11px] text-muted-foreground mt-4 opacity-60">
-          Visualização somente-leitura · Gerado por IsoScanning
+          Visualização somente-leitura{data?.whiteLabel ? "" : " · Gerado por IsoScanning"}
         </p>
       </main>
     </div>

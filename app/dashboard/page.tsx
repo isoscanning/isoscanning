@@ -30,16 +30,21 @@ import {
   Calculator,
   FileSignature,
   Share2,
-  ClipboardList
+  ClipboardList,
+  Clock
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { OnboardingTour, TourStep } from "@/components/onboarding-tour";
+import { usePlan } from "@/lib/plans/use-plan";
+import { UsageMeter } from "@/components/plan/usage-meter";
+import { UpgradeButton } from "@/components/plan/plan-gate";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { userProfile, loading } = useAuth();
+  const plan = usePlan();
   const [googleName, setGoogleName] = useState("");
 
   // Dashboard Stats
@@ -262,7 +267,7 @@ export default function DashboardPage() {
                   <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600">
                     Olá, {userProfile.displayName || googleName}!
                   </h1>
-                  {(userProfile.subscriptionTier === 'standard' || userProfile.subscriptionTier === 'pro' || userProfile.subscriptionTier === 'vip') && (
+                  {plan.can("verifiedBadge") && (
                     <div title="Perfil Verificado">
                       <BadgeCheck className="h-8 w-8 text-blue-500 fill-blue-500/10" />
                     </div>
@@ -278,6 +283,29 @@ export default function DashboardPage() {
               <div className="absolute top-0 right-0 -mt-10 -mr-10 h-64 w-64 rounded-full bg-primary/5 blur-3xl"></div>
               <div className="absolute bottom-0 left-0 -mb-10 -ml-10 h-64 w-64 rounded-full bg-blue-500/5 blur-3xl"></div>
             </div>
+          </ScrollReveal>
+
+          {/* Trial banner */}
+          {plan.isTrial && plan.trialDaysLeft !== null && (
+            <ScrollReveal delay={0.03} duration={0.4}>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-4">
+                <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                <p className="text-sm flex-1">
+                  <span className="font-semibold">
+                    Seu teste do Pro termina em {plan.trialDaysLeft} dia{plan.trialDaysLeft === 1 ? "" : "s"}.
+                  </span>{" "}
+                  <span className="text-muted-foreground">
+                    Assine para manter selo verificado, contato direto no perfil e as ferramentas de IA depois do teste.
+                  </span>
+                </p>
+                <UpgradeButton size="sm">Assinar o Pro</UpgradeButton>
+              </div>
+            </ScrollReveal>
+          )}
+
+          {/* Plano e uso */}
+          <ScrollReveal delay={0.04} duration={0.4}>
+            <UsageMeter compact />
           </ScrollReveal>
 
           {/* Stats Row */}

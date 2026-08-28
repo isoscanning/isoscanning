@@ -180,7 +180,8 @@ export default function CadastroPage() {
                       Criar conta
                     </CardTitle>
                     <CardDescription className="text-base text-muted-foreground">
-                      Escolha o tipo de conta e comece agora
+                      Escolha o tipo de conta e comece agora.{" "}
+                      <span className="font-medium text-foreground">14 dias do plano Pro grátis</span>, sem cartão.
                     </CardDescription>
                   </div>
                 </CardHeader>

@@ -20,9 +20,29 @@ export interface Equipment {
   imageUrls?: string[];
   ownerId: string;
   ownerName: string;
+  /** Dono está em plano pago (selo Perfil Verificado). */
+  ownerVerified?: boolean;
+  /** Só vêm preenchidos quando o dono está em plano pago (contato direto). */
+  ownerContactPhone?: string | null;
+  ownerWhatsappUrl?: string | null;
   isAvailable: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/**
+ * Erro com a mensagem do backend, preservando `response` para as páginas
+ * detectarem 403 de plano (`response.data.code === "PLAN_LIMIT" | "PLAN_FEATURE"`)
+ * e não duplicarem o modal de upgrade aberto pelo interceptor do apiClient.
+ */
+function backendError(error: any, fallback: string): Error {
+  const message = error?.response?.data?.message;
+  const err = new Error(
+    typeof message === "string" ? message : Array.isArray(message) ? message.join(", ") : fallback
+  );
+  (err as any).response = error?.response;
+  (err as any).code = error?.response?.data?.code;
+  return err;
 }
 
 export interface Professional {
@@ -42,10 +62,19 @@ export interface Professional {
   phone?: string;
   phoneCountryCode?: string;
   portfolioLink?: string;
-  instagram?: string;
+  /** Só vem preenchido quando o dono do perfil está em plano pago. */
+  instagram?: string | null;
   otherLinks?: string;
   isActive?: boolean;
+  /** Tier efetivo (já rebaixado para free se a assinatura venceu). */
   subscriptionTier?: 'free' | 'standard' | 'pro' | 'vip';
+  /** Selo Perfil Verificado (plano pago). */
+  verified?: boolean;
+  /** Posição nas buscas: 1 = Free, 2 = Pro, 3 = Ultra (Destaque). */
+  searchRank?: 1 | 2 | 3;
+  /** Contato direto — null a menos que o dono esteja em plano pago. */
+  contactPhone?: string | null;
+  contactWhatsappUrl?: string | null;
 }
 
 export interface JobOffer {
@@ -229,7 +258,7 @@ export async function createEquipment(
   } catch (error: any) {
     console.error("[data-service] Error creating equipment:", error);
     // Preserva mensagens do backend (ex.: limite do plano atingido)
-    throw new Error(error?.response?.data?.message || "Erro ao criar equipamento");
+    throw backendError(error, "Erro ao criar equipamento");
   }
 }
 
@@ -443,11 +472,8 @@ export async function createPortfolioItem(data: CreatePortfolioItemData): Promis
     return response.data;
   } catch (error: any) {
     console.error("[data-service] Error creating portfolio item:", error);
-    // Preservar a mensagem de erro do backend caso venha o 'Portfolio limit reached'
-    if (error.response?.data?.message) {
-      throw new Error(error.response.data.message);
-    }
-    throw new Error("Erro ao adicionar item ao portfólio");
+    // Preserva a mensagem (e o `code`) do backend — ex.: limite do plano
+    throw backendError(error, "Erro ao adicionar item ao portfólio");
   }
 }
 
@@ -460,10 +486,7 @@ export async function updatePortfolioItem(
     return response.data;
   } catch (error: any) {
     console.error("[data-service] Error updating portfolio item:", error);
-    if (error.response?.data?.message) {
-      throw new Error(error.response.data.message);
-    }
-    throw new Error("Erro ao atualizar item do portfólio");
+    throw backendError(error, "Erro ao atualizar item do portfólio");
   }
 }
 
@@ -648,28 +671,21 @@ export async function createJobOffer(data: CreateJobOfferData): Promise<string> 
   } catch (error: any) {
     console.error("[data-service] Error creating job offer:", error);
     // Preserva mensagens do backend (ex.: limite do plano atingido)
-    throw new Error(error?.response?.data?.message || "Erro ao criar vaga");
+    throw backendError(error, "Erro ao criar vaga");
   }
 }
 
+/**
+ * Muda o status de uma vaga pelo backend (valida dono e limites do plano;
+ * um 403 de plano abre o modal de upgrade via interceptor do apiClient).
+ */
 export const updateJobStatus = async (jobId: string, status: 'open' | 'paused' | 'closed'): Promise<boolean> => {
   try {
-    // Also update isActive for backward compatibility
-    const isActive = status === 'open';
-
-    const { error } = await supabase
-      .from('job_offers')
-      .update({
-        status,
-        is_active: isActive
-      })
-      .eq('id', jobId);
-
-    if (error) {
-      console.error("Error updating job status:", error);
-      throw error;
-    }
-
+    // isActive acompanha o status (compatibilidade com o filtro público)
+    await apiClient.patch(`/job-offers/${jobId}/status`, {
+      status,
+      isActive: status === 'open',
+    });
     return true;
   } catch (error) {
     console.error("Error updating job status:", error);
@@ -679,22 +695,11 @@ export const updateJobStatus = async (jobId: string, status: 'open' | 'paused' |
 
 export const bulkUpdateJobStatus = async (jobIds: string[], status: 'open' | 'paused' | 'closed'): Promise<boolean> => {
   try {
-    // Also update isActive for backward compatibility
-    const isActive = status === 'open';
-
-    const { error } = await supabase
-      .from('job_offers')
-      .update({
-        status,
-        is_active: isActive
-      })
-      .in('id', jobIds);
-
-    if (error) {
-      console.error("Error bulk updating job status:", error);
-      throw error;
-    }
-
+    await apiClient.post('/job-offers/bulk-status', {
+      ids: jobIds,
+      status,
+      isActive: status === 'open',
+    });
     return true;
   } catch (error) {
     console.error("Error bulk updating job status:", error);
@@ -1061,20 +1066,14 @@ export const sendJobAgreement = async (
   }
 ): Promise<boolean> => {
   try {
-    const { data, error } = await supabase
-      .from('job_applications')
-      .update({
-        agreement_text: agreementData.agreementText,
-        agreement_value: agreementData.agreementValue,
-        agreement_deadline: agreementData.agreementDeadline,
-        agreement_location: agreementData.agreementLocation,
-        agreement_status: 'pending_candidate'
-      })
-      .eq('id', applicationId)
-      .select();
-
-    if (error) throw error;
-    if (!data || data.length === 0) return false;
+    // Backend valida que o ator é o dono da vaga, marca o acordo como
+    // pending_candidate e notifica o candidato.
+    await apiClient.post(`/job-applications/${applicationId}/agreement`, {
+      agreementText: agreementData.agreementText,
+      agreementValue: agreementData.agreementValue,
+      agreementDeadline: agreementData.agreementDeadline,
+      agreementLocation: agreementData.agreementLocation,
+    });
     return true;
   } catch (error) {
     console.error("Error sending job agreement:", error);
@@ -1083,26 +1082,15 @@ export const sendJobAgreement = async (
 };
 
 export const respondToJobAgreement = async (
-  applicationId: string, 
+  applicationId: string,
   response: 'accepted' | 'rejected'
 ): Promise<boolean> => {
   try {
-    const updateData: any = { agreement_status: response };
-    if (response === 'accepted') {
-      updateData.status = 'accepted';
-      
-      // We should also set the agreed_value based on the agreement_value
-      // Let's just set status to accepted. The agreed_value is already stored in agreement_value.
-    }
-
-    const { data, error } = await supabase
-      .from('job_applications')
-      .update(updateData)
-      .eq('id', applicationId)
-      .select();
-
-    if (error) throw error;
-    if (!data || data.length === 0) return false;
+    // Backend valida que o ator é o candidato; ao aceitar, também marca a
+    // candidatura como accepted.
+    await apiClient.post(`/job-applications/${applicationId}/agreement/respond`, {
+      accept: response === 'accepted',
+    });
     return true;
   } catch (error) {
     console.error("Error responding to job agreement:", error);

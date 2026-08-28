@@ -7,7 +7,7 @@
 // A resposta segue exatamente o shape do CreateBriefingDto do backend.
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/server/api-auth";
+import { requireUser, consumeAiCredits } from "@/lib/server/api-auth";
 import { callGroqJson, GroqError } from "@/lib/server/groq";
 import {
   BRIEFING_TYPES,
@@ -186,6 +186,10 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  // Plano: debita créditos de IA (após validar a entrada, antes da Groq)
+  const denied = await consumeAiCredits(auth, "briefing-generate");
+  if (denied) return denied;
 
   try {
     const parsed = await callGroqJson<GeneratedBriefing>({

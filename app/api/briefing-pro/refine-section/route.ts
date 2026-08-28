@@ -8,7 +8,7 @@
 // mostra o preview e aplica via backend (substituição do conteúdo da seção).
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/server/api-auth";
+import { requireUser, requireFeature, consumeAiCredits } from "@/lib/server/api-auth";
 import { callGroqJson, GroqError } from "@/lib/server/groq";
 import {
   ITEM_JSON_FORMAT,
@@ -118,6 +118,14 @@ export async function POST(request: NextRequest) {
   if (!body.section || !Array.isArray(body.section.items)) {
     return NextResponse.json({ error: "Seção inválida" }, { status: 400 });
   }
+
+  // Plano: refino com IA é recurso Pro/Ultra; depois debita créditos de IA
+  // (após validar a entrada, antes da Groq)
+  const featureDenied = await requireFeature(auth, "briefingAiRefine");
+  if (featureDenied) return featureDenied;
+
+  const creditsDenied = await consumeAiCredits(auth, "briefing-refine");
+  if (creditsDenied) return creditsDenied;
 
   try {
     const parsed = await callGroqJson<RawGeneratedSection>({

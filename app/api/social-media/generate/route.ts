@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, checkAiCalendarQuota, recordAiCalendarUsage } from "@/lib/server/api-auth";
+import { requireUser, checkAiCalendarQuota, recordAiCalendarUsage, aiCalendarLimitResponse } from "@/lib/server/api-auth";
 import { callGroqJson, GroqError } from "@/lib/server/groq";
 
 const MONTHS_PT = [
@@ -209,18 +209,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Não autorizado. Faça login novamente." }, { status: 401 });
     }
 
-    // Limite de plano: Free = 1 calendário com IA por mês
+    // Limite de plano: Free = 1 calendário com IA por mês. O calendário tem
+    // cota própria (não consome créditos de IA) — 403 no formato PLAN_LIMIT.
     const quota = await checkAiCalendarQuota(auth);
     if (!quota.allowed) {
-      return NextResponse.json(
-        {
-          error:
-            `Você já usou ${quota.used} de ${quota.limit} geração(ões) de calendário com IA este mês. ` +
-            `Faça upgrade do plano para gerações ilimitadas.`,
-          planLimit: true,
-        },
-        { status: 403 }
-      );
+      return aiCalendarLimitResponse(quota);
     }
 
     const body = await request.json();

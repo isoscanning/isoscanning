@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { briefingProService, CreateBriefingPayload } from "@/lib/briefing-pro-service";
+import { tokenManager } from "@/lib/token-manager";
+import { notifyPlanLimit } from "@/lib/plans/plan-events";
 import {
   BriefingType,
   BRIEFING_TYPE_LABELS,
@@ -39,6 +41,12 @@ function apiErrorMessage(err: unknown, fallback: string): string {
     ?.response?.data?.message;
   if (Array.isArray(msg)) return msg[0] ?? fallback;
   return msg || fallback;
+}
+
+/** 403 de plano vindo do apiClient — o interceptor já abriu o modal de upgrade. */
+function isPlanApiError(err: unknown): boolean {
+  const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
+  return code === "PLAN_LIMIT" || code === "PLAN_FEATURE";
 }
 
 /** Estrutura sugerida por tipo de trabalho na criação manual. */
@@ -125,9 +133,10 @@ export default function NewBriefingPage() {
       toast.success("Briefing criado!");
       router.push(`/dashboard/briefing-pro/${briefing.id}`);
     } catch (err) {
+      setSaving(false);
+      if (isPlanApiError(err)) return; // cota de briefings/mês: modal já aberto
       console.error(err);
       toast.error(apiErrorMessage(err, "Erro ao criar o briefing"));
-      setSaving(false);
     }
   }
 
@@ -138,11 +147,16 @@ export default function NewBriefingPage() {
     }
     setGenerating(true);
     try {
-      const structure = await briefingProService.generateWithAi(
-        aiText,
-        aiType === "auto" ? undefined : aiType
-      );
-      setPreview(structure);
+      // fetch direto (em vez do service) para ler o corpo do 403 de plano (créditos de IA)
+      const res = await fetch("/api/briefing-pro/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
+        body: JSON.stringify({ text: aiText, briefing_type: aiType === "auto" ? undefined : aiType }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 403 && notifyPlanLimit(data)) return;
+      if (!res.ok) throw new Error(data?.error || "Erro ao gerar o briefing com IA");
+      setPreview(data.briefing as GeneratedBriefingStructure);
       toast.success("Briefing estruturado! Revise antes de salvar.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao gerar com IA");
@@ -159,9 +173,10 @@ export default function NewBriefingPage() {
       toast.success("Briefing criado! Ajuste o que quiser na tela de edição.");
       router.push(`/dashboard/briefing-pro/${briefing.id}`);
     } catch (err) {
+      setSaving(false);
+      if (isPlanApiError(err)) return; // cota de briefings/mês: modal já aberto
       console.error(err);
       toast.error(apiErrorMessage(err, "Erro ao salvar o briefing"));
-      setSaving(false);
     }
   }
 

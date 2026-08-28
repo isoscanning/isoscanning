@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/server/api-auth";
+import { requireUser, consumeAiCredits } from "@/lib/server/api-auth";
 import { callGroqJson, GroqError, GROQ_SEARCH_MODEL } from "@/lib/server/groq";
 
 // Anamnese de uma conta do Instagram a partir do @:
@@ -47,7 +47,8 @@ function sanitize(parsed: AnalysisResult, webResearch: boolean) {
 export async function POST(request: NextRequest) {
   try {
     // Rota proxia a chave Groq — exige usuário autenticado
-    if (!(await requireUser(request))) {
+    const auth = await requireUser(request);
+    if (!auth) {
       return NextResponse.json({ error: "Não autorizado. Faça login novamente." }, { status: 401 });
     }
 
@@ -58,6 +59,10 @@ export async function POST(request: NextRequest) {
     if (!cleanHandle) {
       return NextResponse.json({ error: "Informe o @ da conta" }, { status: 400 });
     }
+
+    // Plano: debita créditos de IA (após validar a entrada, antes da Groq)
+    const denied = await consumeAiCredits(auth, "account-analysis");
+    if (denied) return denied;
 
     const systemPrompt = `Você é um estrategista de social media sênior fazendo a anamnese de uma conta de Instagram para assumir a gestão dela.
 Seja honesto: se não encontrar informações confiáveis sobre a conta/empresa, diga isso (found: false) em vez de inventar.

@@ -14,6 +14,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { briefingProService } from "@/lib/briefing-pro-service";
+import { tierAllows } from "@/components/plan/plan-gate";
+import { useOwnerPlanTier } from "@/components/social-media/premium-gate";
 import {
   BriefingComment,
   BriefingDetail,
@@ -62,6 +64,9 @@ export default function BriefingPrintPage() {
   const [detail, setDetail] = useState<BriefingDetail | null>(null);
   const [comments, setComments] = useState<BriefingComment[]>([]);
   const [fetching, setFetching] = useState(true);
+  // White-label (Ultra): a marca IsoScanning some do PDF quando o DONO do briefing tem o recurso
+  const ownerTier = useOwnerPlanTier(detail?.briefing.owner_id);
+  const whiteLabel = ownerTier !== null && tierAllows(ownerTier, "whiteLabel");
 
   useEffect(() => {
     if (!loading && !userProfile) router.push("/login");
@@ -88,7 +93,7 @@ export default function BriefingPrintPage() {
     load();
   }, [userProfile, load]);
 
-  if (loading || fetching || !detail) {
+  if (loading || fetching || !detail || ownerTier === null) {
     return (
       <div className="min-h-screen bg-white p-8 max-w-3xl mx-auto space-y-4">
         <Skeleton className="h-10 w-64" />
@@ -135,7 +140,8 @@ export default function BriefingPrintPage() {
         {/* Cabeçalho do documento */}
         <div className="border-b-2 border-black pb-4 mb-6">
           <p className="text-xs uppercase tracking-widest text-gray-500 mb-1">
-            {isReport ? "Relatório pós-execução" : "Briefing de trabalho"} · ISOSCANNING Briefing Pro
+            {isReport ? "Relatório pós-execução" : "Briefing de trabalho"}
+            {!whiteLabel && " · ISOSCANNING Briefing Pro"}
           </p>
           <h1 className="text-2xl font-bold">{briefing.title}</h1>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1 mt-3 text-xs">
@@ -473,7 +479,7 @@ export default function BriefingPrintPage() {
             {isReport ? "Relatório pós-execução" : "Briefing"} gerado em{" "}
             {new Date().toLocaleString("pt-BR")}
           </span>
-          <span>ISOSCANNING · Briefing Pro</span>
+          {!whiteLabel && <span>ISOSCANNING · Briefing Pro</span>}
         </div>
       </div>
     </div>

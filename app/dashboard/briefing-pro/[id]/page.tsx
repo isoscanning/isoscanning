@@ -49,6 +49,10 @@ import { BriefingTimeShiftDialog } from "@/components/briefing-time-shift-dialog
 import { BriefingIncidentsCard } from "@/components/briefing-incidents-card";
 import { toast } from "sonner";
 import { briefingProService } from "@/lib/briefing-pro-service";
+import { tokenManager } from "@/lib/token-manager";
+import { usePlan } from "@/lib/plans/use-plan";
+import { PlanBadge } from "@/components/plan/plan-gate";
+import { notifyPlanLimit } from "@/lib/plans/plan-events";
 import {
   BriefingContact,
   BriefingDeliverable,
@@ -222,6 +226,12 @@ const STATUS_ACTIONS: Array<{
 
 // ─── Página ──────────────────────────────────────────────────────────────────
 
+/** 403 de plano vindo do apiClient (o interceptor já abriu o modal de upgrade). */
+function isPlanApiError(err: unknown): boolean {
+  const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
+  return code === "PLAN_LIMIT" || code === "PLAN_FEATURE";
+}
+
 export default function BriefingDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -278,6 +288,7 @@ export default function BriefingDetailPage() {
 
   const briefing = detail?.briefing;
   const isOwner = detail?.my_role === "owner";
+  const plan = usePlan();
   const canEdit = detail?.my_role === "owner" || detail?.my_role === "editor";
   const isApprover = isOwner || briefing?.approver_id === userProfile?.id;
 
@@ -676,6 +687,7 @@ export default function BriefingDetailPage() {
                           {isOwner && (
                             <DropdownMenuItem onClick={() => setRefineDialog({ section })}>
                               <Sparkles className="h-4 w-4 mr-2 text-rose-500" />Refinar com IA
+                              {!plan.can("briefingAiRefine") && <PlanBadge className="ml-2" />}
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuSeparator />
@@ -1932,7 +1944,11 @@ function RefineSectionDialog({
     }
     setGenerating(true);
     try {
-      const result = await briefingProService.refineSectionWithAi({
+      // fetch direto (em vez do service) para ler o corpo do 403 de plano
+      const res = await fetch("/api/briefing-pro/refine-section", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
+        body: JSON.stringify({
         mode,
         instruction: mode === "custom" ? instruction.trim() : undefined,
         briefing: {
@@ -1957,8 +1973,13 @@ function RefineSectionDialog({
             subitems: i.subitems.map((s) => ({ title: s.title })),
           })),
         },
+        }),
       });
-      setPreview(result);
+      const data = await res.json().catch(() => ({}));
+      // Recurso Pro (refinar com IA) ou créditos de IA esgotados → modal de upgrade
+      if (res.status === 403 && notifyPlanLimit(data)) return;
+      if (!res.ok) throw new Error(data?.error || "Erro ao refinar a seção com IA");
+      setPreview(data.section as GeneratedSection);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao refinar a seção");
     } finally {
@@ -2748,6 +2769,9 @@ function TeamSheet({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const ownerProfile = detail.profiles[detail.briefing.owner_id] ?? null;
+  // Limite de membros por briefing (plano do dono — só o dono adiciona)
+  const plan = usePlan();
+  const memberLimit = plan.limitOf("briefingMembers");
   const memberIds = new Set([
     detail.briefing.owner_id,
     ...detail.members.map((m) => m.user_id),
@@ -2791,7 +2815,9 @@ function TeamSheet({
       setQuery("");
       setResults([]);
       onChanged();
-    } catch {
+    } catch (err) {
+      // 403 de plano (limite de membros): o apiClient já abriu o modal de upgrade
+      if (isPlanApiError(err)) return;
       toast.error("Erro ao adicionar o membro");
     }
   }
@@ -2806,6 +2832,9 @@ function TeamSheet({
           </SheetTitle>
           <SheetDescription>
             Todos aqui veem o briefing e acompanham a execução em tempo real.
+            {isOwner && memberLimit !== null && (
+              <> · {detail.members.length} de {memberLimit} membros</>
+            )}
           </SheetDescription>
         </SheetHeader>
 

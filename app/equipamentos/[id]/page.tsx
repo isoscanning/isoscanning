@@ -8,7 +8,7 @@ import { Footer } from "@/components/footer"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { MapPin, Package, MessageSquare, User, ChevronLeft, ChevronRight, X, Maximize2, MessageCircle, Star, Shield, Calendar, ArrowLeft } from "lucide-react"
+import { MapPin, Package, MessageSquare, User, ChevronLeft, ChevronRight, X, Maximize2, MessageCircle, Phone, Star, Shield, Calendar, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
 import apiClient from "@/lib/api-service"
@@ -33,8 +33,11 @@ interface EquipmentDetails {
   imageUrls?: string[]
   ownerId: string
   ownerName: string
-  ownerPhone?: string
-  ownerPhoneCountryCode?: string
+  /** Dono em plano pago (selo Perfil Verificado). */
+  ownerVerified?: boolean
+  /** Contato direto — o backend só preenche quando o dono está em plano pago. */
+  ownerContactPhone?: string | null
+  ownerWhatsappUrl?: string | null
   available: boolean
   additionalConditions?: string
 }
@@ -338,10 +341,12 @@ export default function EquipmentDetailsPage() {
                       </div>
                       <div>
                         <p className="font-bold text-lg">{equipment.ownerName}</p>
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <Shield className="h-3 w-3 text-green-500" />
-                          Perfil Verificado
-                        </p>
+                        {equipment.ownerVerified && (
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <Shield className="h-3 w-3 text-green-500" />
+                            Perfil Verificado
+                          </p>
+                        )}
                       </div>
                       <Link href={`/profissionais/${equipment.ownerId}`} className="ml-auto">
                         <Button variant="ghost" size="sm" className="rounded-full">
@@ -351,38 +356,41 @@ export default function EquipmentDetailsPage() {
                     </div>
 
                     <div className="space-y-3">
-                      {equipment.ownerPhone && (
+                      {/* Contato direto: o backend só envia estes campos quando o dono está em plano pago */}
+                      {equipment.ownerWhatsappUrl && (
                         <Button
                           className="w-full h-12 text-base rounded-xl bg-[#25D366] hover:bg-[#128C7E] text-white shadow-lg hover:shadow-[#25D366]/20 transition-all duration-300"
                           onClick={() => {
-                            let cleanNumber = '';
-                            if (equipment.ownerPhoneCountryCode && equipment.ownerPhone) {
-                              const code = equipment.ownerPhoneCountryCode.replace(/\D/g, '');
-                              const num = equipment.ownerPhone.replace(/\D/g, '');
-                              cleanNumber = `${code}${num}`;
-                            } else {
-                              const phone = equipment.ownerPhone || '';
-                              const isInternational = phone.startsWith('+');
-                              const cleanPhone = phone.replace(/\D/g, '');
-                              if (!isInternational && cleanPhone.length <= 11) {
-                                cleanNumber = `55${cleanPhone}`;
-                              } else {
-                                cleanNumber = cleanPhone;
-                              }
-                            }
-                            if (cleanNumber) {
-                              trackEvent({
-                                action: 'contact_seller',
-                                category: 'Equipment',
-                                label: equipment.name,
-                              });
-                              window.open(`https://wa.me/${cleanNumber}`, '_blank');
-                            }
+                            trackEvent({
+                              action: 'contact_seller',
+                              category: 'Equipment',
+                              label: equipment.name,
+                            });
+                            window.open(equipment.ownerWhatsappUrl as string, '_blank', 'noopener,noreferrer');
                           }}
                         >
                           <MessageCircle className="h-5 w-5 mr-2" />
                           Conversar no WhatsApp
                         </Button>
+                      )}
+
+                      {equipment.ownerContactPhone && (
+                        <a
+                          href={`tel:${equipment.ownerContactPhone.replace(/[^\d+]/g, '')}`}
+                          className="block"
+                          onClick={() => {
+                            trackEvent({
+                              action: 'contact_seller',
+                              category: 'Equipment',
+                              label: equipment.name,
+                            });
+                          }}
+                        >
+                          <Button variant="outline" className="w-full h-12 text-base rounded-xl">
+                            <Phone className="h-5 w-5 mr-2" />
+                            Ligar: {equipment.ownerContactPhone}
+                          </Button>
+                        </a>
                       )}
 
                       {userProfile && userProfile.id !== equipment.ownerId && equipment.available ? (

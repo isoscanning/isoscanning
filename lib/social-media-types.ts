@@ -110,11 +110,12 @@ export interface SocialMediaPost {
 }
 
 // Planos com acesso às features premium de social media (Relatório IA,
-// demografia e Simulador de Feed). Slugs do banco: pro = "Pro", vip = "Ultra".
-// Tier null/undefined = promoção de lançamento (tratado como vip).
-export const PREMIUM_SM_TIERS = ["pro", "vip"];
+// demografia e Simulador de Feed). Slugs do banco: pro/standard = "Pro", vip = "Ultra".
+// Tier null/undefined = free (a promoção de lançamento acabou).
+// Fonte: lib/plans/plan-limits.ts → smPremiumReports.
+export const PREMIUM_SM_TIERS = ["standard", "pro", "vip"];
 export function isPremiumSmTier(tier?: string | null): boolean {
-  if (tier == null) return true;
+  if (tier == null) return false;
   return PREMIUM_SM_TIERS.includes(tier);
 }
 

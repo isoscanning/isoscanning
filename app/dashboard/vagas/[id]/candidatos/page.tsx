@@ -24,6 +24,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CandidateCard } from "./components/candidate-card";
+import { isPlanErrorBody } from "@/lib/plans/plan-limits";
+
+/** 403 de plano → o modal de upgrade já foi aberto pelo interceptor do apiClient. */
+const isPlanError = (error: unknown) => isPlanErrorBody((error as any)?.response?.data);
 
 export default function CandidatosVagaPage() {
     const params = useParams();
@@ -82,11 +86,13 @@ export default function CandidatosVagaPage() {
             });
         } catch (error) {
             console.error("Erro ao atualizar status:", error);
-            toast({
-                title: "Erro ao atualizar",
-                description: "Não foi possível atualizar o status do candidato. Tente novamente.",
-                variant: "destructive",
-            });
+            if (!isPlanError(error)) {
+                toast({
+                    title: "Erro ao atualizar",
+                    description: "Não foi possível atualizar o status do candidato. Tente novamente.",
+                    variant: "destructive",
+                });
+            }
         } finally {
             setProcessingId(null);
         }
@@ -101,7 +107,9 @@ export default function CandidatosVagaPage() {
             setIsConcludeDialogOpen(false);
         } catch (error) {
             console.error("Erro ao concluir vaga:", error);
-            toast({ variant: "destructive", title: "Erro", description: "Não foi possível concluir a vaga." });
+            if (!isPlanError(error)) {
+                toast({ variant: "destructive", title: "Erro", description: "Não foi possível concluir a vaga." });
+            }
         }
     };
 
@@ -114,7 +122,9 @@ export default function CandidatosVagaPage() {
             setIsReopenDialogOpen(false);
         } catch (error) {
             console.error("Erro ao reabrir vaga:", error);
-            toast({ variant: "destructive", title: "Erro", description: "Não foi possível reabrir a vaga." });
+            if (!isPlanError(error)) {
+                toast({ variant: "destructive", title: "Erro", description: "Não foi possível reabrir a vaga." });
+            }
         }
     };
 

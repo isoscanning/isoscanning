@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { isPlanErrorBody } from "@/lib/plans/plan-limits";
 
 export default function AcordoVagaPage() {
     const params = useParams();
@@ -155,11 +156,14 @@ Data: ${format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}`;
             }
         } catch (error) {
             console.error(error);
-            toast({
-                variant: "destructive",
-                title: "Erro",
-                description: "Não foi possível enviar o termo de acordo."
-            });
+            // 403 de plano: o modal de upgrade já foi aberto pelo apiClient.
+            if (!isPlanErrorBody((error as any)?.response?.data)) {
+                toast({
+                    variant: "destructive",
+                    title: "Erro",
+                    description: "Não foi possível enviar o termo de acordo."
+                });
+            }
         } finally {
             setIsSubmitting(false);
         }

@@ -40,6 +40,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { createJobOffer, fetchSpecialties, Specialty } from "@/lib/data-service";
 import { ScrollReveal } from "@/components/scroll-reveal";
+import { isPlanErrorBody } from "@/lib/plans/plan-limits";
 
 const TIPOS_TRABALHO = [
     { value: "freelance", label: "Freelance" },
@@ -159,6 +160,10 @@ export default function NovaVagaPage() {
             }, 1500);
         } catch (err: any) {
             console.error("Erro ao criar vaga:", err);
+
+            // 403 de plano (limite de vagas/mês): o modal de upgrade já foi
+            // aberto pelo interceptor do apiClient — sem alerta duplicado.
+            if (isPlanErrorBody(err?.response?.data)) return;
 
             // Extract error message from API response
             let errorMessage = "Erro inesperado ao cadastrar vaga.";

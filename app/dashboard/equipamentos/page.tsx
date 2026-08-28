@@ -19,6 +19,7 @@ import {
 } from "@/lib/data-service";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { motion, AnimatePresence } from "framer-motion";
+import { usePlan } from "@/lib/plans/use-plan";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,6 +49,10 @@ export default function MeusEquipamentosPage() {
   const [loadingEquipments, setLoadingEquipments] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [equipmentToDelete, setEquipmentToDelete] = useState<string | null>(null);
+
+  // Anúncios ativos × limite do plano (null = ilimitado → sem dica)
+  const plan = usePlan();
+  const equipmentLimit = plan.limitOf("equipmentListings");
 
   const fetchEquipments = useCallback(async () => {
     if (!userProfile) return;
@@ -175,6 +180,17 @@ export default function MeusEquipamentosPage() {
                 <p className="text-muted-foreground mt-2">
                   Gerencie seu inventário de equipamentos para venda ou aluguel
                 </p>
+                {equipmentLimit !== null && (
+                  <p
+                    className={`mt-2 text-xs font-medium ${
+                      equipments.length >= equipmentLimit
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {equipments.length}/{equipmentLimit} equipamentos anunciados no plano {plan.label}
+                  </p>
+                )}
               </div>
               <Link href="/dashboard/equipamentos/novo">
                 <Button className="rounded-full shadow-lg hover:shadow-xl transition-all duration-300">

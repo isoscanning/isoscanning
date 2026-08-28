@@ -22,6 +22,10 @@ import {
 import { toast } from "sonner";
 import { TeamMember, MemberRole } from "@/lib/social-media-types";
 import { notifySocialMediaTeamInvite } from "@/lib/data-service";
+import { usePlan } from "@/lib/plans/use-plan";
+import { PlanPaywall } from "@/components/plan/plan-gate";
+import { notifyPlanLimit } from "@/lib/plans/plan-events";
+import { buildPlanFeatureBody, buildPlanLimitBody } from "@/lib/plans/plan-limits";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -97,6 +101,10 @@ export default function TeamPage() {
   const router = useRouter();
   const { userProfile, loading } = useAuth();
   const scheduleId = params.scheduleId as string;
+  // Só o dono acessa esta página (accessDenied caso contrário) → usePlan() é o plano do dono
+  const plan = usePlan();
+  const teamLimit = plan.limitOf("teamMembersPerAccount");
+  const teamAllowed = teamLimit === null || teamLimit > 0;
 
   const [scheduleName, setScheduleName] = useState("");
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -227,17 +235,15 @@ export default function TeamPage() {
   async function handleInvite(profile: ProfileResult) {
     if (inviting) return;
 
-    // Limites do plano (espelham o banco): equipe é recurso Ultra, máx. 5 ativos
-    const tier = (userProfile as any)?.subscriptionTier ?? "vip";
-    if (tier !== "vip") {
-      toast.error(
-        "Membros de equipe estão disponíveis apenas no plano Ultra. Faça upgrade em /precos para colaborar em equipe."
-      );
+    // Limites do plano (espelham o banco): equipe é recurso Ultra, até 5 ativos por conta.
+    // Em vez de toast, abre o modal de upgrade; o RPC continua validando no servidor.
+    const activeMembers = members.filter((m) => m.status === "active").length;
+    if (!teamAllowed) {
+      notifyPlanLimit(buildPlanFeatureBody("teamMembersPerAccount", plan.tier));
       return;
     }
-    const activeMembers = members.filter((m) => m.status === "active").length;
-    if (activeMembers >= 5) {
-      toast.error("Limite de 5 membros de equipe por conta atingido.");
+    if (!plan.allows("teamMembersPerAccount", activeMembers)) {
+      notifyPlanLimit(buildPlanLimitBody("teamMembersPerAccount", plan.tier, activeMembers, teamLimit));
       return;
     }
 
@@ -421,6 +427,16 @@ export default function TeamPage() {
             </div>
           </div>
 
+          {/* Paywall: equipe é recurso do plano Ultra (plano do dono do cronograma) */}
+          {!teamAllowed && (
+            <PlanPaywall
+              feature="teamMembersPerAccount"
+              title="Equipe de colaboradores"
+              description="Convide editores, aprovadores e visualizadores para trabalhar no cronograma — disponível no plano Ultra."
+              compact
+            />
+          )}
+
           {/* Invite Card */}
           <Card>
             <CardHeader>
@@ -430,9 +446,12 @@ export default function TeamPage() {
               </CardTitle>
               <CardDescription>
                 Busque pelo nome ou @usuário de alguém cadastrado na plataforma
+                {teamAllowed && teamLimit !== null && (
+                  <> · {members.filter((m) => m.status === "active").length} de {teamLimit} membros</>
+                )}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-5">
+            <CardContent className={`space-y-5 ${teamAllowed ? "" : "opacity-60"}`}>
 
               {/* Role selector */}
               <div className="space-y-2">
@@ -446,6 +465,7 @@ export default function TeamPage() {
                         key={role}
                         type="button"
                         onClick={() => setInviteRole(role)}
+                        disabled={!teamAllowed}
                         className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 text-xs transition-all ${inviteRole === role
                           ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
                           : "border-border hover:border-blue-300"
@@ -469,6 +489,7 @@ export default function TeamPage() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                     <Input
                       placeholder="Digite o nome ou @usuário..."
+                      disabled={!teamAllowed}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onFocus={() => searchResults.length > 0 && setDropdownOpen(true)}
@@ -526,7 +547,7 @@ export default function TeamPage() {
                               <button
                                 type="button"
                                 onClick={() => handleInvite(profile)}
-                                disabled={!!inviting}
+                                disabled={!!inviting || !teamAllowed}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all ${
                                   inviting === profile.id
                                     ? "bg-muted text-muted-foreground cursor-not-allowed"

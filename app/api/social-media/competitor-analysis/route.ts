@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/server/api-auth";
+import { requireUser, requireFeature, consumeAiCredits } from "@/lib/server/api-auth";
 import { callGroqJson, GroqError, GROQ_SEARCH_MODEL } from "@/lib/server/groq";
 
 // Análise de concorrentes a partir de até 3 @s do Instagram:
@@ -57,12 +57,13 @@ function sanitize(parsed: CompetitorAnalysisResult, handles: string[], webResear
 export async function POST(request: NextRequest) {
   try {
     // Rota proxia a chave Groq — exige usuário autenticado
-    if (!(await requireUser(request))) {
+    const auth = await requireUser(request);
+    if (!auth) {
       return NextResponse.json({ error: "Não autorizado. Faça login novamente." }, { status: 401 });
     }
 
     const body = await request.json();
-    const { competitors, clientName, clientNiche, accountHandle } = body;
+    const { competitors, clientName, clientNiche, accountHandle, scheduleId } = body;
 
     const handles: string[] = (Array.isArray(competitors) ? competitors : [])
       .map((h) => String(h ?? "").replace(/^@/, "").trim())
@@ -72,6 +73,27 @@ export async function POST(request: NextRequest) {
     if (!handles.length) {
       return NextResponse.json({ error: "Informe pelo menos um @ de concorrente" }, { status: 400 });
     }
+
+    // Plano: análise de concorrentes é recurso Pro/Ultra. Se o cronograma for
+    // informado (scheduleId, opcional), vale o plano do DONO — a equipe herda;
+    // a leitura passa pela RLS do usuário, então só dono/membro enxerga o dono.
+    // Sem cronograma, vale o plano do próprio usuário.
+    let planOwnerId = auth.user.id;
+    if (typeof scheduleId === "string" && scheduleId) {
+      const { data: schedule } = await auth.supabase
+        .from("social_media_schedules")
+        .select("owner_id")
+        .eq("id", scheduleId)
+        .maybeSingle();
+      const ownerId = (schedule as { owner_id?: string | null } | null)?.owner_id;
+      if (ownerId) planOwnerId = ownerId;
+    }
+    const featureDenied = await requireFeature(auth, "competitorAnalysis", planOwnerId);
+    if (featureDenied) return featureDenied;
+
+    // Créditos de IA são sempre do usuário que dispara a análise
+    const creditsDenied = await consumeAiCredits(auth, "competitor-analysis");
+    if (creditsDenied) return creditsDenied;
 
     const clientContext = [
       clientName ? `marca do cliente: ${clientName}` : null,

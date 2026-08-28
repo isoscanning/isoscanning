@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, MapPin, Star } from "lucide-react";
+import { ArrowRight, BadgeCheck, MapPin, Sparkles, Star } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useState } from "react";
@@ -25,13 +25,24 @@ function enhanceAvatarUrl(url: string | undefined): string | undefined {
 export function ProfessionalCard({ professional, index }: ProfessionalCardProps) {
     const avatarUrl = enhanceAvatarUrl(professional.avatarUrl || undefined);
     const [imgError, setImgError] = useState(false);
+    // Selo/destaque vêm do backend (tier efetivo); fallback pelo tier bruto.
+    const isVerified =
+        professional.verified ??
+        ["standard", "pro", "vip"].includes(professional.subscriptionTier ?? "");
+    const isFeatured = professional.searchRank === 3;
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: index * 0.1 }}
         >
-            <Card className="group hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 border-2 hover:border-primary/30 overflow-hidden bg-card h-full">
+            <Card
+                className={`group hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 border-2 overflow-hidden bg-card h-full ${
+                    isFeatured
+                        ? "border-amber-400/60 ring-2 ring-amber-400/25 hover:border-amber-400"
+                        : "hover:border-primary/30"
+                }`}
+            >
                 <CardContent className="p-0">
                     <Link
                         href={`/profissionais/${professional.id}`}
@@ -60,6 +71,16 @@ export function ProfessionalCard({ professional, index }: ProfessionalCardProps)
                             {/* Gradient Overlay */}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
+                            {/* Destaque (Ultra) */}
+                            {isFeatured && (
+                                <div className="absolute top-4 left-4">
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500/90 backdrop-blur-sm text-white text-[10px] font-bold rounded-full uppercase tracking-wider shadow-lg">
+                                        <Sparkles className="h-3 w-3" />
+                                        Destaque
+                                    </span>
+                                </div>
+                            )}
+
                             {/* Availability Badge */}
                             <div className="absolute top-4 right-4">
                                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-500/90 backdrop-blur-sm text-white text-xs font-bold rounded-full uppercase tracking-wide shadow-lg">
@@ -80,8 +101,14 @@ export function ProfessionalCard({ professional, index }: ProfessionalCardProps)
                         {/* Content */}
                         <div className="p-6">
                             <div className="mb-3">
-                                <h3 className="font-bold text-xl text-foreground mb-1 group-hover:text-primary transition-colors">
-                                    {professional.artisticName || professional.displayName}
+                                <h3 className="font-bold text-xl text-foreground mb-1 group-hover:text-primary transition-colors flex items-center gap-1.5">
+                                    <span className="truncate">{professional.artisticName || professional.displayName}</span>
+                                    {isVerified && (
+                                        <BadgeCheck
+                                            className="h-5 w-5 shrink-0 text-blue-500 fill-blue-500/10"
+                                            aria-label="Verificado"
+                                        />
+                                    )}
                                 </h3>
                                 <p className="text-sm font-medium text-primary">
                                     {professional.specialty || "Profissional"}

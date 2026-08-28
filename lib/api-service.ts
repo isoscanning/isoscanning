@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from "axios";
 import { tokenManager } from "./token-manager";
+import { notifyPlanLimit } from "./plans/plan-events";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 const API_TIMEOUT = parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || "30000");
@@ -33,6 +34,15 @@ apiClient.interceptors.response.use(
     const skipRedirect =
       error.config?.headers?.["X-Skip-Auth-Redirect"] ||
       error.config?.headers?.["x-skip-auth-redirect"];
+
+    // 403 de plano (code: PLAN_LIMIT | PLAN_FEATURE) → abre o modal de upgrade
+    // contextual. A promise continua rejeitando para a página tratar o estado.
+    if (error.response?.status === 403 && typeof window !== "undefined") {
+      const skipPlanModal =
+        error.config?.headers?.["X-Skip-Plan-Modal"] ||
+        error.config?.headers?.["x-skip-plan-modal"];
+      if (!skipPlanModal) notifyPlanLimit(error.response.data);
+    }
 
     if (error.response?.status === 401 && typeof window !== "undefined") {
       const currentPath = window.location.pathname;

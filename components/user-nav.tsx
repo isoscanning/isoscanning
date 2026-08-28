@@ -15,9 +15,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { User, Settings, LogOut, LogIn, UserPlus, Briefcase, PlayCircle, MessageSquare, UserCircle, CreditCard, ShieldCheck } from "lucide-react";
 import { isPlatformAdmin } from "@/lib/admin-config";
+import { usePlan } from "@/lib/plans/use-plan";
 
 export function UserNav() {
   const { userProfile, signOut, loading } = useAuth();
+  const plan = usePlan();
 
   if (loading) {
     return (
@@ -120,8 +122,13 @@ export function UserNav() {
             <p className="text-sm font-semibold leading-none text-primary">
               {userProfile.displayName}
             </p>
-            <p className="text-xs leading-none text-muted-foreground capitalize">
-              {userProfile.subscriptionTier || 'Free'}
+            <p className="text-xs leading-none text-muted-foreground">
+              Plano {plan.label}
+              {plan.isTrial && plan.trialDaysLeft !== null && (
+                <span className="text-amber-600 dark:text-amber-400">
+                  {` · teste, ${plan.trialDaysLeft} dia${plan.trialDaysLeft === 1 ? "" : "s"}`}
+                </span>
+              )}
             </p>
           </div>
         </DropdownMenuLabel>

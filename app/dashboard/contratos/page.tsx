@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
+import { usePlan, usePlanUsage } from "@/lib/plans/use-plan";
 
 interface Contract {
   id: string;
@@ -68,6 +69,12 @@ export default function ContratosPage() {
   useEffect(() => {
     if (!loading && !userProfile) router.push("/login");
   }, [userProfile, loading, router]);
+
+  // Cota de contratos enviados/mês (GET /plans/me) — só exibe quando o plano tem limite
+  const plan = usePlan();
+  const { usage } = usePlanUsage();
+  const contractLimit = plan.limitOf("contractsPerMonth");
+  const contractsUsed = usage.contractsPerMonth;
 
   useEffect(() => {
     if (!userProfile) return;
@@ -141,6 +148,11 @@ export default function ContratosPage() {
                 <p className="text-muted-foreground mt-1">
                   Crie, envie e acompanhe contratos digitais com assinatura eletrônica.
                 </p>
+                {contractLimit !== null && contractsUsed !== undefined && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {contractsUsed}/{contractLimit} contratos enviados este mês no plano {plan.label}
+                  </p>
+                )}
               </div>
               <Link href="/dashboard/contratos/novo">
                 <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">

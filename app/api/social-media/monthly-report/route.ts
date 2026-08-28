@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, checkOwnerPremiumSm, PREMIUM_SM_MSG } from "@/lib/server/api-auth";
+import { requireUser, checkOwnerPremiumSm } from "@/lib/server/api-auth";
 import { callGroqJson, GroqError } from "@/lib/server/groq";
 
 // Relatório mensal de resultados: recebe os posts do mês com métricas,
@@ -137,9 +137,7 @@ export async function POST(request: NextRequest) {
 
     // Plano: relatório com IA é recurso Pro/Ultra (pelo plano do dono)
     const premium = await checkOwnerPremiumSm(auth, schedule.owner_id);
-    if (!premium.allowed) {
-      return NextResponse.json({ error: PREMIUM_SM_MSG, planLimit: true }, { status: 403 });
-    }
+    if (!premium.allowed) return premium.denied as NextResponse;
     if (posts.length === 0) {
       return NextResponse.json({ error: "Nenhum post no mês para analisar" }, { status: 400 });
     }

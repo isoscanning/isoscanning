@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/server/api-auth";
+import { requireUser, consumeAiCredits } from "@/lib/server/api-auth";
 import { callGroqJson, GroqError } from "@/lib/server/groq";
 
 // Gera 3 variações de legenda + hashtags para um post existente, cada uma com
@@ -23,7 +23,8 @@ interface Variation {
 export async function POST(request: NextRequest) {
   try {
     // Rota proxia a chave Groq — exige usuário autenticado
-    if (!(await requireUser(request))) {
+    const auth = await requireUser(request);
+    if (!auth) {
       return NextResponse.json({ error: "Não autorizado. Faça login novamente." }, { status: 401 });
     }
 
@@ -37,6 +38,10 @@ export async function POST(request: NextRequest) {
     if (!title || !postType || !network) {
       return NextResponse.json({ error: "Parâmetros obrigatórios faltando" }, { status: 400 });
     }
+
+    // Plano: debita créditos de IA (após validar a entrada, antes da Groq)
+    const denied = await consumeAiCredits(auth, "copy-variations");
+    if (denied) return denied;
 
     const networkHint = NETWORK_HINTS[network as string];
 

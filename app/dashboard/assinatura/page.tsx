@@ -39,8 +39,22 @@ import {
   ArrowRight,
   Loader2,
   RefreshCw,
+  Mail,
+  MessageCircle,
+  Users,
+  LifeBuoy,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
+import { usePlan } from "@/lib/plans/use-plan";
+import { UpgradeButton } from "@/components/plan/plan-gate";
+import {
+  SUPPORT_CHANNEL_DESCRIPTIONS,
+  SUPPORT_CHANNEL_LABELS,
+  SUPPORT_EMAIL,
+  supportHref,
+} from "@/lib/plans/support";
+import type { SupportChannel } from "@/lib/plans/plan-limits";
 
 interface Subscription {
   id: string;
@@ -102,8 +116,23 @@ function formatCycle(cycle: string): string {
   return cycle === "annual" ? "Anual" : "Mensal";
 }
 
+function formatShortDate(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
+
+const SUPPORT_ICONS: Record<SupportChannel, React.ElementType> = {
+  community: Users,
+  email: Mail,
+  whatsapp: MessageCircle,
+};
+
 export default function AssinaturaPage() {
-  const { userProfile, refreshProfile } = useAuth();
+  const { refreshProfile } = useAuth();
+  const plan = usePlan();
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -177,8 +206,13 @@ export default function AssinaturaPage() {
     setRefreshing(false);
   };
 
-  const tier = userProfile?.subscriptionTier ?? "free";
+  const tier = plan.tier;
   const PlanIcon = PLAN_ICONS[tier] ?? Zap;
+
+  const supportChannel: SupportChannel = plan.limits.supportChannel;
+  const SupportIcon = SUPPORT_ICONS[supportChannel];
+  const supportLink = supportHref(supportChannel);
+  const trialEndsShort = formatShortDate(plan.trialEndsAt);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -221,13 +255,23 @@ export default function AssinaturaPage() {
               <PlanIcon className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-xl">
-                Plano {tier === "free" ? "Free" : PLAN_LABELS[tier] ?? tier}
+              <CardTitle className="text-xl flex items-center gap-2 flex-wrap">
+                Plano {plan.label}
+                {plan.isTrial && (
+                  <Badge
+                    variant="outline"
+                    className="bg-amber-500/10 text-amber-600 border-amber-200 dark:text-amber-400"
+                  >
+                    Teste grátis
+                  </Badge>
+                )}
               </CardTitle>
               <CardDescription>
-                {tier === "free"
-                  ? "Plano gratuito"
-                  : "Assinatura ativa"}
+                {plan.isTrial
+                  ? `Teste do Pro até ${trialEndsShort} — depois sua conta volta para o Free`
+                  : tier === "free"
+                    ? "Plano gratuito"
+                    : "Assinatura ativa"}
               </CardDescription>
             </div>
             <Button
@@ -244,6 +288,29 @@ export default function AssinaturaPage() {
             </Button>
           </CardHeader>
         </Card>
+
+        {/* Trial state */}
+        {plan.isTrial && (
+          <Card className="mb-6 border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/50">
+            <CardContent className="flex flex-col sm:flex-row sm:items-center gap-4 pt-6">
+              <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-amber-800 dark:text-amber-300">
+                  Teste do Pro até {trialEndsShort}
+                  {plan.trialDaysLeft !== null && (
+                    <span className="font-normal">
+                      {" "}· {plan.trialDaysLeft} dia{plan.trialDaysLeft === 1 ? "" : "s"} restante{plan.trialDaysLeft === 1 ? "" : "s"}
+                    </span>
+                  )}
+                </p>
+                <p className="text-sm text-amber-700 dark:text-amber-400/90">
+                  Depois sua conta volta para o Free. Assine para manter selo verificado, contato direto no perfil e as ferramentas de IA.
+                </p>
+              </div>
+              <UpgradeButton size="sm">Assinar o Pro</UpgradeButton>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Subscription details */}
         {loading ? (
@@ -382,8 +449,9 @@ export default function AssinaturaPage() {
               <div>
                 <p className="font-semibold">Nenhuma assinatura ativa</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Você está no plano Free. Faça upgrade para desbloquear todos
-                  os recursos.
+                  {plan.isTrial
+                    ? `Você está no teste grátis do Pro até ${trialEndsShort}. Assine para manter os recursos depois dessa data.`
+                    : "Você está no plano Free. Faça upgrade para desbloquear todos os recursos."}
                 </p>
               </div>
               <Link href="/precos">
@@ -413,6 +481,87 @@ export default function AssinaturaPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Suporte — canal definido pelo plano */}
+        <Card className="mt-6">
+          <CardHeader className="flex flex-row items-center gap-4">
+            <div className="p-3 rounded-xl bg-primary/10">
+              <LifeBuoy className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Suporte</CardTitle>
+              <CardDescription>
+                Canal do plano {plan.label}: {SUPPORT_CHANNEL_LABELS[supportChannel]}
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/30 p-4">
+              <SupportIcon className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">{SUPPORT_CHANNEL_LABELS[supportChannel]}</p>
+                <p className="text-sm text-muted-foreground">
+                  {SUPPORT_CHANNEL_DESCRIPTIONS[supportChannel]}
+                </p>
+                {supportChannel === "email" && (
+                  <p className="text-xs text-muted-foreground mt-1 break-all">{SUPPORT_EMAIL}</p>
+                )}
+                {supportChannel === "whatsapp" && !supportLink && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                    Número em configuração — enquanto isso, fale conosco por e-mail: {SUPPORT_EMAIL}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              {supportChannel === "community" && supportLink && (
+                <Link href={supportLink}>
+                  <Button variant="outline" className="w-full sm:w-auto">
+                    <Users className="mr-2 h-4 w-4" />
+                    Ir para a comunidade
+                  </Button>
+                </Link>
+              )}
+              {supportChannel === "email" && supportLink && (
+                <a href={supportLink}>
+                  <Button variant="outline" className="w-full sm:w-auto">
+                    <Mail className="mr-2 h-4 w-4" />
+                    Enviar e-mail
+                  </Button>
+                </a>
+              )}
+              {supportChannel === "whatsapp" && (
+                supportLink ? (
+                  <a href={supportLink} target="_blank" rel="noopener noreferrer">
+                    <Button className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white">
+                      <MessageCircle className="mr-2 h-4 w-4" />
+                      Abrir WhatsApp
+                      <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                    </Button>
+                  </a>
+                ) : (
+                  <a href={supportHref("email") ?? `mailto:${SUPPORT_EMAIL}`}>
+                    <Button variant="outline" className="w-full sm:w-auto">
+                      <Mail className="mr-2 h-4 w-4" />
+                      Enviar e-mail
+                    </Button>
+                  </a>
+                )
+              )}
+              {supportChannel !== "whatsapp" && tier !== "vip" && (
+                <Link href="/precos">
+                  <Button variant="ghost" className="w-full sm:w-auto text-muted-foreground">
+                    {supportChannel === "community"
+                      ? "Suporte por e-mail a partir do Pro"
+                      : "Suporte prioritário por WhatsApp no Ultra"}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </main>
 
       <Footer />

@@ -18,6 +18,10 @@ import { useToast } from "@/components/ui/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { isPlanErrorBody } from "@/lib/plans/plan-limits";
+
+/** 403 de plano → o modal de upgrade já foi aberto pelo interceptor do apiClient. */
+const isPlanError = (error: unknown) => isPlanErrorBody((error as any)?.response?.data);
 export default function MinhasCandidaturasPage() {
     const { userProfile, loading: authLoading } = useAuth();
     const [applications, setApplications] = useState<JobApplication[]>([]);
@@ -77,11 +81,15 @@ export default function MinhasCandidaturasPage() {
             setProposalValue("");
         } catch (error) {
             console.error("Erro ao enviar proposta:", error);
-            toast({
-                variant: "destructive",
-                title: "Erro",
-                description: "Ocorreu um erro ao enviar sua proposta. Tente novamente."
-            });
+            if (isPlanError(error)) {
+                setSelectedApplication(null);
+            } else {
+                toast({
+                    variant: "destructive",
+                    title: "Erro",
+                    description: "Ocorreu um erro ao enviar sua proposta. Tente novamente."
+                });
+            }
         } finally {
             setIsSubmittingProposal(false);
         }
@@ -123,11 +131,13 @@ export default function MinhasCandidaturasPage() {
             setAgreementToReview(null);
         } catch (error) {
             console.error("Erro ao responder ao acordo:", error);
-            toast({
-                variant: "destructive",
-                title: "Erro",
-                description: "Ocorreu um erro ao responder ao termo de acordo."
-            });
+            if (!isPlanError(error)) {
+                toast({
+                    variant: "destructive",
+                    title: "Erro",
+                    description: "Ocorreu um erro ao responder ao termo de acordo."
+                });
+            }
         } finally {
             setIsRespondingToAgreement(false);
         }

@@ -576,33 +576,42 @@ export default function HomePage() {
               <ScrollReveal>
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-sm font-medium mb-4">
                   <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                  Oferta de Lançamento
+                  14 dias grátis
                 </div>
                 <h2 data-glow className="text-3xl md:text-5xl font-bold leading-tight">
-                  A Revolução do Audiovisual Começou
+                  Teste o Pro grátis por 14 dias
                 </h2>
               </ScrollReveal>
 
               <ScrollReveal delay={0.2}>
                 <p className="text-xl md:text-2xl text-white/90 max-w-2xl mx-auto leading-relaxed">
-                  Estamos no ar! Aproveite nossas condições especiais de lançamento e garanta acesso a todos os recursos da plataforma por tempo limitado.
+                  Todo cadastro novo ganha 14 dias do plano Pro, sem cartão de crédito. Selo verificado, contato direto no perfil, calendários com IA, briefings, contratos e muito mais.
                 </p>
               </ScrollReveal>
 
               <ScrollReveal delay={0.4}>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-                  <Link href="/precos">
+                  <Link href="/cadastro">
                     <Button
                       size="lg"
                       className="w-full sm:w-auto h-14 px-8 text-lg rounded-full bg-white text-primary hover:bg-white/90 shadow-xl transition-all duration-300 font-bold"
                     >
-                      Resgatar Plano VIP Grátis
+                      Criar conta e testar o Pro
                       <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                  <Link href="/precos">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="w-full sm:w-auto h-14 px-8 text-lg rounded-full border-white/60 bg-transparent text-white hover:bg-white/10 hover:text-white transition-all duration-300 font-semibold"
+                    >
+                      Ver planos
                     </Button>
                   </Link>
                 </div>
                 <p className="text-white/70 text-sm mt-4">
-                  * Oferta por tempo limitado para os primeiros membros
+                  Sem cartão de crédito. Depois do teste sua conta continua no Free, sem custo.
                 </p>
               </ScrollReveal>
             </div>

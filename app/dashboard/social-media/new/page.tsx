@@ -28,14 +28,10 @@ import {
 import { HolidayPicker } from "@/components/social-media/holiday-picker";
 import { SelectedHoliday } from "@/lib/holidays-data";
 import { tokenManager } from "@/lib/token-manager";
-
-// Limites de contas (cronogramas) por plano — espelha /precos e a RLS do banco
-const SCHEDULE_LIMITS: Record<string, number | null> = {
-  free: 1,
-  standard: 5,
-  pro: 5,
-  vip: null, // ilimitado
-};
+import { usePlan } from "@/lib/plans/use-plan";
+import { PlanPaywall } from "@/components/plan/plan-gate";
+import { notifyPlanLimit } from "@/lib/plans/plan-events";
+import { buildPlanLimitBody } from "@/lib/plans/plan-limits";
 
 const STEPS = ["Briefing", "Configuração", "Geração com IA"];
 
@@ -61,6 +57,7 @@ function NewSchedulePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { userProfile } = useAuth();
+  const plan = usePlan();
   const [step, setStep] = useState(0);
 
   // Modo "novo mês": gera um cronograma de outro mês para uma conta existente,
@@ -73,6 +70,8 @@ function NewSchedulePageInner() {
   const [latestReport, setLatestReport] = useState<SmMonthlyReport | null>(null);
   const [applyReportInsights, setApplyReportInsights] = useState(true);
   const [generating, setGenerating] = useState(false);
+  // Contas (cronogramas) já criadas pelo usuário — limite `socialMediaAccounts` do plano
+  const [existingCount, setExistingCount] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [generatedPosts, setGeneratedPosts] = useState<SocialMediaPost[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -111,6 +110,21 @@ function NewSchedulePageInner() {
   });
 
   const isCurrentMonth = form.month === currentMonth && form.year === currentYear;
+
+  // Conta as contas existentes para aplicar o limite do plano (não vale no modo "novo mês")
+  const userId = userProfile?.id;
+  useEffect(() => {
+    if (!userId || isExtendMode) return;
+    supabase
+      .from("social_media_schedules")
+      .select("*", { count: "exact", head: true })
+      .eq("owner_id", userId)
+      .then(({ count }) => setExistingCount(count ?? 0));
+  }, [userId, isExtendMode]);
+
+  const accountLimit = plan.limitOf("socialMediaAccounts");
+  const accountLimitReached =
+    !isExtendMode && existingCount !== null && !plan.allows("socialMediaAccounts", existingCount);
 
   // Pré-carrega o briefing da conta existente no modo "novo mês"
   useEffect(() => {
@@ -251,6 +265,8 @@ function NewSchedulePageInner() {
         }),
       });
       const data = await res.json().catch(() => ({}));
+      // Créditos de IA do plano esgotados → modal de upgrade (sem toast)
+      if (res.status === 403 && notifyPlanLimit(data)) return;
       if (!res.ok) throw new Error(data?.error || "Erro na análise da conta");
 
       setAccountAnalysis(data.analysis as AccountAnalysis);
@@ -319,7 +335,9 @@ function NewSchedulePageInner() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
+        // Créditos de IA do plano esgotados → modal de upgrade (sem toast)
+        if (res.status === 403 && notifyPlanLimit(err)) return;
         throw new Error(err.error || "Erro na geração");
       }
 
@@ -393,18 +411,15 @@ function NewSchedulePageInner() {
       }
 
       // Limite do plano: contas de social media (Free 1 | Pro 5 | Ultra ilimitado)
-      const tier = (userProfile as any).subscriptionTier ?? "vip";
-      const limit = SCHEDULE_LIMITS[tier] ?? null;
-      if (limit !== null) {
+      if (accountLimit !== null) {
         const { count } = await supabase
           .from("social_media_schedules")
           .select("*", { count: "exact", head: true })
           .eq("owner_id", userProfile.id);
-        if ((count ?? 0) >= limit) {
-          toast.error(
-            `Seu plano permite gerenciar até ${limit} conta(s) de social media. ` +
-            `Faça upgrade em /precos para adicionar mais contas.`
-          );
+        const used = count ?? 0;
+        setExistingCount(used);
+        if (!plan.allows("socialMediaAccounts", used)) {
+          notifyPlanLimit(buildPlanLimitBody("socialMediaAccounts", plan.tier, used, accountLimit));
           setSaving(false);
           return;
         }
@@ -553,6 +568,16 @@ function NewSchedulePageInner() {
           </div>
 
           {/* Step 0: Briefing */}
+          {/* Limite de contas do plano atingido — bloqueia o salvamento do novo cronograma */}
+          {accountLimitReached && (
+            <PlanPaywall
+              feature="socialMediaAccounts"
+              title="Limite de contas de social media atingido"
+              description={`Seu plano ${plan.label} permite ${accountLimit} conta(s) e você já gerencia ${existingCount}.`}
+              compact
+            />
+          )}
+
           {step === 0 && (
             <Card>
               <CardHeader>
@@ -1189,7 +1214,7 @@ function NewSchedulePageInner() {
             ) : (
               <Button
                 onClick={handleSave}
-                disabled={generatedPosts.length === 0 || saving}
+                disabled={generatedPosts.length === 0 || saving || accountLimitReached}
                 className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
               >
                 {saving ? (

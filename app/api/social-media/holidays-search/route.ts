@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/server/api-auth";
+import { requireUser, consumeAiCredits } from "@/lib/server/api-auth";
 import { GROQ_MODEL } from "@/lib/server/groq";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
@@ -10,12 +10,17 @@ export async function POST(request: NextRequest) {
     if (!groqKey) return NextResponse.json({ dates: [] });
 
     // Rota proxia a chave Groq — exige usuário autenticado
-    if (!(await requireUser(request))) {
+    const auth = await requireUser(request);
+    if (!auth) {
       return NextResponse.json({ error: "Não autorizado. Faça login novamente." }, { status: 401 });
     }
 
     const { query } = await request.json();
     if (!query?.trim() || query.trim().length < 3) return NextResponse.json({ dates: [] });
+
+    // Plano: debita créditos de IA (após validar a entrada, antes da Groq)
+    const denied = await consumeAiCredits(auth, "holidays");
+    if (denied) return denied;
 
     const prompt = `Você é um especialista em datas comemorativas e marketing de conteúdo no Brasil.
 

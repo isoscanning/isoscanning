@@ -58,6 +58,9 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { ParticleBackground } from "@/components/particle-background";
 import { ScrollReveal } from "@/components/scroll-reveal";
+import { usePlan } from "@/lib/plans/use-plan";
+import { PLAN_LIMITS, isPlanErrorBody } from "@/lib/plans/plan-limits";
+import { PlanPaywall, UpgradeButton } from "@/components/plan/plan-gate";
 
 export default function PortfolioPage() {
   const { userProfile, loading } = useAuth();
@@ -132,23 +135,19 @@ export default function PortfolioPage() {
     });
   };
 
-  // Limites por plano — espelham o backend (Free: 4 | Pro/Standard: 10 | Ultra/VIP: 150)
-  const PORTFOLIO_LIMITS: Record<string, { media: number; videos: number }> = {
-    free: { media: 4, videos: 1 },
-    standard: { media: 10, videos: 5 },
-    pro: { media: 10, videos: 5 },
-    vip: { media: 150, videos: 20 },
-  };
-  const tier = ((userProfile as any)?.subscriptionTier as string) ?? "vip";
-  const { media: MAX_MEDIA, videos: MAX_VIDEOS } = PORTFOLIO_LIMITS[tier] ?? PORTFOLIO_LIMITS.vip;
+  // Limites do plano efetivo (fonte: backend via GET /auth/me). null = ilimitado.
+  const plan = usePlan();
+  const MAX_MEDIA = plan.limitOf("portfolioMediaFiles");
+  const MAX_VIDEOS = plan.limitOf("portfolioVideos");
+  const maxMediaLabel = MAX_MEDIA === null ? "∞" : String(MAX_MEDIA);
 
   const currentTotalMedia = portfolioItems.reduce((acc, item) => acc + (item.media?.length || 0), 0);
   const currentTotalVideos = portfolioItems.reduce((acc, item) => acc + (item.media?.filter(m => m.type === 'video').length || 0), 0);
 
-  const isLimitReached = currentTotalMedia >= MAX_MEDIA;
+  const isLimitReached = !plan.allows("portfolioMediaFiles", currentTotalMedia);
 
   // Percentage for progress bar
-  const usagePercentage = Math.min(100, (currentTotalMedia / MAX_MEDIA) * 100);
+  const usagePercentage = MAX_MEDIA ? Math.min(100, (currentTotalMedia / MAX_MEDIA) * 100) : 0;
 
   const processFiles = async (files: File[]) => {
     if (!files.length) return;
@@ -164,8 +163,8 @@ export default function PortfolioPage() {
       ? currentTotalMedia - existingMedia.length
       : currentTotalMedia;
 
-    if (totalMediaConsidered + existingMedia.length + portfolioFiles.length + files.length > MAX_MEDIA) {
-      setFileError(`Você só pode ter no máximo ${MAX_MEDIA} arquivos ao todo no seu portfólio.`);
+    if (MAX_MEDIA !== null && totalMediaConsidered + existingMedia.length + portfolioFiles.length + files.length > MAX_MEDIA) {
+      setFileError(`Você só pode ter no máximo ${MAX_MEDIA} arquivos ao todo no seu portfólio (plano ${plan.label}).`);
       return;
     }
 
@@ -188,7 +187,7 @@ export default function PortfolioPage() {
         newFiles.push(file);
         newPreviews.push({ url: URL.createObjectURL(file), type: 'image' });
       } else if (isVideo) {
-        if (videoCount >= MAX_VIDEOS) {
+        if (MAX_VIDEOS !== null && videoCount >= MAX_VIDEOS) {
           hasReachedVideoLimit = true;
           continue;
         }
@@ -211,7 +210,7 @@ export default function PortfolioPage() {
     if (hasSkippedImageSize) errorReasons.push("algumas fotos possuem mais de 15MB");
     if (hasSkippedVideoSize) errorReasons.push("alguns vídeos possuem mais de 150MB");
     if (hasSkippedVideoDuration) errorReasons.push("alguns vídeos têm mais de 1m30s");
-    if (hasReachedVideoLimit) errorReasons.push(`limite de ${MAX_VIDEOS} vídeos por profissional atingido`);
+    if (hasReachedVideoLimit) errorReasons.push(`limite de ${MAX_VIDEOS} vídeos do plano ${plan.label} atingido`);
 
     if (errorReasons.length > 0) {
       if (hasSkippedImageSize && errorReasons.length === 1) {
@@ -267,7 +266,7 @@ export default function PortfolioPage() {
     }
 
     if (isLimitReached) {
-      setErrorMsg(`Você já atingiu o limite de ${MAX_MEDIA} itens no portfólio.`);
+      setErrorMsg(`Você já atingiu o limite de ${MAX_MEDIA} arquivos do plano ${plan.label} no portfólio.`);
       return;
     }
 
@@ -310,8 +309,11 @@ export default function PortfolioPage() {
       setTimeout(() => setSuccessMsg(""), 5000);
     } catch (err: any) {
       console.error("Error adding portfolio item:", err);
-      // Nice error message if it's the 403 from backend
-      if (err.message && err.message.includes("Portfolio limit reached")) {
+      // 403 de plano: o modal de upgrade já foi aberto pelo interceptor do
+      // apiClient — só ressincroniza a galeria, sem alerta duplicado.
+      if (isPlanErrorBody(err?.response?.data)) {
+        await loadPortfolio();
+      } else if (err.message && err.message.includes("Portfolio limit reached")) {
         setErrorMsg("Limite do plano atingido (validado pelo servidor).");
       } else {
         setErrorMsg(err.message || "Erro ao adicionar item ao portfólio.");
@@ -488,7 +490,10 @@ export default function PortfolioPage() {
                 Meu Portfólio
               </h1>
               <p className="text-muted-foreground text-lg max-w-2xl">
-                Adicione suas melhores fotos e vídeos. Seu portfólio permite até {MAX_MEDIA} arquivos no total.
+                Adicione suas melhores fotos e vídeos.{" "}
+                {MAX_MEDIA === null
+                  ? `Seu plano ${plan.label} não limita o número de arquivos.`
+                  : `No plano ${plan.label} seu portfólio permite até ${MAX_MEDIA} arquivos no total.`}
               </p>
             </div>
           </ScrollReveal>
@@ -531,23 +536,35 @@ export default function PortfolioPage() {
                       Adicionar Novo Item
                     </CardTitle>
                     <CardDescription>
-                      Você pode adicionar até {MAX_MEDIA} arquivos no total.
+                      {MAX_MEDIA === null
+                        ? "Sem limite de arquivos no seu plano."
+                        : `Você pode adicionar até ${MAX_MEDIA} arquivos no total${MAX_VIDEOS !== null ? ` (${MAX_VIDEOS} vídeos)` : ""}.`}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
 
                     {isLimitReached && (
-                      <Alert className="bg-yellow-500/10 border-yellow-500/20 text-yellow-600 dark:text-yellow-400 flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>
-                            Limite de {MAX_MEDIA} itens atingido.
-                          </AlertDescription>
-                        </div>
-                        <Button variant="outline" size="sm" className="w-full mt-1 border-yellow-500/30 text-yellow-600 hover:bg-yellow-500/10" onClick={() => router.push('/precos')}>
-                          Fazer Upgrade do Plano
-                        </Button>
-                      </Alert>
+                      plan.tier === "free" ? (
+                        <PlanPaywall
+                          feature="portfolioMediaFiles"
+                          compact
+                          title={`Limite de ${MAX_MEDIA} arquivos atingido`}
+                          description={`Pro: até ${PLAN_LIMITS.pro.portfolioMediaFiles} arquivos · Ultra: até ${PLAN_LIMITS.vip.portfolioMediaFiles}.`}
+                        />
+                      ) : (
+                        <Alert className="bg-yellow-500/10 border-yellow-500/20 text-yellow-600 dark:text-yellow-400 flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>
+                              Limite de {MAX_MEDIA} arquivos do plano {plan.label} atingido.
+                              {plan.isUltra
+                                ? " Exclua itens para liberar espaço."
+                                : ` O Ultra permite até ${PLAN_LIMITS.vip.portfolioMediaFiles}.`}
+                            </AlertDescription>
+                          </div>
+                          {!plan.isUltra && <UpgradeButton tier="vip" size="sm" className="w-full mt-1" />}
+                        </Alert>
+                      )
                     )}
 
                     <div className="space-y-2">
@@ -658,7 +675,7 @@ export default function PortfolioPage() {
                   </h2>
                   <div className="flex flex-col items-end">
                     <span className="text-xs font-medium text-muted-foreground bg-secondary px-3 py-1 rounded-full border border-border">
-                      {currentTotalMedia} de {MAX_MEDIA} arquivos
+                      {currentTotalMedia} de {maxMediaLabel} arquivos
                     </span>
                     {/* Progress bar */}
                     <div className="w-32 h-1.5 bg-secondary rounded-full mt-1.5 overflow-hidden">

@@ -17,9 +17,10 @@ import { toast } from "sonner";
 import {
   SocialMediaSchedule, SocialMediaPost, MonthlyReportStats, MonthlyReportAI,
   MONTHS_PT, POST_TYPE_CONFIG, PostType, InstagramConnection, AudienceDemographics, AudienceSlice,
-  isPremiumSmTier,
 } from "@/lib/social-media-types";
-import { PremiumGate } from "@/components/social-media/premium-gate";
+import { PlanGate, tierAllows } from "@/components/plan/plan-gate";
+import { notifyPlanLimit, unwrapPlanError } from "@/lib/plans/plan-events";
+import { resolveEffectiveTier, SubscriptionTier } from "@/lib/plans/plan-limits";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -97,8 +98,9 @@ function MonthlyReportInner() {
   const [audience, setAudience] = useState<AudienceDemographics | null>(null);
   const [audienceNote, setAudienceNote] = useState<string | null>(null);
   const [audienceTried, setAudienceTried] = useState(false);
-  // Plano do DONO do cronograma libera o recurso para toda a equipe
-  const [ownerAllowed, setOwnerAllowed] = useState<boolean | null>(null);
+  // Plano EFETIVO do DONO do cronograma libera o recurso para toda a equipe
+  const [ownerTier, setOwnerTier] = useState<SubscriptionTier | null>(null);
+  const ownerAllowed = ownerTier === null ? null : tierAllows(ownerTier, "smPremiumReports");
 
   useEffect(() => {
     if (!loading && userProfile) fetchData();
@@ -117,14 +119,16 @@ function MonthlyReportInner() {
       if (schedErr) throw schedErr;
       setSchedule(sched as SocialMediaSchedule);
 
-      // Recurso Pro/Ultra — validado pelo plano do dono do cronograma
+      // Recurso Pro/Ultra — validado pelo plano EFETIVO do dono do cronograma
       const { data: ownerProfile } = await supabase
         .from("profiles")
-        .select("subscription_tier")
+        .select("subscription_tier, subscription_expires_at")
         .eq("id", (sched as SocialMediaSchedule).owner_id)
         .maybeSingle();
-      const allowed = isPremiumSmTier(ownerProfile?.subscription_tier as string | null);
-      setOwnerAllowed(allowed);
+      const op = ownerProfile as { subscription_tier?: string | null; subscription_expires_at?: string | null } | null;
+      const tier = resolveEffectiveTier(op?.subscription_tier, op?.subscription_expires_at ?? null);
+      setOwnerTier(tier);
+      const allowed = tierAllows(tier, "smPremiumReports");
       if (!allowed) {
         setFetching(false);
         return;
@@ -207,8 +211,14 @@ function MonthlyReportInner() {
       headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
       body: JSON.stringify({ scheduleId }),
     })
-      .then((res) => res.json().catch(() => ({})))
-      .then((data) => {
+      .then(async (res) => ({ status: res.status, data: await res.json().catch(() => ({})) }))
+      .then(({ status, data }) => {
+        // 403 de plano numa chamada automática: não abre o modal, só registra a nota
+        const planErr = status === 403 ? unwrapPlanError(data) : null;
+        if (planErr) {
+          setAudienceNote(planErr.message);
+          return;
+        }
         if (data?.audience) setAudience(data.audience as AudienceDemographics);
         else if (data?.note) setAudienceNote(data.note as string);
       })
@@ -284,6 +294,8 @@ function MonthlyReportInner() {
         }),
       });
       const data = await res.json().catch(() => ({}));
+      // Recurso Pro ou créditos de IA esgotados → modal de upgrade, sem toast genérico
+      if (res.status === 403 && notifyPlanLimit(data)) return;
       if (!res.ok) throw new Error(data?.error || "Erro ao gerar relatório");
 
       // Anexa o snapshot demográfico ao relatório (fica no PDF e no histórico)
@@ -349,37 +361,6 @@ function MonthlyReportInner() {
     );
   }
 
-  // Paywall: dono do cronograma não é Pro/Ultra
-  if (ownerAllowed === false) {
-    return (
-      <div className="min-h-screen bg-background/50">
-        <Header />
-        <main className="container mx-auto max-w-lg py-10 px-4 space-y-4">
-          <div className="flex items-center gap-3">
-            <Link href={`/dashboard/social-media/${scheduleId}`}>
-              <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
-            </Link>
-            <h1 className="text-xl font-bold flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-blue-500" />
-              Relatório Mensal
-            </h1>
-          </div>
-          <PremiumGate
-            title="Relatórios de resultados com IA"
-            description="Entregue ao seu cliente um relatório mensal profissional, gerado automaticamente a partir das métricas reais."
-            bullets={[
-              "Ranking dos melhores posts e análise por formato",
-              "Diagnóstico com IA: o que funcionou e o que corrigir",
-              "Demografia do público (idade, gênero, região)",
-              "Sugestões de posts e estratégia para o próximo mês",
-              "Exportação em PDF para enviar ao cliente",
-            ]}
-          />
-        </main>
-      </div>
-    );
-  }
-
   const statCards = stats
     ? [
         { label: "Curtidas", value: stats.totalLikes, icon: Heart, color: "text-pink-500" },
@@ -396,314 +377,340 @@ function MonthlyReportInner() {
       <div className="print:hidden">
         <Header />
       </div>
-      <main className="container mx-auto max-w-4xl py-10 px-4 space-y-6 print:py-4">
-
-        {/* Top bar */}
-        <div className="flex items-center justify-between gap-3 flex-wrap print:hidden">
+      <main className={ownerAllowed ? "container mx-auto max-w-4xl py-10 px-4 space-y-6 print:py-4" : "container mx-auto max-w-lg py-10 px-4 space-y-4"}>
+        {/* Paywall: a equipe herda o plano do dono do cronograma */}
+        {ownerAllowed === false && (
           <div className="flex items-center gap-3">
             <Link href={`/dashboard/social-media/${scheduleId}`}>
               <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
             </Link>
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-blue-500" />
+              Relatório Mensal
+            </h1>
+          </div>
+        )}
+        <PlanGate
+          feature="smPremiumReports"
+          ownerTier={ownerTier}
+          title="Relatórios de resultados com IA"
+          description="Entregue ao seu cliente um relatório mensal profissional, gerado automaticamente a partir das métricas reais."
+          bullets={[
+            "Ranking dos melhores posts e análise por formato",
+            "Diagnóstico com IA: o que funcionou e o que corrigir",
+            "Demografia do público (idade, gênero, região)",
+            "Sugestões de posts e estratégia para o próximo mês",
+            "Exportação em PDF para enviar ao cliente",
+          ]}
+        >
+
+          {/* Top bar */}
+          <div className="flex items-center justify-between gap-3 flex-wrap print:hidden">
+            <div className="flex items-center gap-3">
+              <Link href={`/dashboard/social-media/${scheduleId}`}>
+                <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+              </Link>
+              <div>
+                <h1 className="text-2xl font-bold flex items-center gap-2">
+                  <BarChart3 className="h-6 w-6 text-blue-500" />
+                  Relatório Mensal
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  {schedule.client_name}{schedule.account_handle ? ` · @${schedule.account_handle}` : ""}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <select
+                value={month}
+                onChange={(e) => setMonth(Number(e.target.value))}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                {MONTHS_PT.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+              </select>
+              <select
+                value={year}
+                onChange={(e) => setYear(Number(e.target.value))}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
+              </select>
+              {report && (
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => window.print()}>
+                  <Printer className="h-3.5 w-3.5" />
+                  PDF
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Cabeçalho de impressão */}
+          <div className="hidden print:block border-b border-border pb-4">
+            <h1 className="text-2xl font-bold">Relatório de Resultados — {monthName} {year}</h1>
+            <p className="text-sm text-muted-foreground">
+              {schedule.client_name}{schedule.account_handle ? ` · @${schedule.account_handle}` : ""}
+            </p>
+          </div>
+
+          {/* Cobertura de métricas + gerar */}
+          <div className="rounded-2xl border border-border bg-card p-5 flex items-center justify-between gap-4 flex-wrap print:hidden">
             <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <BarChart3 className="h-6 w-6 text-blue-500" />
-                Relatório Mensal
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {schedule.client_name}{schedule.account_handle ? ` · @${schedule.account_handle}` : ""}
+              <p className="text-sm font-medium">
+                {posts.length} posts em {monthName} {year} · <strong>{postsWithMetrics.length}</strong> com métricas registradas
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {postsWithMetrics.length === 0
+                  ? igConnection?.connected
+                    ? "Clique em \"Sincronizar do Instagram\" para puxar as métricas automaticamente."
+                    : "Conecte o Instagram no calendário para puxar métricas automaticamente, ou preencha a seção \"Desempenho do post\" em cada post publicado."
+                  : reportDate
+                    ? `Último relatório gerado em ${new Date(reportDate).toLocaleDateString("pt-BR")}. Gere novamente se atualizou métricas.`
+                    : "Métricas prontas — gere o relatório com IA."}
               </p>
             </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {igConnection?.connected && canGenerate && (
+                <Button
+                  variant="outline"
+                  onClick={handleIgSync}
+                  disabled={igSyncing}
+                  className="gap-2"
+                >
+                  {igSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Instagram className="h-4 w-4 text-pink-500" />}
+                  {igSyncing ? "Sincronizando..." : "Sincronizar do Instagram"}
+                </Button>
+              )}
+              {canGenerate && (
+                <Button
+                  onClick={handleGenerateReport}
+                  disabled={generating || postsWithMetrics.length === 0}
+                  className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                >
+                  {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  {generating ? "Analisando resultados..." : report ? "Regerar relatório" : "Gerar relatório com IA"}
+                </Button>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <select
-              value={month}
-              onChange={(e) => setMonth(Number(e.target.value))}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              {MONTHS_PT.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-            </select>
-            <select
-              value={year}
-              onChange={(e) => setYear(Number(e.target.value))}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-            {report && (
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => window.print()}>
-                <Printer className="h-3.5 w-3.5" />
-                PDF
-              </Button>
-            )}
-          </div>
-        </div>
+          {/* Público da conta (demografia dos seguidores via Instagram) */}
+          {audience ? (
+            <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h2 className="font-bold flex items-center gap-2">
+                  <Users className="h-4 w-4 text-pink-500" />
+                  Público da conta
+                </h2>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {typeof audience.followers === "number" && (
+                    <span className="px-2.5 py-1 rounded-full bg-pink-50 dark:bg-pink-950/30 text-pink-700 dark:text-pink-300 font-medium">
+                      {audience.followers.toLocaleString("pt-BR")} seguidores
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1">
+                    <Instagram className="h-3 w-3" />
+                    dados do Instagram
+                  </span>
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-x-8 gap-y-5">
+                <AudienceBars title="Faixa etária" slices={audience.age} barClass="bg-blue-500" />
+                <AudienceBars title="Gênero" slices={audience.gender} barClass="bg-pink-500" labelMap={GENDER_LABELS} />
+                <AudienceBars title="Principais cidades" slices={audience.city} barClass="bg-emerald-500" />
+                <AudienceBars title="Principais países" slices={audience.country} barClass="bg-violet-500" />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Demografia dos seguidores fornecida pela API do Instagram (snapshot atual da conta).
+                A Meta não disponibiliza esses dados por publicação individual — apenas no nível da conta.
+              </p>
+            </section>
+          ) : audienceNote ? (
+            <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground flex items-center gap-2 print:hidden">
+              <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
+              {audienceNote}
+            </div>
+          ) : null}
 
-        {/* Cabeçalho de impressão */}
-        <div className="hidden print:block border-b border-border pb-4">
-          <h1 className="text-2xl font-bold">Relatório de Resultados — {monthName} {year}</h1>
-          <p className="text-sm text-muted-foreground">
-            {schedule.client_name}{schedule.account_handle ? ` · @${schedule.account_handle}` : ""}
-          </p>
-        </div>
+          {/* Corpo do relatório */}
+          {stats && report ? (
+            <div className="space-y-6">
 
-        {/* Cobertura de métricas + gerar */}
-        <div className="rounded-2xl border border-border bg-card p-5 flex items-center justify-between gap-4 flex-wrap print:hidden">
-          <div>
-            <p className="text-sm font-medium">
-              {posts.length} posts em {monthName} {year} · <strong>{postsWithMetrics.length}</strong> com métricas registradas
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {postsWithMetrics.length === 0
-                ? igConnection?.connected
-                  ? "Clique em \"Sincronizar do Instagram\" para puxar as métricas automaticamente."
-                  : "Conecte o Instagram no calendário para puxar métricas automaticamente, ou preencha a seção \"Desempenho do post\" em cada post publicado."
-                : reportDate
-                  ? `Último relatório gerado em ${new Date(reportDate).toLocaleDateString("pt-BR")}. Gere novamente se atualizou métricas.`
-                  : "Métricas prontas — gere o relatório com IA."}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {igConnection?.connected && canGenerate && (
-              <Button
-                variant="outline"
-                onClick={handleIgSync}
-                disabled={igSyncing}
-                className="gap-2"
-              >
-                {igSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Instagram className="h-4 w-4 text-pink-500" />}
-                {igSyncing ? "Sincronizando..." : "Sincronizar do Instagram"}
-              </Button>
-            )}
-            {canGenerate && (
-              <Button
-                onClick={handleGenerateReport}
-                disabled={generating || postsWithMetrics.length === 0}
-                className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
-              >
-                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                {generating ? "Analisando resultados..." : report ? "Regerar relatório" : "Gerar relatório com IA"}
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Público da conta (demografia dos seguidores via Instagram) */}
-        {audience ? (
-          <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <h2 className="font-bold flex items-center gap-2">
-                <Users className="h-4 w-4 text-pink-500" />
-                Público da conta
-              </h2>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                {typeof audience.followers === "number" && (
-                  <span className="px-2.5 py-1 rounded-full bg-pink-50 dark:bg-pink-950/30 text-pink-700 dark:text-pink-300 font-medium">
-                    {audience.followers.toLocaleString("pt-BR")} seguidores
+              {/* Stat cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {statCards.map(({ label, value, icon: Icon, color }) => (
+                  <div key={label} className="rounded-xl border border-border bg-card p-4">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Icon className={`h-3.5 w-3.5 ${color}`} />
+                      {label}
+                    </div>
+                    <p className="text-2xl font-bold mt-1">{value.toLocaleString("pt-BR")}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-3 flex-wrap text-sm">
+                <span className="px-3 py-1.5 rounded-full bg-muted text-muted-foreground">
+                  {stats.publishedPosts}/{stats.totalPosts} posts publicados
+                </span>
+                <span className="px-3 py-1.5 rounded-full bg-muted text-muted-foreground">
+                  Engajamento médio: <strong className="text-foreground">{stats.avgEngagementPerPost.toLocaleString("pt-BR")}</strong>/post
+                </span>
+                {stats.engagementRate !== null && (
+                  <span className="px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                    Taxa de engajamento: <strong>{stats.engagementRate}%</strong>
                   </span>
                 )}
-                <span className="flex items-center gap-1">
-                  <Instagram className="h-3 w-3" />
-                  dados do Instagram
-                </span>
               </div>
-            </div>
-            <div className="grid sm:grid-cols-2 gap-x-8 gap-y-5">
-              <AudienceBars title="Faixa etária" slices={audience.age} barClass="bg-blue-500" />
-              <AudienceBars title="Gênero" slices={audience.gender} barClass="bg-pink-500" labelMap={GENDER_LABELS} />
-              <AudienceBars title="Principais cidades" slices={audience.city} barClass="bg-emerald-500" />
-              <AudienceBars title="Principais países" slices={audience.country} barClass="bg-violet-500" />
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              Demografia dos seguidores fornecida pela API do Instagram (snapshot atual da conta).
-              A Meta não disponibiliza esses dados por publicação individual — apenas no nível da conta.
-            </p>
-          </section>
-        ) : audienceNote ? (
-          <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground flex items-center gap-2 print:hidden">
-            <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
-            {audienceNote}
-          </div>
-        ) : null}
 
-        {/* Corpo do relatório */}
-        {stats && report ? (
-          <div className="space-y-6">
-
-            {/* Stat cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {statCards.map(({ label, value, icon: Icon, color }) => (
-                <div key={label} className="rounded-xl border border-border bg-card p-4">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Icon className={`h-3.5 w-3.5 ${color}`} />
-                    {label}
-                  </div>
-                  <p className="text-2xl font-bold mt-1">{value.toLocaleString("pt-BR")}</p>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-3 flex-wrap text-sm">
-              <span className="px-3 py-1.5 rounded-full bg-muted text-muted-foreground">
-                {stats.publishedPosts}/{stats.totalPosts} posts publicados
-              </span>
-              <span className="px-3 py-1.5 rounded-full bg-muted text-muted-foreground">
-                Engajamento médio: <strong className="text-foreground">{stats.avgEngagementPerPost.toLocaleString("pt-BR")}</strong>/post
-              </span>
-              {stats.engagementRate !== null && (
-                <span className="px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-                  Taxa de engajamento: <strong>{stats.engagementRate}%</strong>
-                </span>
-              )}
-            </div>
-
-            {/* Resumo executivo */}
-            <section className="rounded-2xl border border-border bg-card p-6 space-y-2">
-              <h2 className="font-bold flex items-center gap-2"><BarChart3 className="h-4 w-4 text-blue-500" /> Resumo executivo</h2>
-              <p className="text-sm leading-relaxed">{report.executive_summary}</p>
-              {(report.highlights?.length ?? 0) > 0 && (
-                <ul className="mt-2 space-y-1.5">
-                  {report.highlights.map((h, i) => (
-                    <li key={i} className="text-sm flex gap-2">
-                      <Check className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-                      {h}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            {/* Top posts */}
-            <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
-              <h2 className="font-bold flex items-center gap-2"><Trophy className="h-4 w-4 text-amber-500" /> Melhores posts do mês</h2>
-              <div className="space-y-2">
-                {stats.topPosts.map((p, i) => {
-                  const cfg = POST_TYPE_CONFIG[p.post_type as PostType];
-                  return (
-                    <div key={p.id || i} className="flex items-center gap-3 p-3 rounded-xl border border-border">
-                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                        i === 0 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" : "bg-muted text-muted-foreground"
-                      }`}>
-                        {i + 1}º
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{p.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {p.scheduled_date} · {cfg?.label || p.post_type} · {p.network}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
-                        <span className="flex items-center gap-1"><Heart className="h-3 w-3 text-pink-500" />{p.likes.toLocaleString("pt-BR")}</span>
-                        <span className="flex items-center gap-1"><MessageCircle className="h-3 w-3 text-blue-500" />{p.comments.toLocaleString("pt-BR")}</span>
-                        <span className="font-semibold text-foreground">{p.engagement.toLocaleString("pt-BR")} eng.</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {(stats.formatBreakdown?.length ?? 0) > 0 && (
-                <div className="pt-2 border-t border-border">
-                  <p className="text-xs font-semibold text-muted-foreground mb-2">Engajamento médio por formato</p>
-                  <div className="flex flex-wrap gap-2">
-                    {stats.formatBreakdown.map((f) => {
-                      const cfg = POST_TYPE_CONFIG[f.post_type as PostType];
-                      return (
-                        <span key={f.post_type} className="text-xs px-2.5 py-1 rounded-full border border-border flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-sm ${cfg?.bgColor || "bg-muted"}`} />
-                          {cfg?.label || f.post_type}: <strong>{f.avgEngagement.toLocaleString("pt-BR")}</strong> ({f.count} posts)
-                        </span>
-                      );
-                    })}
-                  </div>
-                  {report.format_insights && (
-                    <p className="text-sm mt-3 leading-relaxed">{report.format_insights}</p>
-                  )}
-                </div>
-              )}
-            </section>
-
-            {/* O que funcionou / abaixo do esperado */}
-            <div className="grid md:grid-cols-2 gap-4">
-              <section className="rounded-2xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 dark:bg-emerald-950/20 p-5 space-y-2">
-                <h2 className="font-bold text-sm flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
-                  <TrendingUp className="h-4 w-4" /> O que funcionou
-                </h2>
-                <ul className="space-y-1.5">
-                  {(report.what_worked || []).map((w, i) => <li key={i} className="text-sm leading-relaxed">• {w}</li>)}
-                </ul>
+              {/* Resumo executivo */}
+              <section className="rounded-2xl border border-border bg-card p-6 space-y-2">
+                <h2 className="font-bold flex items-center gap-2"><BarChart3 className="h-4 w-4 text-blue-500" /> Resumo executivo</h2>
+                <p className="text-sm leading-relaxed">{report.executive_summary}</p>
+                {(report.highlights?.length ?? 0) > 0 && (
+                  <ul className="mt-2 space-y-1.5">
+                    {report.highlights.map((h, i) => (
+                      <li key={i} className="text-sm flex gap-2">
+                        <Check className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                        {h}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </section>
-              <section className="rounded-2xl border border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/20 p-5 space-y-2">
-                <h2 className="font-bold text-sm flex items-center gap-2 text-red-700 dark:text-red-300">
-                  <TrendingDown className="h-4 w-4" /> Abaixo do esperado
-                </h2>
-                <ul className="space-y-1.5">
-                  {(report.what_underperformed || []).map((w, i) => <li key={i} className="text-sm leading-relaxed">• {w}</li>)}
-                </ul>
-              </section>
-            </div>
 
-            {/* Recomendações + estratégia */}
-            <section className="rounded-2xl border border-border bg-card p-6 space-y-3">
-              <h2 className="font-bold flex items-center gap-2"><Lightbulb className="h-4 w-4 text-amber-500" /> Recomendações</h2>
-              <ol className="space-y-2">
-                {(report.recommendations || []).map((r, i) => (
-                  <li key={i} className="text-sm flex gap-2 leading-relaxed">
-                    <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
-                    {r}
-                  </li>
-                ))}
-              </ol>
-              {report.next_month_strategy && (
-                <div className="rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-4 mt-2">
-                  <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">Estratégia para o próximo mês</p>
-                  <p className="text-sm leading-relaxed">{report.next_month_strategy}</p>
-                </div>
-              )}
-            </section>
-
-            {/* Posts sugeridos */}
-            {(report.suggested_posts?.length ?? 0) > 0 && (
-              <section className="rounded-2xl border border-border bg-card p-6 space-y-3">
-                <h2 className="font-bold flex items-center gap-2"><Sparkles className="h-4 w-4 text-blue-500" /> Posts sugeridos para o próximo mês</h2>
+              {/* Top posts */}
+              <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
+                <h2 className="font-bold flex items-center gap-2"><Trophy className="h-4 w-4 text-amber-500" /> Melhores posts do mês</h2>
                 <div className="space-y-2">
-                  {report.suggested_posts.map((s, i) => {
-                    const cfg = POST_TYPE_CONFIG[s.post_type as PostType];
+                  {stats.topPosts.map((p, i) => {
+                    const cfg = POST_TYPE_CONFIG[p.post_type as PostType];
                     return (
-                      <div key={i} className="p-3 rounded-xl border border-border">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {cfg && (
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${cfg.bgColor} ${cfg.color}`}>{cfg.label}</span>
-                          )}
-                          <p className="text-sm font-medium">{s.title}</p>
+                      <div key={p.id || i} className="flex items-center gap-3 p-3 rounded-xl border border-border">
+                        <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                          i === 0 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" : "bg-muted text-muted-foreground"
+                        }`}>
+                          {i + 1}º
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{p.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {p.scheduled_date} · {cfg?.label || p.post_type} · {p.network}
+                          </p>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{s.rationale}</p>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                          <span className="flex items-center gap-1"><Heart className="h-3 w-3 text-pink-500" />{p.likes.toLocaleString("pt-BR")}</span>
+                          <span className="flex items-center gap-1"><MessageCircle className="h-3 w-3 text-blue-500" />{p.comments.toLocaleString("pt-BR")}</span>
+                          <span className="font-semibold text-foreground">{p.engagement.toLocaleString("pt-BR")} eng.</span>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-                <div className="rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground print:hidden flex items-center gap-2">
-                  <CalendarDays className="h-4 w-4 shrink-0" />
-                  Para aplicar: volte ao calendário, avance para o próximo mês e clique em "Gerar cronograma" — marque a opção
-                  "Aplicar diagnóstico do relatório" para a IA usar esta estratégia.
-                </div>
+                {(stats.formatBreakdown?.length ?? 0) > 0 && (
+                  <div className="pt-2 border-t border-border">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">Engajamento médio por formato</p>
+                    <div className="flex flex-wrap gap-2">
+                      {stats.formatBreakdown.map((f) => {
+                        const cfg = POST_TYPE_CONFIG[f.post_type as PostType];
+                        return (
+                          <span key={f.post_type} className="text-xs px-2.5 py-1 rounded-full border border-border flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-sm ${cfg?.bgColor || "bg-muted"}`} />
+                            {cfg?.label || f.post_type}: <strong>{f.avgEngagement.toLocaleString("pt-BR")}</strong> ({f.count} posts)
+                          </span>
+                        );
+                      })}
+                    </div>
+                    {report.format_insights && (
+                      <p className="text-sm mt-3 leading-relaxed">{report.format_insights}</p>
+                    )}
+                  </div>
+                )}
               </section>
-            )}
 
-            <p className="text-xs text-muted-foreground text-center print:block">
-              Relatório gerado com IA em {reportDate ? new Date(reportDate).toLocaleDateString("pt-BR") : ""} · {schedule.client_name} · {monthName} {year}
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center space-y-3">
-            <div className="w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-900/20 text-blue-500 flex items-center justify-center mx-auto">
-              <BarChart3 className="h-7 w-7" />
+              {/* O que funcionou / abaixo do esperado */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <section className="rounded-2xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 dark:bg-emerald-950/20 p-5 space-y-2">
+                  <h2 className="font-bold text-sm flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+                    <TrendingUp className="h-4 w-4" /> O que funcionou
+                  </h2>
+                  <ul className="space-y-1.5">
+                    {(report.what_worked || []).map((w, i) => <li key={i} className="text-sm leading-relaxed">• {w}</li>)}
+                  </ul>
+                </section>
+                <section className="rounded-2xl border border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/20 p-5 space-y-2">
+                  <h2 className="font-bold text-sm flex items-center gap-2 text-red-700 dark:text-red-300">
+                    <TrendingDown className="h-4 w-4" /> Abaixo do esperado
+                  </h2>
+                  <ul className="space-y-1.5">
+                    {(report.what_underperformed || []).map((w, i) => <li key={i} className="text-sm leading-relaxed">• {w}</li>)}
+                  </ul>
+                </section>
+              </div>
+
+              {/* Recomendações + estratégia */}
+              <section className="rounded-2xl border border-border bg-card p-6 space-y-3">
+                <h2 className="font-bold flex items-center gap-2"><Lightbulb className="h-4 w-4 text-amber-500" /> Recomendações</h2>
+                <ol className="space-y-2">
+                  {(report.recommendations || []).map((r, i) => (
+                    <li key={i} className="text-sm flex gap-2 leading-relaxed">
+                      <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                      {r}
+                    </li>
+                  ))}
+                </ol>
+                {report.next_month_strategy && (
+                  <div className="rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-4 mt-2">
+                    <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">Estratégia para o próximo mês</p>
+                    <p className="text-sm leading-relaxed">{report.next_month_strategy}</p>
+                  </div>
+                )}
+              </section>
+
+              {/* Posts sugeridos */}
+              {(report.suggested_posts?.length ?? 0) > 0 && (
+                <section className="rounded-2xl border border-border bg-card p-6 space-y-3">
+                  <h2 className="font-bold flex items-center gap-2"><Sparkles className="h-4 w-4 text-blue-500" /> Posts sugeridos para o próximo mês</h2>
+                  <div className="space-y-2">
+                    {report.suggested_posts.map((s, i) => {
+                      const cfg = POST_TYPE_CONFIG[s.post_type as PostType];
+                      return (
+                        <div key={i} className="p-3 rounded-xl border border-border">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {cfg && (
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${cfg.bgColor} ${cfg.color}`}>{cfg.label}</span>
+                            )}
+                            <p className="text-sm font-medium">{s.title}</p>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{s.rationale}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground print:hidden flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4 shrink-0" />
+                    Para aplicar: volte ao calendário, avance para o próximo mês e clique em "Gerar cronograma" — marque a opção
+                    "Aplicar diagnóstico do relatório" para a IA usar esta estratégia.
+                  </div>
+                </section>
+              )}
+
+              <p className="text-xs text-muted-foreground text-center print:block">
+                Relatório gerado com IA em {reportDate ? new Date(reportDate).toLocaleDateString("pt-BR") : ""} · {schedule.client_name} · {monthName} {year}
+              </p>
             </div>
-            <p className="font-medium">Nenhum relatório gerado para {monthName} {year}</p>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Registre as métricas dos posts publicados (curtidas, comentários, alcance...) na seção
-              "Desempenho do post" de cada post e clique em "Gerar relatório com IA".
-            </p>
-          </div>
-        )}
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-900/20 text-blue-500 flex items-center justify-center mx-auto">
+                <BarChart3 className="h-7 w-7" />
+              </div>
+              <p className="font-medium">Nenhum relatório gerado para {monthName} {year}</p>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Registre as métricas dos posts publicados (curtidas, comentários, alcance...) na seção
+                "Desempenho do post" de cada post e clique em "Gerar relatório com IA".
+              </p>
+            </div>
+          )}
+        </PlanGate>
       </main>
     </div>
   );

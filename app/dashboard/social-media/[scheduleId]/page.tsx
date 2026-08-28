@@ -22,8 +22,10 @@ import { notifySocialMediaPostStatus } from "@/lib/data-service";
 import {
   SocialMediaSchedule, SocialMediaPost, NetworkType, PostType, PostStatus,
   POST_TYPE_CONFIG, MONTHS_PT, COMMEMORATIVE_DATES, InstagramConnection,
-  isPremiumSmTier
 } from "@/lib/social-media-types";
+import { usePlan } from "@/lib/plans/use-plan";
+import { PlanBadge, tierAllows } from "@/components/plan/plan-gate";
+import { useOwnerPlanTier } from "@/components/social-media/premium-gate";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
@@ -107,8 +109,10 @@ export default function ScheduleCalendarPage() {
   const [pendingDeletePost, setPendingDeletePost] = useState<SocialMediaPost | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Recursos Pro/Ultra (Relatório e Simulador de Feed) — plano do dono
-  const [ownerPremium, setOwnerPremium] = useState<boolean | null>(null);
+  // Recursos Pro/Ultra (Relatório, Feed, Concorrentes) — a equipe herda o plano do dono
+  const ownerTier = useOwnerPlanTier(schedule?.owner_id);
+  const plan = usePlan();
+  const aiCredits = plan.limitOf("aiCreditsPerMonth");
 
   // Conexão com o Instagram (Graph API)
   const [igConnection, setIgConnection] = useState<InstagramConnection | null>(null);
@@ -169,16 +173,6 @@ export default function ScheduleCalendarPage() {
 
       if (schedErr) throw schedErr;
       setSchedule(sched as SocialMediaSchedule);
-
-      // Plano do dono define o acesso a Relatório/Feed (badge PRO nos botões)
-      supabase
-        .from("profiles")
-        .select("subscription_tier")
-        .eq("id", sched.owner_id)
-        .maybeSingle()
-        .then(({ data }) =>
-          setOwnerPremium(isPremiumSmTier(data?.subscription_tier as string | null))
-        );
 
       // Status da conexão com o Instagram (função não expõe o token;
       // falha silenciosa se a migration 44 ainda não foi executada)
@@ -788,11 +782,7 @@ export default function ScheduleCalendarPage() {
                 <Button variant="outline" size="sm" className="gap-1.5">
                   <LayoutGrid className="h-3.5 w-3.5 text-pink-500" />
                   Feed
-                  {ownerPremium === false && (
-                    <span className="text-[9px] font-bold px-1 py-px rounded bg-gradient-to-r from-blue-500 to-violet-500 text-white leading-none">
-                      PRO
-                    </span>
-                  )}
+                  {ownerTier !== null && !tierAllows(ownerTier, "smPremiumReports") && <PlanBadge />}
                 </Button>
               </Link>
 
@@ -800,6 +790,7 @@ export default function ScheduleCalendarPage() {
                 <Button variant="outline" size="sm" className="gap-1.5">
                   <Users className="h-3.5 w-3.5 text-violet-500" />
                   Concorrentes
+                  {ownerTier !== null && !tierAllows(ownerTier, "competitorAnalysis") && <PlanBadge />}
                 </Button>
               </Link>
 
@@ -807,11 +798,7 @@ export default function ScheduleCalendarPage() {
                 <Button variant="outline" size="sm" className="gap-1.5">
                   <BarChart3 className="h-3.5 w-3.5" />
                   Relatório
-                  {ownerPremium === false && (
-                    <span className="text-[9px] font-bold px-1 py-px rounded bg-gradient-to-r from-blue-500 to-violet-500 text-white leading-none">
-                      PRO
-                    </span>
-                  )}
+                  {ownerTier !== null && !tierAllows(ownerTier, "smPremiumReports") && <PlanBadge />}
                 </Button>
               </Link>
 
@@ -828,6 +815,12 @@ export default function ScheduleCalendarPage() {
               </Button>
             </div>
           </div>
+
+          {/* Créditos de IA do plano (refinar post, variações de copy, eventos com IA…) */}
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+            <Sparkles className="h-3 w-3 text-blue-500" />
+            Cada ação de IA consome créditos do seu plano · {aiCredits === null ? "ilimitado" : `${aiCredits}/mês`}
+          </p>
 
           {/* Calendar Card */}
           <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">

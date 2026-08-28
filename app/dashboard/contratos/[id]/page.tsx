@@ -155,7 +155,10 @@ export default function ContratoDetailPage() {
       const res = await apiClient.post(`/contracts/${id}/send`);
       setContract((prev) => prev ? { ...prev, ...res.data } : prev);
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { message?: string } } };
+      const err = e as { response?: { data?: { message?: string; code?: string } } };
+      // 403 de plano (contratos enviados/mês): o apiClient já abriu o modal de upgrade
+      const code = err?.response?.data?.code;
+      if (code === "PLAN_LIMIT" || code === "PLAN_FEATURE") return;
       setError(err?.response?.data?.message ?? "Erro ao enviar contrato.");
     } finally {
       setSendingContract(false);

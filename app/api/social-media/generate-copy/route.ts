@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/server/api-auth";
+import { requireUser, consumeAiCredits } from "@/lib/server/api-auth";
 import { callGroqJson, GroqError } from "@/lib/server/groq";
 
 // Rota legada de geração de copy de um post individual.
@@ -9,7 +9,8 @@ import { callGroqJson, GroqError } from "@/lib/server/groq";
 export async function POST(request: NextRequest) {
   try {
     // Rota proxia a chave Groq — exige usuário autenticado
-    if (!(await requireUser(request))) {
+    const auth = await requireUser(request);
+    if (!auth) {
       return NextResponse.json({ error: "Não autorizado. Faça login novamente." }, { status: 401 });
     }
 
@@ -19,6 +20,10 @@ export async function POST(request: NextRequest) {
     if (!title || !postType || !network) {
       return NextResponse.json({ error: "Parâmetros obrigatórios faltando" }, { status: 400 });
     }
+
+    // Plano: debita créditos de IA (após validar a entrada, antes da Groq)
+    const denied = await consumeAiCredits(auth, "copy");
+    if (denied) return denied;
 
     const systemPrompt = `Você é um copywriter sênior especialista em redes sociais brasileiras.
 Crie textos criativos, engajantes e em português brasileiro natural.

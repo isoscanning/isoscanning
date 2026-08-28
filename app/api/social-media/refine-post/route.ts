@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/server/api-auth";
+import { requireUser, consumeAiCredits } from "@/lib/server/api-auth";
 import { callGroqJson, GroqError } from "@/lib/server/groq";
 
 // Refino rápido de um post existente com IA.
@@ -19,7 +19,8 @@ const NETWORK_HINTS: Record<string, string> = {
 export async function POST(request: NextRequest) {
   try {
     // Rota proxia a chave Groq — exige usuário autenticado
-    if (!(await requireUser(request))) {
+    const auth = await requireUser(request);
+    if (!auth) {
       return NextResponse.json({ error: "Não autorizado. Faça login novamente." }, { status: 401 });
     }
 
@@ -34,6 +35,10 @@ export async function POST(request: NextRequest) {
     if (!title || !postType || !network) {
       return NextResponse.json({ error: "Parâmetros obrigatórios faltando" }, { status: 400 });
     }
+
+    // Plano: debita créditos de IA (após validar a entrada, antes da Groq)
+    const denied = await consumeAiCredits(auth, "refine-post");
+    if (denied) return denied;
 
     const isFull = scope === "full";
     const networkHint = NETWORK_HINTS[network as string];

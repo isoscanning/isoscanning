@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import useSWR from "swr";
 import { useAuth } from "@/lib/auth-context";
 import { isPlatformAdmin } from "@/lib/admin-config";
 import apiClient from "@/lib/api-service";
+import { useToast } from "@/components/ui/use-toast";
+import { FEATURE_LABELS, PLAN_LABELS, type PlanLimits } from "@/lib/plans/plan-limits";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import {
@@ -32,6 +34,8 @@ import {
   RefreshCw,
   Loader2,
   AlertTriangle,
+  Gauge,
+  Wrench,
 } from "lucide-react";
 import {
   Area,
@@ -81,8 +85,36 @@ interface PlatformMetrics {
   };
 }
 
+interface PlanLimitFeatureStat {
+  feature: string;
+  hits: number;
+  users: number;
+  free_hits: number;
+}
+
+interface PlanLimitStats {
+  days: number;
+  total_hits: number;
+  by_feature: PlanLimitFeatureStat[];
+  trials: {
+    active_trials: number;
+    expired_trials: number;
+    converted_trials: number;
+  };
+  migrationMissing?: boolean;
+}
+
 const fetcher = (url: string) =>
   apiClient.get<PlatformMetrics>(url).then((res) => res.data);
+
+const limitsFetcher = (url: string) =>
+  apiClient.get<PlanLimitStats>(url).then((res) => res.data);
+
+function featureLabel(key: string): string {
+  const label = (FEATURE_LABELS as Record<string, string>)[key as keyof PlanLimits];
+  if (!label) return key;
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
 
 const nf = new Intl.NumberFormat("pt-BR");
 
@@ -102,10 +134,10 @@ function formatDay(value: string) {
 }
 
 const TIER_LABELS: Record<string, string> = {
-  free: "Free",
-  standard: "Standard",
-  pro: "Pro",
-  vip: "VIP",
+  free: PLAN_LABELS.free,
+  standard: `${PLAN_LABELS.standard} (legado)`,
+  pro: PLAN_LABELS.pro,
+  vip: PLAN_LABELS.vip,
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -166,6 +198,55 @@ export default function AdminDashboardPage() {
       revalidateOnFocus: true,
       dedupingInterval: 5000,
     });
+
+  const {
+    data: limits,
+    error: limitsError,
+    isLoading: limitsLoading,
+    mutate: mutateLimits,
+  } = useSWR<PlanLimitStats>(
+    !loading && isAdmin ? "/admin/plan-limits" : null,
+    limitsFetcher,
+    {
+      refreshInterval: REFRESH_MS * 4,
+      revalidateOnFocus: true,
+      dedupingInterval: 5000,
+    }
+  );
+
+  const { toast } = useToast();
+  const [maintenanceRunning, setMaintenanceRunning] = useState(false);
+
+  const runMaintenance = async () => {
+    setMaintenanceRunning(true);
+    try {
+      const { data: result } = await apiClient.post<{ expired: number; reminded: number }>(
+        "/admin/plans/run-maintenance"
+      );
+      toast({
+        title: "Manutenção de planos concluída",
+        description: `${nf.format(result?.expired ?? 0)} assinatura(s)/teste(s) expirado(s) · ${nf.format(result?.reminded ?? 0)} lembrete(s) de fim de teste enviado(s).`,
+      });
+      await Promise.all([mutateLimits(), mutate()]);
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Falha ao rodar a manutenção",
+        description:
+          err?.response?.data?.message || err?.message || "Erro desconhecido",
+      });
+    } finally {
+      setMaintenanceRunning(false);
+    }
+  };
+
+  const limitFeatures = useMemo(() => {
+    if (!limits?.by_feature) return [];
+    return [...limits.by_feature].sort((a, b) => b.hits - a.hits);
+  }, [limits]);
+  const maxLimitHits = limitFeatures.length
+    ? Math.max(...limitFeatures.map((f) => f.hits), 1)
+    : 1;
 
   const dark = resolvedTheme === "dark";
   // Paleta validada (dataviz): azul sequencial p/ série única e
@@ -545,6 +626,194 @@ export default function AdminDashboardPage() {
                       ))}
                     </tbody>
                   </table>
+                </CardContent>
+              </Card>
+            </section>
+
+            {/* Limites de plano atingidos + funil de trial */}
+            <section>
+              <Card>
+                <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4 space-y-0 pb-2">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Gauge className="h-4 w-4 text-primary" />
+                      Limites atingidos ({limits?.days ?? 30} dias)
+                    </CardTitle>
+                    <CardDescription>
+                      Quantas vezes usuários bateram em um limite de plano, por recurso —
+                      a coluna Free mostra o potencial de upgrade.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={runMaintenance}
+                    disabled={maintenanceRunning}
+                    title="Expira assinaturas/testes vencidos e envia lembretes de fim de teste"
+                  >
+                    {maintenanceRunning ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Wrench className="mr-2 h-4 w-4" />
+                    )}
+                    Rodar manutenção de planos
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {limitsError && (
+                    <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-500/40 p-3 text-sm">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+                      <span>
+                        Não foi possível carregar os limites:{" "}
+                        {(limitsError as any)?.response?.data?.message ||
+                          (limitsError as Error)?.message ||
+                          "Erro desconhecido"}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="ml-auto"
+                        onClick={() => mutateLimits()}
+                      >
+                        Tentar novamente
+                      </Button>
+                    </div>
+                  )}
+
+                  {limits?.migrationMissing && (
+                    <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+                      <span>
+                        Aplique a migration 62 no Supabase (RPC{" "}
+                        <code className="rounded bg-muted px-1">admin_plan_limit_stats</code>) para ver
+                        estas métricas.
+                      </span>
+                    </div>
+                  )}
+
+                  {limitsLoading && !limits ? (
+                    <div className="grid gap-4 lg:grid-cols-3">
+                      <Skeleton className="h-40 w-full rounded-xl lg:col-span-2" />
+                      <Skeleton className="h-40 w-full rounded-xl" />
+                    </div>
+                  ) : limits ? (
+                    <div className="grid gap-6 lg:grid-cols-3">
+                      <div className="lg:col-span-2">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          Total de bloqueios
+                        </p>
+                        <p className="mt-1 text-2xl font-bold">
+                          {nf.format(limits.total_hits ?? 0)}
+                        </p>
+                        {limitFeatures.length === 0 ? (
+                          <p className="mt-3 text-sm text-muted-foreground">
+                            Nenhum limite atingido no período.
+                          </p>
+                        ) : (
+                          <div className="mt-3 overflow-x-auto">
+                            <table className="w-full min-w-[480px] text-sm">
+                              <thead>
+                                <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                                  <th className="py-2 pr-4 font-medium">Recurso</th>
+                                  <th className="py-2 pr-4 font-medium">Bloqueios</th>
+                                  <th className="py-2 pr-4 text-right font-medium">Usuários</th>
+                                  <th className="py-2 text-right font-medium">Free</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {limitFeatures.map((f) => (
+                                  <tr
+                                    key={f.feature}
+                                    className="border-b border-border/50 last:border-0 hover:bg-muted/40"
+                                  >
+                                    <td className="py-2.5 pr-4 font-medium">
+                                      {featureLabel(f.feature)}
+                                    </td>
+                                    <td className="py-2.5 pr-4">
+                                      <div className="flex items-center gap-2">
+                                        <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
+                                          <div
+                                            className="h-full rounded-full"
+                                            style={{
+                                              width: `${(f.hits / maxLimitHits) * 100}%`,
+                                              backgroundColor: chart.series,
+                                            }}
+                                          />
+                                        </div>
+                                        <span className="tabular-nums">{nf.format(f.hits)}</span>
+                                      </div>
+                                    </td>
+                                    <td className="py-2.5 pr-4 text-right tabular-nums">
+                                      {nf.format(f.users)}
+                                    </td>
+                                    <td className="py-2.5 text-right tabular-nums">
+                                      {f.free_hits > 0 ? (
+                                        <span className="font-medium text-amber-500">
+                                          {nf.format(f.free_hits)}
+                                        </span>
+                                      ) : (
+                                        <span className="text-muted-foreground">0</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          Funil do teste grátis (Pro)
+                        </p>
+                        <ul className="mt-2 space-y-2">
+                          {[
+                            {
+                              key: "active",
+                              label: "Testes ativos",
+                              value: limits.trials?.active_trials ?? 0,
+                              tone: "text-primary",
+                            },
+                            {
+                              key: "converted",
+                              label: "Convertidos em assinatura",
+                              value: limits.trials?.converted_trials ?? 0,
+                              tone: "text-emerald-500",
+                            },
+                            {
+                              key: "expired",
+                              label: "Expirados sem assinar",
+                              value: limits.trials?.expired_trials ?? 0,
+                              tone: "text-muted-foreground",
+                            },
+                          ].map((row) => (
+                            <li
+                              key={row.key}
+                              className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-sm"
+                            >
+                              <span>{row.label}</span>
+                              <span className={`text-lg font-bold tabular-nums ${row.tone}`}>
+                                {nf.format(row.value)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                        {(() => {
+                          const converted = limits.trials?.converted_trials ?? 0;
+                          const expired = limits.trials?.expired_trials ?? 0;
+                          const finished = converted + expired;
+                          if (finished === 0) return null;
+                          return (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Conversão: {Math.round((converted / finished) * 100)}% dos testes
+                              encerrados viraram assinatura.
+                            </p>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
             </section>

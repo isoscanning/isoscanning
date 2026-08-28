@@ -29,6 +29,7 @@ import { AlertCircle, CheckCircle2, ChevronLeft, Upload, X } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { createEquipment, uploadEquipmentImages } from "@/lib/data-service";
 import { ScrollReveal } from "@/components/scroll-reveal";
+import { isPlanErrorBody } from "@/lib/plans/plan-limits";
 
 const CATEGORIAS = [
   "Câmeras",
@@ -189,6 +190,9 @@ export default function NovoEquipamentoPage() {
         }, 1500);
       } catch (equipmentError: any) {
         console.error("Erro ao criar equipamento:", equipmentError);
+        // 403 de plano (limite de anúncios): o modal de upgrade já foi
+        // aberto pelo interceptor do apiClient — sem alerta duplicado.
+        if (isPlanErrorBody(equipmentError?.response?.data)) return;
         setError(`Erro ao salvar equipamento: ${equipmentError.message}`);
       }
     } catch (err: any) {

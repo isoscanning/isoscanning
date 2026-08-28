@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, checkOwnerPremiumSm, PREMIUM_SM_MSG } from "@/lib/server/api-auth";
+import { requireUser, checkOwnerPremiumSm } from "@/lib/server/api-auth";
 import { graphGet, MetaApiError } from "@/lib/server/meta";
 import { getSupabaseAdmin, ADMIN_MISSING_MSG } from "@/lib/server/supabase-admin";
 import { loadInstagramConnection } from "@/lib/server/instagram-connection";
@@ -93,9 +93,7 @@ export async function POST(request: NextRequest) {
 
     // Plano: demografia faz parte do relatório Pro/Ultra (pelo plano do dono)
     const premium = await checkOwnerPremiumSm(auth, schedule.owner_id);
-    if (!premium.allowed) {
-      return NextResponse.json({ error: PREMIUM_SM_MSG, planLimit: true }, { status: 403 });
-    }
+    if (!premium.allowed) return premium.denied as NextResponse;
 
     // Token cifrado no banco — decifrado só no servidor
     const { connection } = await loadInstagramConnection(admin, scheduleId);

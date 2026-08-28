@@ -11,6 +11,7 @@ import apiClient from "./api-service";
 import { supabase } from "./supabase";
 import { trackEvent } from "./analytics";
 import { tokenManager } from "./token-manager";
+import type { PlanInfo } from "./plans/use-plan";
 
 /**
  * LocalStorage keys used by auth context:
@@ -45,7 +46,11 @@ export interface UserProfile {
   isPublished: boolean;
   createdAt: Date;
   updatedAt: Date;
+  /** Tier EFETIVO (o backend já rebaixa para "free" se a assinatura/trial venceu). */
   subscriptionTier?: 'free' | 'standard' | 'pro' | 'vip';
+  subscriptionExpiresAt?: string | null;
+  /** Plano efetivo + limites (GET /auth/me). Use o hook usePlan() em vez de ler daqui. */
+  plan?: PlanInfo;
 }
 
 interface AuthContextType {

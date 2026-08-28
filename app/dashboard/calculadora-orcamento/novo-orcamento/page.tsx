@@ -19,6 +19,19 @@ import Link from "next/link";
 import Script from "next/script";
 import apiClient from "@/lib/api-service";
 import { ScrollReveal } from "@/components/scroll-reveal";
+import { usePlan } from "@/lib/plans/use-plan";
+
+/** 403 de plano (cálculos de rota/mês) — o interceptor do apiClient já abriu o modal de upgrade. */
+function isPlanApiError(err: unknown): boolean {
+  const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
+  return code === "PLAN_LIMIT" || code === "PLAN_FEATURE";
+}
+
+function routeLimitHint(limit: number | null): string {
+  return limit === null
+    ? "Cálculos de rota ilimitados no seu plano"
+    : `${limit} cálculos de rota/mês no seu plano`;
+}
 
 declare global {
   interface Window { google: any; }
@@ -526,7 +539,8 @@ function NovoOrcamentoInner() {
         transportTollCost: applyBRLMask(String(Math.round(data.tollCost * 100))),
         transportRouteCalculated: true,
       }));
-    } catch {
+    } catch (err) {
+      if (isPlanApiError(err)) return; // limite do plano: modal de upgrade já aberto
       setCalcError("Erro ao calcular rota. Verifique os endereços ou insira os valores manualmente.");
     } finally {
       setCalcLoading(false);
@@ -1403,6 +1417,7 @@ function TeamTransportCard({ transport, staffMembers, allTransports, onChange, o
 }) {
   const [calcLoading, setCalcLoading] = useState(false);
   const [calcError, setCalcError] = useState("");
+  const routeLimit = usePlan().limitOf("routeCalculationsPerMonth");
 
   const handleOriginChange = useCallback((v: string) => onChange({ origin: v }), [onChange]);
   const handleDestChange = useCallback((v: string) => onChange({ destination: v }), [onChange]);
@@ -1430,7 +1445,7 @@ function TeamTransportCard({ transport, staffMembers, allTransports, onChange, o
         tollCost: applyBRLMask(String(Math.round(data.tollCost * 100))),
         routeCalculated: true,
       });
-    } catch { setCalcError("Erro ao calcular rota. Insira os valores manualmente."); }
+    } catch (err) { if (!isPlanApiError(err)) setCalcError("Erro ao calcular rota. Insira os valores manualmente."); }
     finally { setCalcLoading(false); }
   }
 
@@ -1559,6 +1574,7 @@ function TeamTransportCard({ transport, staffMembers, allTransports, onChange, o
                 ? <><MapPin className="h-3.5 w-3.5" /> Recalcular Rota</>
                 : <><MapPin className="h-3.5 w-3.5" /> Calcular Rota</>}
             </Button>
+            <p className="text-[11px] text-muted-foreground text-center">{routeLimitHint(routeLimit)}</p>
             {calcError && (
               <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/10 rounded-lg p-2.5">
                 <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" /><p>{calcError}</p>
@@ -1655,6 +1671,7 @@ function StepTransporte({ form, set, calcLoading, calcError, onCalculate, google
   onCalculate: () => void; googleReady: boolean;
   roundTrip: boolean; onRoundTripChange: (v: boolean) => void;
 }) {
+  const routeLimit = usePlan().limitOf("routeCalculationsPerMonth");
   const hasTeam = form.staffMembers.length > 0;
 
   const types = [
@@ -1794,6 +1811,7 @@ function StepTransporte({ form, set, calcLoading, calcError, onCalculate, google
                 ? <><MapPin className="h-4 w-4" /> Recalcular Rota</>
                 : <><MapPin className="h-4 w-4" /> Calcular Rota</>}
             </Button>
+            <p className="text-xs text-muted-foreground text-center">{routeLimitHint(routeLimit)}</p>
             {calcError && (
               <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 rounded-lg p-3">
                 <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><p>{calcError}</p>

@@ -23,6 +23,7 @@ import { notifySocialMediaPostStatus, notifySocialMediaComment } from "@/lib/dat
 import { RichText, RichTextArea } from "@/components/social-media/rich-text";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { notifyPlanLimit } from "@/lib/plans/plan-events";
 
 interface PostSlideOverProps {
   post: SocialMediaPost | null;
@@ -297,6 +298,8 @@ export function PostSlideOver({
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        // Cota de créditos de IA do plano esgotada → modal de upgrade, sem toast
+        if (res.status === 403 && notifyPlanLimit(data)) return;
         const apiMsg = (data as { error?: string })?.error;
         throw new Error(apiMsg || "Erro no refino pela IA");
       }
@@ -347,7 +350,10 @@ export function PostSlideOver({
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error((data as { error?: string })?.error || "Erro ao gerar variações");
+      if (!res.ok) {
+        if (res.status === 403 && notifyPlanLimit(data)) return;
+        throw new Error((data as { error?: string })?.error || "Erro ao gerar variações");
+      }
       setVariations(Array.isArray(data.variations) ? data.variations : []);
       toast.success("Variações geradas! Escolha a que preferir.");
     } catch (err) {

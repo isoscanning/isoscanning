@@ -30,6 +30,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { briefingProService } from "@/lib/briefing-pro-service";
+import { usePlan, usePlanUsage } from "@/lib/plans/use-plan";
 import {
   BriefingListRow,
   BRIEFING_STATUS_CONFIG,
@@ -147,6 +148,12 @@ export default function BriefingProPage() {
   const [deleting, setDeleting] = useState(false);
   const [duplicateTarget, setDuplicateTarget] = useState<BriefingListRow | null>(null);
 
+  // Cota de briefings/mês (GET /plans/me) — só exibe quando o plano tem limite
+  const plan = usePlan();
+  const { usage } = usePlanUsage();
+  const briefingLimit = plan.limitOf("briefingsPerMonth");
+  const briefingsUsed = usage.briefingsPerMonth;
+
   useEffect(() => {
     if (!loading && !userProfile) router.push("/login");
   }, [userProfile, loading, router]);
@@ -214,6 +221,11 @@ export default function BriefingProPage() {
             <p className="text-muted-foreground mt-1">
               Crie briefings completos, compartilhe com a equipe e acompanhe a execução em tempo real.
             </p>
+            {briefingLimit !== null && briefingsUsed !== undefined && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {briefingsUsed}/{briefingLimit} briefings este mês no plano {plan.label}
+              </p>
+            )}
           </div>
           <Button onClick={() => router.push("/dashboard/briefing-pro/new")} className="gap-2">
             <Plus className="h-4 w-4" />

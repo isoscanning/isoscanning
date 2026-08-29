@@ -19,7 +19,7 @@ import type { PlanInfo } from "./plans/use-plan";
  * - refresh_token: JWT refresh token for token renewal
  * - user_profile: Cached user profile object
  * - redirectAfterLogin: URL to redirect to after OAuth
- * - signupUserType: User type selected during signup (for OAuth signup)
+ * - signupUserType: sempre "professional" — o cadastro não oferece mais escolha
  */
 export interface UserProfile {
   id: string;
@@ -275,8 +275,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         email,
         password,
         displayName: userData.displayName || email.split("@")[0],
-        userType: userData.userType || "professional",
         ...userData,
+        // Depois do spread de propósito: toda conta nasce profissional.
+        userType: "professional",
       });
 
       if (response.data.accessToken) {
@@ -288,7 +289,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUserProfile(response.data.user);
           localStorage.setItem("user_profile", JSON.stringify(response.data.user));
         }
-        trackEvent({ action: 'sign_up', category: 'Auth', label: userData.userType });
+        trackEvent({ action: 'sign_up', category: 'Auth', label: 'professional' });
       }
     } catch (error) {
       console.error("[auth-context] Sign up error:", error);

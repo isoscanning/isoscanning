@@ -56,6 +56,13 @@ import {
   Hash,
   SendHorizonal,
   Trash2,
+  Instagram,
+  LayoutGrid,
+  BarChart3,
+  Search,
+  Wand2,
+  Activity,
+  PartyPopper,
 } from "lucide-react";
 
 // ── Demo mockup data (all fictitious) ──────────────────────────────────────
@@ -371,22 +378,29 @@ const perfis = [
 ];
 
 const allFeatures = [
-  { icon: Sparkles, title: "Geração com IA", description: "Gere um calendário mensal completo em segundos. A IA cria títulos, tipos de post e distribuição de datas com base no nicho e tom de voz do cliente.", color: "from-blue-500 to-blue-600", shadow: "shadow-blue-500/25" },
+  { icon: Activity, title: "Anamnese da Conta com IA", description: "Cole o @ do cliente e a IA pesquisa a conta na web: posicionamento, público, pontos fortes e o que está faltando. O briefing já começa preenchido.", color: "from-blue-600 to-indigo-500", shadow: "shadow-indigo-500/25" },
+  { icon: Sparkles, title: "Calendário Gerado por IA", description: "Nicho, tom de voz, objetivo, diferenciais e o que evitar. A IA devolve o mês inteiro com títulos, copy, hashtags e datas distribuídas de forma estratégica.", color: "from-blue-500 to-cyan-500", shadow: "shadow-cyan-500/25" },
   { icon: CalendarDays, title: "Calendário Visual", description: "Visualize todos os posts do mês em um calendário grid interativo. Arraste cards entre datas para reorganizar o cronograma sem retrabalho.", color: "from-blue-500 to-cyan-500", shadow: "shadow-cyan-500/25" },
-  { icon: Share2, title: "Link de Aprovação", description: "Compartilhe o calendário com o cliente via link público somente-leitura. O cliente vê as atualizações em tempo real, sem precisar criar conta.", color: "from-blue-600 to-blue-500", shadow: "shadow-blue-500/25" },
-  { icon: Users, title: "Gestão de Equipe", description: "Adicione colaboradores com roles específicos: Editor pode alterar conteúdo, Aprovador valida posts e Viewer apenas acompanha o calendário.", color: "from-blue-500 to-blue-600", shadow: "shadow-blue-500/25" },
+  { icon: PartyPopper, title: "Datas e Eventos com IA", description: "Datas comemorativas, feriados da cidade e do estado e eventos de esporte, cultura e comércio sugeridos pela IA — inclua no calendário com um clique.", color: "from-cyan-500 to-blue-600", shadow: "shadow-blue-500/25" },
+  { icon: Wand2, title: "Copy com IA e Refino em 1 Clique", description: "Gere a copy do post e ajuste com um toque: mais curta, gancho mais forte, mais persuasiva, focar em venda. Ou peça variações para testar qual converte.", color: "from-blue-600 to-blue-500", shadow: "shadow-blue-500/25" },
   { icon: Layers, title: "Tipos de Post", description: "Reels, Carrossel, Feed Imagem, Feed Vídeo, Story, Shorts e Thread. Identifique cada post com badges coloridos para uma visão clara do mix de conteúdo.", color: "from-cyan-500 to-blue-600", shadow: "shadow-blue-500/25" },
+  { icon: LayoutGrid, title: "Simulador de Feed", description: "Veja o grid do Instagram antes de publicar, em 3:4 e 1:1, misturando os posts planejados com o feed real da conta. Anexe as artes e monte a harmonia visual.", color: "from-pink-500 to-rose-500", shadow: "shadow-pink-500/25" },
+  { icon: Share2, title: "Link de Aprovação", description: "Compartilhe o calendário com o cliente via link público somente-leitura. O cliente vê as atualizações em tempo real, sem precisar criar conta.", color: "from-blue-600 to-blue-500", shadow: "shadow-blue-500/25" },
+  { icon: Radio, title: "Visualização Ao Vivo", description: "O link de compartilhamento atualiza automaticamente a cada 8 segundos. O cliente vê o calendário evoluir em tempo real, gerando confiança e transparência.", color: "from-blue-500 to-blue-600", shadow: "shadow-blue-500/25" },
+  { icon: Users, title: "Gestão de Equipe", description: "Adicione colaboradores com roles específicos: Editor pode alterar conteúdo, Aprovador valida posts e Viewer apenas acompanha o calendário.", color: "from-blue-500 to-blue-600", shadow: "shadow-blue-500/25" },
   { icon: MessageSquare, title: "Comentários e Feedback", description: "Equipe e aprovadores deixam comentários diretamente no post. Mantenha o histórico de feedback centralizado e evite mensagens perdidas no WhatsApp.", color: "from-blue-500 to-blue-600", shadow: "shadow-blue-500/25" },
   { icon: FolderOpen, title: "Links de Material", description: "Salve o link do material a ser produzido e o link do conteúdo pronto em cada post. Tudo acessível em um lugar só para editor e aprovador.", color: "from-blue-600 to-cyan-500", shadow: "shadow-cyan-500/25" },
-  { icon: Radio, title: "Visualização Ao Vivo", description: "O link de compartilhamento atualiza automaticamente a cada 8 segundos. O cliente vê o calendário evoluir em tempo real, gerando confiança e transparência.", color: "from-blue-500 to-blue-600", shadow: "shadow-blue-500/25" },
+  { icon: Instagram, title: "Instagram Conectado", description: "Conecte a conta profissional do cliente e sincronize as métricas reais de cada post: curtidas, comentários, compartilhamentos, salvos e alcance.", color: "from-pink-500 to-purple-500", shadow: "shadow-purple-500/25" },
+  { icon: BarChart3, title: "Relatório Mensal com IA", description: "Resumo executivo, melhores posts, o que funcionou e o que não funcionou, recomendações e sugestões para o próximo mês — mais a demografia do público.", color: "from-blue-600 to-indigo-500", shadow: "shadow-indigo-500/25" },
+  { icon: Search, title: "Análise de Concorrentes", description: "A IA pesquisa até 3 perfis concorrentes na web e devolve pontos fortes, pontos fracos, estratégia de conteúdo e os espaços vazios que você pode ocupar.", color: "from-violet-500 to-purple-600", shadow: "shadow-violet-500/25" },
 ];
 
 const competitors = [
-  { platform: "Hootsuite", focus: "Agendamento e publicação", ia: "Não", team: "Pago extra", share: "Não", price: "US$ 99/mês", highlight: false },
-  { platform: "Buffer", focus: "Agendamento simplificado", ia: "Básica", team: "Limitado", share: "Não", price: "US$ 15/mês", highlight: false },
-  { platform: "Later", focus: "Foco em Instagram", ia: "Não", team: "Básico", share: "Parcial", price: "US$ 25/mês", highlight: false },
-  { platform: "Notion / Planilha", focus: "Planejamento manual", ia: "Não", team: "Sim", share: "Parcial", price: "Variável", highlight: false },
-  { platform: "IsoScanning", focus: "Calendário IA + Equipe + Aprovação ao vivo", ia: "Nativo", team: "Com roles", share: "Ao vivo", price: "R$ 0 — R$ 159,90", highlight: true },
+  { platform: "Hootsuite", focus: "Agendamento e publicação", ia: "Não", team: "Pago extra", share: "Não", metrics: "Sim, sem IA", price: "US$ 99/mês", highlight: false },
+  { platform: "Buffer", focus: "Agendamento simplificado", ia: "Básica", team: "Limitado", share: "Não", metrics: "Básica", price: "US$ 15/mês", highlight: false },
+  { platform: "Later", focus: "Foco em Instagram", ia: "Não", team: "Básico", share: "Parcial", metrics: "Básica", price: "US$ 25/mês", highlight: false },
+  { platform: "Notion / Planilha", focus: "Planejamento manual", ia: "Não", team: "Sim", share: "Parcial", metrics: "Não", price: "Variável", highlight: false },
+  { platform: "IsoScanning", focus: "Calendário IA + Feed + Métricas + Aprovação ao vivo", ia: "Nativo", team: "Com roles", share: "Ao vivo", metrics: "Instagram + IA", price: "R$ 0 — R$ 159,90", highlight: true },
 ];
 
 const steps = [
@@ -394,6 +408,7 @@ const steps = [
   { step: 2, title: "Gere com IA", description: "Clique em gerar e a IA monta o calendário mensal completo com posts distribuídos ao longo do mês.", icon: Sparkles },
   { step: 3, title: "Ajuste e Colabore", description: "Arraste posts, edite títulos, mude tipos e receba feedback da equipe via comentários.", icon: GripVertical },
   { step: 4, title: "Compartilhe ao Vivo", description: "Envie o link de aprovação ao cliente. Ele vê o calendário atualizado em tempo real, sem precisar de conta.", icon: Share2 },
+  { step: 5, title: "Prove o Resultado", description: "Conecte o Instagram, sincronize as métricas de cada post e gere o relatório mensal com IA para mostrar ao cliente o que funcionou.", icon: BarChart3 },
 ];
 
 const testimonials = [
@@ -411,6 +426,58 @@ const faqs = [
   { q: "Quantas contas de clientes posso gerenciar?", a: "No plano Free você gerencia 1 conta. No plano Pro até 5 contas com geração de IA ilimitada. No Ultra as contas são ilimitadas e você ainda pode adicionar até 5 membros de equipe por conta." },
   { q: "O que são os links de material e vídeo nos posts?", a: "Cada post tem dois campos opcionais: 'Link do Material' (para o arquivo a ser produzido, como um briefing no Drive) e 'Link do Conteúdo Pronto' (para o vídeo ou imagem finalizada). Isso centraliza tudo no calendário, eliminando trocas de arquivo por WhatsApp." },
   { q: "Posso criar posts manualmente além da geração com IA?", a: "Sim! Você pode criar posts manualmente clicando no botão '+' em qualquer dia do calendário. Defina título, tipo, rede social, horário, copy e hashtags. Posts manuais e gerados por IA convivem no mesmo calendário." },
+  { q: "Preciso pagar para testar?", a: "Não. Todo cadastro novo ganha 14 dias do plano Pro grátis, sem cartão de crédito — com Simulador de Feed, relatório com IA, análise de concorrentes e 5 contas de clientes liberados. Ao fim do teste sua conta volta para o Free automaticamente e nada é cobrado; você assina só se quiser manter os recursos." },
+  { q: "O que são créditos de IA?", a: "Cada ação de IA consome créditos do seu plano: gerar o calendário do mês, refinar a copy de um post, criar variações, sugerir datas comemorativas e eventos, analisar concorrentes e montar o relatório mensal. O Free tem 10 créditos por mês, o Pro 300 e o Ultra 1.500. Os créditos renovam todo mês." },
+  { q: "Dá para ver as métricas reais do Instagram?", a: "Sim. Você conecta a conta profissional do cliente pelo Instagram e a plataforma sincroniza as métricas de cada post publicado: curtidas, comentários, compartilhamentos, salvos e alcance. Com isso o relatório mensal com IA mostra os melhores posts do mês, o que funcionou, o que não funcionou e a demografia do público (faixa etária, gênero, cidades e países). Disponível a partir do plano Pro." },
+  { q: "O que é o Simulador de Feed?", a: "É a prévia do perfil no Instagram antes de publicar. Você vê o grid exatamente como vai ficar, em 3:4 e 1:1, com os posts planejados intercalados com o feed real da conta conectada. Dá para anexar as artes e arrastar os posts para acertar a harmonia visual do feed. Disponível a partir do plano Pro." },
+  { q: "Como funciona a análise de concorrentes?", a: "Você informa até 3 @ de concorrentes e a IA pesquisa esses perfis na web, devolvendo pontos fortes, pontos fracos e a estratégia de conteúdo de cada um, além dos espaços vazios do nicho e ações recomendadas para o seu cliente se destacar. O resultado fica salvo no cronograma para toda a equipe consultar. Disponível a partir do plano Pro." },
+  { q: "Consigo entregar relatórios com a minha marca?", a: "Sim, no plano Ultra. O white-label remove a marca IsoScanning dos relatórios e do link público de aprovação, então o cliente enxerga apenas a sua marca na entrega." },
+];
+
+// Recursos que saem do Free — espelham a matriz de lib/plans/plan-limits.ts
+const PREMIUM_TIERS = [
+  {
+    name: "Pro",
+    tagline: "Para freelancers e agências em crescimento",
+    price: "R$ 59,90",
+    annual: "R$ 47,90",
+    icon: Crown,
+    cta: "Assinar Pro",
+    href: "/precos",
+    wrapper: "border-blue-500/40 bg-blue-500/[0.07]",
+    iconWrap: "bg-blue-500/15",
+    iconColor: "text-blue-400",
+    button: "bg-blue-600 hover:bg-blue-700 text-white",
+    items: [
+      { icon: LayoutGrid, title: "Simulador de Feed", description: "Monte o grid do Instagram antes de publicar, em 3:4 e 1:1, misturando os posts planejados com o feed real da conta." },
+      { icon: BarChart3, title: "Relatório mensal com IA e demografia", description: "Resumo executivo, melhores posts, o que funcionou, recomendações — e a faixa etária, gênero e cidades do público." },
+      { icon: Search, title: "Análise de concorrentes com IA", description: "Até 3 perfis pesquisados na web: pontos fortes, pontos fracos e os espaços vazios que você pode ocupar." },
+      { icon: Users, title: "5 contas de clientes", description: "Cinco cronogramas simultâneos e calendários com IA ilimitados — sem cota mensal de geração." },
+      { icon: Sparkles, title: "300 créditos de IA por mês", description: "30x o Free. Dá para refinar copy, gerar variações e rodar análises o mês inteiro." },
+      { icon: MessageSquare, title: "Suporte por e-mail", description: "Fale direto com a equipe IsoScanning, com resposta em até 1 dia útil." },
+    ],
+  },
+  {
+    name: "Ultra",
+    tagline: "Para agências e operações em escala",
+    price: "R$ 159,90",
+    annual: "R$ 127,90",
+    icon: Shield,
+    cta: "Ser Ultra",
+    href: "/precos",
+    wrapper: "border-violet-500/40 bg-violet-500/[0.07]",
+    iconWrap: "bg-violet-500/15",
+    iconColor: "text-violet-400",
+    button: "bg-violet-600 hover:bg-violet-700 text-white",
+    items: [
+      { icon: CheckCircle2, title: "Tudo do Pro incluído", description: "Simulador de Feed, relatório com IA, análise de concorrentes e demografia do público." },
+      { icon: Layers, title: "Contas de clientes ilimitadas", description: "Sem teto de cronogramas. Aumente a carteira sem precisar trocar de plano de novo." },
+      { icon: Users, title: "Equipe de até 5 membros por conta", description: "Roles de Editor, Aprovador e Viewer em cada cliente — cada pessoa com exatamente o acesso que precisa." },
+      { icon: Sparkles, title: "1.500 créditos de IA por mês", description: "Volume para operar dezenas de clientes com IA no dia a dia, sem racionar." },
+      { icon: Eye, title: "White-label", description: "Relatórios e link de aprovação sem a marca IsoScanning. O cliente enxerga só a sua." },
+      { icon: MessageSquare, title: "Suporte prioritário por WhatsApp", description: "Atendimento direto no WhatsApp com a equipe, na frente da fila." },
+    ],
+  },
 ];
 
 const LightRays = () => (
@@ -440,7 +507,7 @@ export default function LpSocialMedia() {
       <LpHeader ctaHref="/cadastro" ctaLabel="Criar Conta Grátis" produtoHref="/lp/social-media" />
 
       <main className="flex-1 flex flex-col">
-        <FullPageScroller sectionsCount={10}>
+        <FullPageScroller sectionsCount={11}>
 
           {/* ===== 1. HERO ===== */}
           <section className="relative min-h-[100vh] h-auto py-20 md:py-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex items-center justify-center overflow-hidden">
@@ -475,9 +542,9 @@ export default function LpSocialMedia() {
 
                   <ScrollReveal delay={0.4}>
                     <p className="text-lg sm:text-xl text-muted-foreground font-light leading-relaxed">
-                      Do briefing ao link de aprovação com o cliente —{" "}
+                      Da anamnese da conta ao relatório de resultados —{" "}
                       <span className="font-medium text-foreground">sem planilhas, sem WhatsApp perdido.</span>{" "}
-                      Colabore com sua equipe e entregue com mais velocidade.
+                      Planeje com IA, aprove com o cliente em link ao vivo e prove o resultado com as métricas reais do Instagram.
                     </p>
                   </ScrollReveal>
 
@@ -501,8 +568,9 @@ export default function LpSocialMedia() {
                     <div className="flex flex-wrap justify-center lg:justify-start gap-4 text-sm font-medium">
                       {[
                         { icon: Sparkles, text: "Calendário em segundos" },
+                        { icon: Instagram, text: "Métricas reais do Instagram" },
                         { icon: Radio, text: "Link ao vivo para o cliente" },
-                        { icon: UserCheck, text: "Começa grátis" },
+                        { icon: UserCheck, text: "14 dias de Pro grátis" },
                       ].map(({ icon: Icon, text }) => (
                         <div key={text} className="flex items-center gap-2 bg-muted/50 backdrop-blur px-4 py-2 rounded-full border border-border/50">
                           <Icon className="h-4 w-4 text-blue-500" />
@@ -716,7 +784,7 @@ export default function LpSocialMedia() {
                 <div className="text-center mb-12 space-y-4 max-w-3xl mx-auto">
                   <span className="text-blue-500 font-semibold text-sm uppercase tracking-wider">Por que IsoScanning?</span>
                   <h2 className="text-3xl sm:text-4xl font-bold">Compare com as alternativas</h2>
-                  <p className="text-muted-foreground">Ferramentas de agendamento existem há anos. Mas nenhuma combina geração por IA, colaboração em equipe e link de aprovação ao vivo — tudo em um só lugar.</p>
+                  <p className="text-muted-foreground">Ferramentas de agendamento existem há anos. Mas nenhuma combina anamnese e geração por IA, simulador de feed, equipe com roles, link de aprovação ao vivo e relatório de resultados — tudo em um só lugar, em português e em real.</p>
                 </div>
               </ScrollReveal>
 
@@ -725,7 +793,7 @@ export default function LpSocialMedia() {
                   <table className="w-full min-w-[800px] border-collapse bg-background rounded-2xl overflow-hidden shadow-sm border border-border">
                     <thead>
                       <tr className="bg-muted/50 border-b border-border text-left">
-                        {["Plataforma", "Foco", "Geração IA", "Equipe c/ Roles", "Link ao Vivo", "Preço"].map((h) => (
+                        {["Plataforma", "Foco", "Geração IA", "Equipe c/ Roles", "Link ao Vivo", "Métricas + Relatório", "Preço"].map((h) => (
                           <th key={h} className="p-4 font-semibold text-foreground">{h}</th>
                         ))}
                       </tr>
@@ -742,6 +810,7 @@ export default function LpSocialMedia() {
                           <td className={`p-4 font-semibold text-sm ${comp.highlight ? "text-green-500" : "text-muted-foreground"}`}>{comp.ia}</td>
                           <td className={`p-4 font-semibold text-sm ${comp.highlight ? "text-green-500" : "text-muted-foreground"}`}>{comp.team}</td>
                           <td className={`p-4 font-semibold text-sm ${comp.highlight ? "text-green-500" : "text-muted-foreground"}`}>{comp.share}</td>
+                          <td className={`p-4 font-semibold text-sm ${comp.highlight ? "text-green-500" : "text-muted-foreground"}`}>{comp.metrics}</td>
                           <td className={`p-4 font-semibold text-sm ${comp.highlight ? "text-blue-500 text-base" : "text-muted-foreground"}`}>{comp.price}</td>
                         </tr>
                       ))}
@@ -759,8 +828,8 @@ export default function LpSocialMedia() {
                           </span>
                           <span className={`font-bold text-sm ${comp.highlight ? "text-blue-500" : "text-muted-foreground"}`}>{comp.price}</span>
                         </div>
-                        <div className="grid grid-cols-3 gap-3 text-center">
-                          {[["IA", comp.ia], ["Equipe", comp.team], ["Ao Vivo", comp.share]].map(([label, val]) => (
+                        <div className="grid grid-cols-2 gap-3 text-center">
+                          {[["IA", comp.ia], ["Equipe", comp.team], ["Ao Vivo", comp.share], ["Métricas", comp.metrics]].map(([label, val]) => (
                             <div key={label}>
                               <span className="block text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">{label}</span>
                               <span className={`text-sm font-semibold ${comp.highlight ? "text-green-500" : "text-muted-foreground"}`}>{val}</span>
@@ -777,7 +846,7 @@ export default function LpSocialMedia() {
                 <div className="text-center mt-8">
                   <p className="text-sm text-blue-600 dark:text-blue-400 font-medium bg-blue-500/10 inline-block px-6 py-3 rounded-full border border-blue-500/20">
                     <CheckCircle2 className="inline-block h-5 w-5 mr-2 -mt-0.5" />
-                    IA nativa + equipe com roles + link ao vivo — só na IsoScanning.
+                    Da anamnese ao relatório com IA: planejar, aprovar e provar resultado no mesmo lugar.
                   </p>
                 </div>
               </ScrollReveal>
@@ -791,12 +860,12 @@ export default function LpSocialMedia() {
                 <div className="text-center mb-16 space-y-4">
                   <span className="text-blue-500 font-semibold text-sm uppercase tracking-wider">Do zero ao cliente em minutos</span>
                   <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold">Como funciona na prática</h2>
-                  <p className="text-lg text-muted-foreground max-w-xl mx-auto">Quatro passos e seu cliente já tem um calendário completo esperando aprovação.</p>
+                  <p className="text-lg text-muted-foreground max-w-xl mx-auto">Cinco passos: do briefing preenchido pela IA ao relatório que renova o contrato.</p>
                 </div>
               </ScrollReveal>
 
               <div className="max-w-5xl mx-auto">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-8">
                   {steps.map((item, i) => (
                     <ScrollReveal key={item.step} delay={i * 0.15}>
                       <div className="relative text-center group">
@@ -884,7 +953,76 @@ export default function LpSocialMedia() {
             </div>
           </section>
 
-          {/* ===== 8. PREÇOS ===== */}
+          {/* ===== 8. PRO E ULTRA ===== */}
+          <section id="recursos-premium" className="scroll-mt-16 min-h-[100vh] h-auto py-20 md:py-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-slate-950 relative overflow-hidden">
+            <LightRays />
+            <div className="container mx-auto px-4 relative z-10">
+              <ScrollReveal>
+                <div className="text-center mb-6 space-y-2 max-w-3xl mx-auto">
+                  <Badge className="bg-white/5 text-white/50 border-white/10 px-3 py-1 text-[10px] font-semibold tracking-widest uppercase">Recursos premium</Badge>
+                  <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">
+                    Tudo que desbloqueia no{" "}
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">Pro e no Ultra</span>
+                  </h2>
+                  <p className="text-sm sm:text-base text-white/50 font-light">
+                    O Free existe para você experimentar com 1 cliente. Quando a operação cresce, é aqui que ela deixa de ser artesanal.
+                  </p>
+                </div>
+              </ScrollReveal>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+                {PREMIUM_TIERS.map((tier, i) => (
+                  <ScrollReveal key={tier.name} delay={i * 0.15}>
+                    <div className={`h-full rounded-2xl border p-5 lg:p-6 backdrop-blur-sm ${tier.wrapper}`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-xl ${tier.iconWrap}`}>
+                          <tier.icon className={`h-5 w-5 ${tier.iconColor}`} />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-white leading-none">{tier.name}</h3>
+                          <p className="text-[11px] text-white/40 mt-1">{tier.tagline}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-baseline gap-x-2 mt-3 mb-4">
+                        <span className="text-2xl lg:text-3xl font-bold text-white">{tier.price}</span>
+                        <span className="text-xs text-white/40">/mês · ou {tier.annual}/mês no plano anual</span>
+                      </div>
+
+                      <div className="space-y-2.5 lg:space-y-3">
+                        {tier.items.map((item) => (
+                          <div key={item.title} className="flex gap-2.5">
+                            <item.icon className={`h-4 w-4 mt-0.5 shrink-0 ${tier.iconColor}`} />
+                            <div>
+                              <p className="text-[13px] font-semibold text-white leading-tight">{item.title}</p>
+                              <p className="text-[11px] text-white/45 leading-snug mt-0.5">{item.description}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <Link href={tier.href} className="block mt-5">
+                        <Button className={`w-full h-10 lg:h-11 rounded-xl ${tier.button}`}>{tier.cta}</Button>
+                      </Link>
+                    </div>
+                  </ScrollReveal>
+                ))}
+              </div>
+
+              <ScrollReveal delay={0.35}>
+                <div className="max-w-5xl mx-auto mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                  <Sparkles className="h-5 w-5 text-blue-400 shrink-0" />
+                  <p className="text-[11px] sm:text-xs text-white/50 leading-relaxed">
+                    <span className="text-white font-semibold">O que são créditos de IA?</span> Cada ação de IA — gerar o calendário,
+                    refinar a copy, criar variações, sugerir datas, analisar concorrentes e montar o relatório — consome créditos do seu plano.{" "}
+                    <span className="text-white/80 font-medium">Free 10/mês · Pro 300/mês · Ultra 1.500/mês.</span>
+                  </p>
+                </div>
+              </ScrollReveal>
+            </div>
+          </section>
+
+          {/* ===== 9. PREÇOS ===== */}
           <section id="precos" className="scroll-mt-16 min-h-[100vh] h-auto py-20 md:py-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center">
             <div className="container mx-auto px-4">
               <ScrollReveal>
@@ -896,7 +1034,7 @@ export default function LpSocialMedia() {
                   </h2>
                   <p className="text-base text-muted-foreground max-w-2xl mx-auto">Sem contratos. Cancele quando quiser.</p>
                   <p className="text-sm text-blue-400 font-medium pt-1">
-                    🎉 Aproveite a versão completa por tempo limitado, basta criar sua conta
+                    🎉 Todo cadastro novo ganha 14 dias do Pro grátis, sem cartão.
                   </p>
                 </div>
               </ScrollReveal>
@@ -904,21 +1042,21 @@ export default function LpSocialMedia() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
                 {[
                   {
-                    name: "Free", description: "Para quem quer experimentar a gestão com IA", price: "R$ 0", period: "/mês",
+                    name: "Free", description: "Para quem quer experimentar a gestão com IA", price: "R$ 0", period: "/mês", annual: "",
                     cta: "Começar Grátis", ctaVariant: "outline" as const, popular: false, icon: Zap, iconColor: "text-muted-foreground",
-                    features: ["Gestão de 1 conta de social media", "1 calendário com IA por mês", "Criação manual de posts", "Todos os tipos de post", "Link de compartilhamento ao vivo"],
-                    notIncluded: ["Múltiplos clientes", "Gestão de equipe", "Calendários ilimitados"],
+                    href: "/cadastro", features: ["Gestão de 1 conta de social media", "1 calendário com IA por mês", "10 créditos de IA por mês", "Criação manual de posts", "Todos os tipos de post", "Link de compartilhamento ao vivo"],
+                    notIncluded: ["Múltiplos clientes", "Simulador de Feed e Relatório com IA", "Análise de concorrentes", "Gestão de equipe"],
                   },
                   {
-                    name: "Pro", description: "Para freelancers e agências em crescimento", price: "R$ 59,90", period: "/mês",
+                    name: "Pro", description: "Para freelancers e agências em crescimento", price: "R$ 59,90", period: "/mês", annual: "R$ 47,90",
                     cta: "Assinar Pro", ctaVariant: "default" as const, popular: true, icon: Crown, iconColor: "text-primary",
-                    features: ["Gestão de até 5 contas de clientes", "Calendários com IA ilimitados", "Criação manual de posts", "Todos os tipos de post", "Link de compartilhamento ao vivo", "Comentários e feedback por post", "Links de material e vídeo por post"],
-                    notIncluded: ["Gestão de equipe", "Contas ilimitadas"],
+                    href: "/precos", features: ["Gestão de até 5 contas de clientes", "Calendários com IA ilimitados", "300 créditos de IA por mês", "Simulador de Feed, Relatório mensal com IA e demografia", "Análise de concorrentes com IA", "Comentários, feedback e links de material por post", "Link de compartilhamento ao vivo"],
+                    notIncluded: ["Gestão de equipe", "Contas ilimitadas", "White-label"],
                   },
                   {
-                    name: "Ultra", description: "Para agências e power users sem limites", price: "R$ 159,90", period: "/mês",
+                    name: "Ultra", description: "Para agências e power users sem limites", price: "R$ 159,90", period: "/mês", annual: "R$ 127,90",
                     cta: "Ser Ultra", ctaVariant: "outline" as const, popular: false, icon: Shield, iconColor: "text-blue-500",
-                    features: ["Contas de social media ILIMITADAS", "Calendários com IA ilimitados", "Até 5 membros de equipe por conta para gestão de social media", "Roles: Owner, Editor, Aprovador, Viewer", "Comentários e feedback por post", "Links de material e vídeo por post", "Link de compartilhamento ao vivo", "Suporte VIP Prioritário"],
+                    href: "/precos", features: ["Contas de social media ILIMITADAS", "Calendários com IA ilimitados", "1.500 créditos de IA por mês", "Até 5 membros de equipe por conta", "Roles: Owner, Editor, Aprovador, Viewer", "Simulador de Feed, Relatório com IA e análise de concorrentes", "Relatórios e links públicos sem marca IsoScanning (white-label)", "Suporte prioritário por WhatsApp"],
                     notIncluded: [],
                   },
                 ].map((plan, i) => (
@@ -941,6 +1079,9 @@ export default function LpSocialMedia() {
                           <span className="text-3xl font-bold">{plan.price}</span>
                           <span className="text-xs text-muted-foreground">{plan.period}</span>
                         </div>
+                        {plan.annual && (
+                          <p className="text-[11px] font-medium text-blue-500 -mt-1">ou {plan.annual}/mês no plano anual</p>
+                        )}
                         <div className="flex-1 space-y-1.5 mt-1">
                           {plan.features.map((f) => (
                             <div key={f} className="flex items-start gap-2 text-xs">
@@ -953,19 +1094,11 @@ export default function LpSocialMedia() {
                             </div>
                           ))}
                         </div>
-                        {plan.cta === "Começar Grátis" ? (
-                          <Link href="/precos" className="mt-auto pt-1">
-                            <Button variant={plan.ctaVariant} className={`w-full h-11 text-sm ${plan.popular ? "shadow-md hover:shadow-lg hover:shadow-primary/20" : ""}`}>
-                              {plan.cta}
-                            </Button>
-                          </Link>
-                        ) : (
-                          <div className="mt-auto pt-1">
-                            <Button variant={plan.ctaVariant} className={`w-full h-11 text-sm ${plan.popular ? "shadow-md hover:shadow-lg hover:shadow-primary/20" : ""}`} disabled>
-                              {plan.cta}
-                            </Button>
-                          </div>
-                        )}
+                        <Link href={plan.href} className="mt-auto pt-1">
+                          <Button variant={plan.ctaVariant} className={`w-full h-11 text-sm ${plan.popular ? "shadow-md hover:shadow-lg hover:shadow-primary/20" : ""}`}>
+                            {plan.cta}
+                          </Button>
+                        </Link>
                       </CardContent>
                     </Card>
                   </ScrollReveal>
@@ -974,14 +1107,14 @@ export default function LpSocialMedia() {
 
               <ScrollReveal delay={0.4}>
                 <p className="text-center text-sm text-muted-foreground mt-4">
-                  Quer ver todos os detalhes?{" "}
+                  Todo cadastro novo ganha 14 dias do Pro grátis, sem cartão. Quer ver todos os detalhes?{" "}
                   <Link href="/precos" className="text-blue-500 font-semibold hover:underline">Consulte a página completa de preços →</Link>
                 </p>
               </ScrollReveal>
             </div>
           </section>
 
-          {/* ===== 9. FAQ ===== */}
+          {/* ===== 10. FAQ ===== */}
           <section id="faq" className="scroll-mt-16 min-h-[100vh] h-auto py-20 md:py-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center bg-muted/30 dark:bg-muted/10">
             <div className="container mx-auto px-4">
               <div className="max-w-6xl mx-auto">
@@ -996,7 +1129,7 @@ export default function LpSocialMedia() {
                   <Card className="border-2 shadow-xl bg-background/50 backdrop-blur">
                     <CardContent className="p-6 md:p-10 flex flex-col md:flex-row gap-6 md:gap-12">
                       <Accordion type="single" collapsible className="w-full flex-1">
-                        {faqs.slice(0, 4).map((faq, i) => (
+                        {faqs.slice(0, Math.ceil(faqs.length / 2)).map((faq, i) => (
                           <AccordionItem key={i} value={`item-${i}`} className="py-1">
                             <AccordionTrigger className="text-base font-medium hover:no-underline hover:text-blue-500 text-left">{faq.q}</AccordionTrigger>
                             <AccordionContent className="text-muted-foreground text-sm md:text-base leading-relaxed">{faq.a}</AccordionContent>
@@ -1004,8 +1137,8 @@ export default function LpSocialMedia() {
                         ))}
                       </Accordion>
                       <Accordion type="single" collapsible className="w-full flex-1">
-                        {faqs.slice(4).map((faq, i) => (
-                          <AccordionItem key={i} value={`item-${i + 4}`} className="py-1">
+                        {faqs.slice(Math.ceil(faqs.length / 2)).map((faq, i) => (
+                          <AccordionItem key={i} value={`item-b-${i}`} className="py-1">
                             <AccordionTrigger className="text-base font-medium hover:no-underline hover:text-blue-500 text-left">{faq.q}</AccordionTrigger>
                             <AccordionContent className="text-muted-foreground text-sm md:text-base leading-relaxed">{faq.a}</AccordionContent>
                           </AccordionItem>
@@ -1018,7 +1151,7 @@ export default function LpSocialMedia() {
             </div>
           </section>
 
-          {/* ===== 10. FINAL CTA ===== */}
+          {/* ===== 11. FINAL CTA ===== */}
           <section className="min-h-[100vh] h-auto pt-20 md:pt-0 md:min-h-0 md:h-[calc(100vh-64px)] w-full flex-shrink-0 flex flex-col justify-center relative overflow-hidden bg-slate-950">
             <FloatingParticles count={15} />
             <div className="absolute inset-0 overflow-hidden pointer-events-none flex justify-center items-center">

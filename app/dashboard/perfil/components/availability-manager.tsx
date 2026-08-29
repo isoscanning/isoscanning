@@ -18,9 +18,10 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { type AvailabilitySlot } from "@/lib/data-service";
+import { describeSlot, isAllDaySlot, parseDateKey, toDateKey } from "@/lib/availability";
 
 interface AvailabilityManagerProps {
     selectedDates: Date[];
@@ -84,7 +85,7 @@ export function AvailabilityManager({
                                 startMonth={new Date()}
                                 modifiers={{
                                     available: (date) => availabilitySlots.some(slot =>
-                                        slot.date && slot.date.substring(0, 10) === format(date, 'yyyy-MM-dd')
+                                        slot.date && slot.date.slice(0, 10) === toDateKey(date)
                                     )
                                 }}
                                 locale={ptBR}
@@ -179,8 +180,8 @@ export function AvailabilityManager({
                             ) : availabilitySlots.length === 0 ? (
                                 <p className="text-muted-foreground italic">Nenhuma disponibilidade cadastrada.</p>
                             ) : (
-                                availabilitySlots
-                                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                                [...availabilitySlots]
+                                    .sort((a, b) => a.date.localeCompare(b.date))
                                     .map((slot) => (
                                         <div key={slot.id} className="flex items-center gap-3 p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors">
                                             <Checkbox
@@ -191,12 +192,12 @@ export function AvailabilityManager({
                                                 <CalendarIcon className="h-5 w-5 text-primary" />
                                                 <div>
                                                     <p className="font-medium">
-                                                        {format(parseISO(slot.date && slot.date.length > 10 ? slot.date : slot.date + 'T12:00:00'), "dd 'de' MMMM, yyyy", { locale: ptBR })}
+                                                        {format(parseDateKey(slot.date), "dd 'de' MMMM, yyyy", { locale: ptBR })}
                                                     </p>
-                                                    {(slot.startTime === "00:00" || slot.startTime === "00:00:00") && (slot.endTime === "23:59" || slot.endTime === "23:59:00") ? (
+                                                    {isAllDaySlot(slot) ? (
                                                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">⭐ Dia Inteiro</span>
                                                     ) : (
-                                                        <p className="text-sm text-muted-foreground">{slot.startTime} - {slot.endTime}</p>
+                                                        <p className="text-sm text-muted-foreground">{describeSlot(slot)}</p>
                                                     )}
                                                 </div>
                                             </div>

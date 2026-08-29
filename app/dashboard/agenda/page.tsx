@@ -14,6 +14,7 @@ import {
   type AvailabilitySlot
 } from "@/lib/data-service";
 import { format } from "date-fns";
+import { todayKey } from "@/lib/availability";
 import { ArrowLeft, Calendar } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
@@ -55,10 +56,10 @@ export default function AgendaPage() {
     if (!userProfile?.id) return;
     setFetchingAvailability(true);
     try {
-      const slots = await fetchAvailability(userProfile.id);
-      const todayStr = format(new Date(), "yyyy-MM-dd");
-      const futureSlots = slots.filter(slot => slot.date >= todayStr);
-      setAvailabilitySlots(futureSlots);
+      // O filtro de data vai para o banco; antes a agenda inteira (inclusive
+      // anos de datas passadas) vinha pela rede para ser descartada aqui.
+      const slots = await fetchAvailability(userProfile.id, { from: todayKey() });
+      setAvailabilitySlots(slots);
     } catch (error) {
       setErrorMsg("Erro ao carregar disponibilidade.");
     } finally {

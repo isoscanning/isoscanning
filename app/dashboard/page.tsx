@@ -32,7 +32,8 @@ import {
   Share2,
   ClipboardList,
   Clock,
-  Handshake
+  Handshake,
+  Ticket,
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
@@ -46,6 +47,22 @@ export default function DashboardPage() {
   const router = useRouter();
   const { userProfile, loading } = useAuth();
   const plan = usePlan();
+
+  // Resultado do cupom aplicado no callback do OAuth (uma vez, depois some)
+  const [couponResult, setCouponResult] = useState<{
+    code?: string; success?: boolean; message?: string; trialDays?: number; trialEndsAt?: string;
+  } | null>(null);
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("couponResult");
+      if (raw) {
+        sessionStorage.removeItem("couponResult");
+        setCouponResult(JSON.parse(raw));
+      }
+    } catch {
+      /* sessionStorage indisponível — sem banner */
+    }
+  }, []);
   const [googleName, setGoogleName] = useState("");
 
   // Dashboard Stats
@@ -285,6 +302,34 @@ export default function DashboardPage() {
               <div className="absolute bottom-0 left-0 -mb-10 -ml-10 h-64 w-64 rounded-full bg-blue-500/5 blur-3xl"></div>
             </div>
           </ScrollReveal>
+
+          {/* Resultado do cupom de cadastro */}
+          {couponResult && (
+            <ScrollReveal delay={0.02} duration={0.4}>
+              {couponResult.success ? (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-green-500/30 bg-green-500/10 px-5 py-4">
+                  <Ticket className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
+                  <p className="text-sm flex-1">
+                    <span className="font-semibold">Cupom {couponResult.code} aplicado!</span>{" "}
+                    <span className="text-muted-foreground">
+                      Você tem {couponResult.trialDays} dias do plano Pro
+                      {couponResult.trialEndsAt
+                        ? ` — até ${new Date(couponResult.trialEndsAt).toLocaleDateString("pt-BR")}`
+                        : ""}.
+                    </span>
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-4">
+                  <Ticket className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <p className="text-sm flex-1">
+                    <span className="font-semibold">Não foi possível aplicar o cupom {couponResult.code}.</span>{" "}
+                    <span className="text-muted-foreground">{couponResult.message}</span>
+                  </p>
+                </div>
+              )}
+            </ScrollReveal>
+          )}
 
           {/* Trial banner */}
           {plan.isTrial && plan.trialDaysLeft !== null && (

@@ -2,8 +2,8 @@
 
 import type React from "react";
 
-import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/header";
@@ -23,19 +23,39 @@ import {
   CheckCircle2,
   Briefcase,
   ArrowRight,
+  Ticket,
+  ChevronDown,
+  Loader2,
+  XCircle,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import apiClient from "@/lib/api-service";
 import { ParticleBackground } from "@/components/particle-background";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { motion } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
 
+// Não existe escolha de tipo de conta no cadastro: todo mundo entra como
+// profissional — é esse tipo que libera o diretório público, a agenda de
+// disponibilidade e o anúncio de equipamentos. "client" só sobrevive para
+// perfis legados.
+const SIGNUP_USER_TYPE = "professional" as const;
+
+// Chave lida por /auth/callback depois do OAuth, quando o perfil já existe.
+const SIGNUP_COUPON_KEY = "signupCoupon";
+
+type CouponStatus = "idle" | "checking" | "valid" | "invalid";
+
+// Mesma normalização do backend/banco: maiúsculo, só [A-Z0-9-].
+const normalizeCoupon = (value: string) => value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 32);
+
 export default function CadastroPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { signUp, signInWithGoogle, getRedirectUrl } = useAuth();
 
-  const [userType, setUserType] = useState<"client" | "professional">("professional");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,25 +63,94 @@ export default function CadastroPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Cupom / código de indicação (opcional)
+  const [coupon, setCoupon] = useState("");
+  const [couponOpen, setCouponOpen] = useState(false);
+  const [couponStatus, setCouponStatus] = useState<CouponStatus>("idle");
+  const [couponMessage, setCouponMessage] = useState("");
+  const [couponDays, setCouponDays] = useState<number | null>(null);
+  const couponRequest = useRef(0);
+
+  // Link de campanha/indicação: /cadastro?cupom=CODIGO já abre o campo preenchido.
+  // Lido de window.location (e não de useSearchParams) para a página seguir estática.
+  useEffect(() => {
+    try {
+      const fromUrl = new URLSearchParams(window.location.search).get("cupom");
+      if (fromUrl) {
+        setCoupon(normalizeCoupon(fromUrl));
+        setCouponOpen(true);
+      }
+    } catch {
+      /* sem window (SSR) — ignora */
+    }
+  }, []);
+
+  // Valida com debounce enquanto digita. O backend responde 200 com valid=false
+  // para recusas de negócio; só erro de rede/500 cai no catch.
+  useEffect(() => {
+    if (coupon.length < 3) {
+      setCouponStatus("idle");
+      setCouponMessage("");
+      setCouponDays(null);
+      return;
+    }
+    const requestId = ++couponRequest.current;
+    setCouponStatus("checking");
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await apiClient.get("/coupons/check", {
+          params: { code: coupon },
+          headers: { "X-Skip-Auth-Redirect": "true" },
+        });
+        if (requestId !== couponRequest.current) return;
+        if (data?.valid) {
+          setCouponStatus("valid");
+          setCouponDays(Number(data.trialDays));
+          setCouponMessage("");
+        } else {
+          setCouponStatus("invalid");
+          setCouponDays(null);
+          setCouponMessage(data?.message || "Cupom inválido.");
+        }
+      } catch (err: any) {
+        if (requestId !== couponRequest.current) return;
+        setCouponStatus("invalid");
+        setCouponDays(null);
+        setCouponMessage(err?.response?.data?.message || "Não foi possível validar o cupom agora.");
+      }
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [coupon]);
+
   // Obter URL de redirecionamento ou usar dashboard como padrão
   const redirectTo = getRedirectUrl() || "/dashboard";
 
-  useEffect(() => {
-    const tipo = searchParams.get("tipo");
-    if (tipo === "profissional") {
-      setUserType("professional");
-    }
-  }, [searchParams]);
-
   const handleGoogleSignUp = async () => {
     setError("");
+
+    // Cupom digitado mas inválido: melhor avisar agora do que o usuário descobrir
+    // no dashboard que ficou com os 14 dias padrão.
+    if (coupon.length >= 3 && couponStatus === "invalid") {
+      setError(`Cupom inválido: ${couponMessage} Corrija o código ou deixe o campo em branco.`);
+      return;
+    }
+    if (coupon.length >= 3 && couponStatus === "checking") {
+      setError("Aguarde a validação do cupom.");
+      return;
+    }
+
     setLoading(true);
     trackEvent({ action: "sign_up", category: "Auth", label: "Google Button Click (Signup)" });
 
     try {
-      // Store the userType so we can use it after OAuth callback
-      localStorage.setItem("signupUserType", userType);
-      localStorage.setItem("redirectAfterLogin", redirectTo);
+      if (coupon.length >= 3 && couponStatus === "valid") {
+        localStorage.setItem(SIGNUP_COUPON_KEY, coupon);
+      } else {
+        localStorage.removeItem(SIGNUP_COUPON_KEY);
+      }
+      // Mantido por compatibilidade com o callback do OAuth, que limpa a chave.
+      // O tipo real é definido no backend, que cria todo perfil como profissional.
+      localStorage.setItem("signupUserType", SIGNUP_USER_TYPE);
       localStorage.setItem("redirectAfterLogin", redirectTo);
       await signInWithGoogle({
         queryParams: {
@@ -180,7 +269,7 @@ export default function CadastroPage() {
                       Criar conta
                     </CardTitle>
                     <CardDescription className="text-base text-muted-foreground">
-                      Escolha o tipo de conta e comece agora.{" "}
+                      Crie sua conta e comece agora.{" "}
                       <span className="font-medium text-foreground">14 dias do plano Pro grátis</span>, sem cartão.
                     </CardDescription>
                   </div>
@@ -215,12 +304,65 @@ export default function CadastroPage() {
                     </div>
                   </div>
 
+                  {/* Cupom / indicação — opcional, fechado por padrão */}
+                  <Collapsible open={couponOpen} onOpenChange={setCouponOpen}>
+                    <CollapsibleTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between rounded-lg px-1 py-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Ticket className="h-4 w-4" />
+                          Tem um cupom ou código de indicação?
+                        </span>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${couponOpen ? "rotate-180" : ""}`} />
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-3 space-y-2">
+                      <Label htmlFor="signup-coupon" className="sr-only">Código do cupom</Label>
+                      <div className="relative">
+                        <Input
+                          id="signup-coupon"
+                          value={coupon}
+                          onChange={(e) => setCoupon(normalizeCoupon(e.target.value))}
+                          placeholder="Ex.: BEMVINDO45"
+                          autoComplete="off"
+                          autoCapitalize="characters"
+                          spellCheck={false}
+                          maxLength={32}
+                          aria-invalid={couponStatus === "invalid"}
+                          className={`h-11 pr-10 font-mono tracking-wider uppercase ${
+                            couponStatus === "valid" ? "border-green-500/60 focus-visible:ring-green-500/40" : ""
+                          } ${couponStatus === "invalid" ? "border-destructive/60" : ""}`}
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                          {couponStatus === "checking" && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                          {couponStatus === "valid" && <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                          {couponStatus === "invalid" && <XCircle className="h-4 w-4 text-destructive" />}
+                        </span>
+                      </div>
+                      {couponStatus === "valid" && couponDays !== null && (
+                        <p className="text-sm text-green-700 dark:text-green-400 font-medium">
+                          Cupom válido: {couponDays} dias do plano Pro grátis, sem cartão.
+                        </p>
+                      )}
+                      {couponStatus === "invalid" && (
+                        <p className="text-sm text-destructive">{couponMessage}</p>
+                      )}
+                      {couponStatus === "idle" && (
+                        <p className="text-xs text-muted-foreground">
+                          Sem cupom, você ganha os 14 dias padrão do Pro.
+                        </p>
+                      )}
+                    </CollapsibleContent>
+                  </Collapsible>
+
                   <Button
                     type="button"
                     size="lg"
                     className="w-full h-14 text-lg font-bold rounded-full shadow-lg hover:shadow-primary/25 transition-all duration-300 group flex items-center justify-center gap-3"
                     onClick={handleGoogleSignUp}
-                    disabled={loading}
+                    disabled={loading || couponStatus === "checking"}
                   >
                     {loading ? (
                       <div className="flex items-center gap-2">

@@ -646,9 +646,22 @@ export interface AvailabilitySlot {
   createdAt: Date;
 }
 
-export async function fetchAvailability(professionalId: string): Promise<AvailabilitySlot[]> {
+/**
+ * Slots de disponibilidade de um profissional.
+ *
+ * Passe `range.from` para não trazer a agenda inteira: hoje a maior parte das
+ * linhas é de datas passadas, que nenhuma tela exibe. O filtro é aplicado no
+ * banco (índice de professional_id + date), não no cliente.
+ */
+export async function fetchAvailability(
+  professionalId: string,
+  range?: { from?: string; to?: string }
+): Promise<AvailabilitySlot[]> {
   try {
-    const response = await apiClient.get(`/availability?professionalId=${professionalId}`);
+    const params = new URLSearchParams({ professionalId });
+    if (range?.from) params.set("from", range.from);
+    if (range?.to) params.set("to", range.to);
+    const response = await apiClient.get(`/availability?${params.toString()}`);
     let data = response.data;
     if (data && typeof data === 'object' && 'data' in data && Array.isArray(data.data)) {
         data = data.data;

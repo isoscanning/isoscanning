@@ -33,6 +33,25 @@ const nextConfig = {
       { protocol: "https", hostname: "**.supabase.co" },
     ],
   },
+  async redirects() {
+    return [
+      // Tela antiga de disponibilidade: ficou órfã (nada linkava para ela) e
+      // usava o modelo de dados anterior, enviando `type: "unavailable"` — valor
+      // que o CreateAvailabilityDto rejeita, então todo salvamento dava 400.
+      // A gestão de agenda vive em /dashboard/agenda.
+      //
+      // Fica aqui, e não como `redirect()` na própria rota, porque
+      // app/dashboard/layout.tsx é "use client": dentro desse boundary o
+      // redirect() é serializado no payload RSC e só acontece depois da
+      // hidratação (responde 200 e pisca a tela). Em `redirects()` o Next
+      // resolve antes de qualquer render, devolvendo 308 com Location.
+      {
+        source: '/dashboard/agenda/disponibilidade',
+        destination: '/dashboard/agenda',
+        permanent: true,
+      },
+    ];
+  },
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,

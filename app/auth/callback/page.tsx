@@ -95,6 +95,36 @@ export default function AuthCallbackPage() {
           localStorage.setItem("user_profile", JSON.stringify(userProfile));
           localStorage.removeItem("signupUserType");
 
+          // 3b. Cupom digitado no /cadastro. Só agora o perfil existe (o trial de
+          // 14 dias já foi dado pelo trigger); o backend estende para os dias do
+          // cupom. Nunca bloqueia o login: o resultado vai para o dashboard.
+          const pendingCoupon = localStorage.getItem("signupCoupon");
+          if (pendingCoupon) {
+            localStorage.removeItem("signupCoupon");
+            setStatus("Aplicando seu cupom...");
+            try {
+              const { data: redeem } = await apiClient.post(
+                "/coupons/redeem",
+                { code: pendingCoupon },
+                { headers: { "X-Skip-Auth-Redirect": "true" } }
+              );
+              sessionStorage.setItem("couponResult", JSON.stringify({ code: pendingCoupon, ...redeem }));
+              if (redeem?.success) {
+                trackEvent({ action: "coupon_redeem", category: "Auth", label: pendingCoupon });
+                // Perfil em cache precisa refletir o novo prazo do trial
+                const fresh = await apiClient.get("/auth/me", { headers: { "X-Skip-Auth-Redirect": "true" } });
+                localStorage.setItem("user_profile", JSON.stringify(fresh.data));
+              }
+            } catch (couponError: any) {
+              console.error("[auth-callback] Coupon redeem failed:", couponError);
+              sessionStorage.setItem("couponResult", JSON.stringify({
+                code: pendingCoupon,
+                success: false,
+                message: couponError?.response?.data?.message || "Não foi possível aplicar o cupom. Fale com o suporte.",
+              }));
+            }
+          }
+
           // 4. Determine destination
           let redirectUrl = localStorage.getItem("redirectAfterLogin") || "/dashboard";
           localStorage.removeItem("redirectAfterLogin");

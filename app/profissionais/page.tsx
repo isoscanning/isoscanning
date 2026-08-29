@@ -210,7 +210,7 @@ export default function ProfissionaisPage() {
                   Cadastre-se gratuitamente e seja encontrado por clientes
                   que precisam do seu talento.
                 </p>
-                <Link href="/cadastro?tipo=profissional" onClick={() => trackEvent({ action: 'click_cta', category: 'Professionals', label: 'Create Profile Footer' })}>
+                <Link href="/cadastro" onClick={() => trackEvent({ action: 'click_cta', category: 'Professionals', label: 'Create Profile Footer' })}>
                   <Button
                     size="lg"
                     variant="secondary"

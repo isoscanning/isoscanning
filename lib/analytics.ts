@@ -21,6 +21,7 @@ type EventName =
   | 'click_social'
   | 'click_cta'
   | 'click_nav'
+  | 'coupon_redeem'
 
 interface AnalyticsEvent {
   action: EventName

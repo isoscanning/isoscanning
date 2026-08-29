@@ -32,6 +32,7 @@ import Image from "next/image";
 import apiClient from "@/lib/api-service";
 import { type Professional, type AvailabilitySlot, fetchAvailability } from "@/lib/data-service";
 import { AvailabilityCalendar } from "@/components/availability-calendar";
+import { todayKey } from "@/lib/availability";
 import {
   getMockAvatar,
   generateMockPortfolioItems,
@@ -277,10 +278,10 @@ export default function ProfessionalProfilePage() {
 
       // Fetch availability
       try {
-        const availabilityData = await fetchAvailability(professionalId);
-        const todayStr = new Date().toISOString().split("T")[0];
-        const futureAvailability = availabilityData.filter((slot: any) => slot.date >= todayStr);
-        setAvailability(futureAvailability);
+        // O corte por data vem do backend. O filtro que existia aqui usava
+        // toISOString() (data em UTC) e, à noite no Brasil, escondia o dia atual.
+        const availabilityData = await fetchAvailability(professionalId, { from: todayKey() });
+        setAvailability(availabilityData);
       } catch (error) {
         console.error("[profissional-detail] Error fetching availability:", error);
       }

@@ -57,7 +57,7 @@ const fluxos = [
     title: "Construa sua autoridade visual.",
     description: "Conquiste clientes com um visual impecável. Centralize seu portfólio, agendamentos e contratos em um só lugar.",
     bullets: [
-      "Portfólio online sem limites de upload",
+      "Portfólio online com até 150 arquivos e vídeos",
       "Agenda integrada para ensaios e eventos",
       "Contratos digitais com validade legal",
       "Aluguel de câmeras e lentes no Marketplace",
@@ -322,7 +322,7 @@ const LightRays = () => (
 export default function LpProfissional() {
   return (
     <div className="md:h-screen md:overflow-hidden flex flex-col bg-background">
-      <LpHeader ctaHref="/cadastro?tipo=profissional" ctaLabel="Criar Perfil Grátis" produtoHref="/lp/profissional" />
+      <LpHeader ctaHref="/cadastro" ctaLabel="Criar Perfil Grátis" produtoHref="/lp/profissional" />
 
       <main className="flex-1 flex flex-col">
         <FullPageScroller sectionsCount={10}>
@@ -377,7 +377,7 @@ export default function LpProfissional() {
 
               <ScrollReveal delay={0.55}>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-                  <Link href="/cadastro?tipo=profissional">
+                  <Link href="/cadastro">
                     <Button
                       size="lg"
                       className="w-full sm:w-auto h-14 px-8 text-lg rounded-full shadow-lg hover:shadow-xl hover:shadow-primary/25 transition-all duration-300 group"
@@ -688,7 +688,7 @@ export default function LpProfissional() {
 
             <ScrollReveal delay={0.5}>
               <div className="text-center mt-16">
-                <Link href="/cadastro?tipo=profissional">
+                <Link href="/cadastro">
                   <Button
                     size="lg"
                     className="h-14 px-10 text-lg rounded-full shadow-lg hover:shadow-xl hover:shadow-primary/25 transition-all duration-300 group"
@@ -1031,7 +1031,7 @@ export default function LpProfissional() {
 
               <ScrollReveal delay={0.35}>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
-                  <Link href="/cadastro?tipo=profissional">
+                  <Link href="/cadastro">
                     <Button
                       size="lg"
                       className="w-full sm:w-auto h-14 px-8 text-base rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white shadow-xl transition-all duration-300 group"
@@ -1062,7 +1062,7 @@ export default function LpProfissional() {
                   </div>
                   <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 backdrop-blur-sm">
                     <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                    <span className="text-white/70 text-xs font-medium">Teste grátis por 7 dias</span>
+                    <span className="text-white/70 text-xs font-medium">14 dias de Pro grátis</span>
                   </div>
                 </div>
 

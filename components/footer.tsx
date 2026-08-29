@@ -64,7 +64,7 @@ export function Footer() {
             <ul className="space-y-2 text-sm">
               <li>
                 <Link
-                  href="/cadastro?tipo=profissional"
+                  href="/cadastro"
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   Cadastre-se

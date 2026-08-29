@@ -319,7 +319,7 @@ export default function HomePage() {
                   </ul>
 
                   <div className="pt-6">
-                    <AuthAwareLink href="/cadastro?tipo=profissional" authenticatedHref="/dashboard/financeiro">
+                    <AuthAwareLink href="/cadastro" authenticatedHref="/dashboard/financeiro">
                       <Button size="lg" className="h-14 px-8 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20 hover:shadow-xl transition-all duration-300">
                         Começar a Controlar Custo Zero
                         <ArrowRight className="ml-2 h-5 w-5" />
@@ -451,7 +451,7 @@ export default function HomePage() {
                   </ul>
 
                   <div className="pt-4">
-                    <AuthAwareLink href="/cadastro?tipo=profissional">
+                    <AuthAwareLink href="/cadastro">
                       <Button size="lg" className="h-14 px-8 rounded-full shadow-lg hover:shadow-xl transition-all duration-300">
                         Criar Meu Perfil Grátis
                         <ArrowRight className="ml-2 h-5 w-5" />

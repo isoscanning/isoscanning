@@ -83,3 +83,63 @@ export function addDaysToKey(date: string, days: number): string {
   utc.setUTCDate(utc.getUTCDate() + days);
   return utc.toISOString().slice(0, 10);
 }
+
+// ── Dias de atendimento (perfil público) ────────────────────────────────────
+
+export interface WeeklyPatternWindow {
+  start: string;
+  end: string;
+}
+
+export interface WeeklyPatternDayInput {
+  weekday: number;
+  windows: WeeklyPatternWindow[];
+}
+
+const WEEKDAY_SHORT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+/** "24:00" é a representação do motor para fim do dia. */
+function windowLabel(w: WeeklyPatternWindow): string {
+  if (w.start === "00:00" && (w.end === "24:00" || w.end === "23:59")) return "dia inteiro";
+  return `${w.start}–${w.end === "24:00" ? "23:59" : w.end}`;
+}
+
+export function describeWindows(windows: WeeklyPatternWindow[]): string {
+  return windows.map(windowLabel).join(" e ");
+}
+
+/**
+ * "Seg a Sex 09:00–18:00 · Sáb 09:00–12:00": agrupa dias consecutivos com o
+ * mesmo horário. É o texto que o perfil público mostra como "Atende …".
+ */
+export function formatWeeklyPattern(pattern: WeeklyPatternDayInput[]): string {
+  const days = [...pattern]
+    .filter((d) => d.windows.length > 0)
+    .sort((a, b) => a.weekday - b.weekday);
+  if (days.length === 0) return "";
+
+  const groups: { from: number; to: number; label: string }[] = [];
+  for (const day of days) {
+    const label = describeWindows(day.windows);
+    const last = groups[groups.length - 1];
+    if (last && last.label === label && day.weekday === last.to + 1) {
+      last.to = day.weekday;
+    } else {
+      groups.push({ from: day.weekday, to: day.weekday, label });
+    }
+  }
+
+  return groups
+    .map((g) => {
+      const span = g.to - g.from;
+      const name =
+        span === 0
+          ? WEEKDAY_SHORT[g.from]
+          : span === 1
+            ? `${WEEKDAY_SHORT[g.from]} e ${WEEKDAY_SHORT[g.to]}`
+            : `${WEEKDAY_SHORT[g.from]} a ${WEEKDAY_SHORT[g.to]}`;
+      return `${name} ${g.label}`;
+    })
+    .join(" · ");
+}
+

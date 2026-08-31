@@ -10,7 +10,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Card } from "@/components/ui/card";
 
 import type { AgendaDay, AgendaView, AgendaWindow, AvailabilitySlot } from "@/lib/data-service";
-import { parseDateKey, toDateKey, todayKey } from "@/lib/availability";
+import { formatWeeklyPattern, parseDateKey, toDateKey, todayKey } from "@/lib/availability";
 
 // Calendário PÚBLICO do perfil. Desenha a agenda efetiva calculada pelo
 // backend (`agenda`): semana padrão + datas − bloqueios − calendários
@@ -78,6 +78,7 @@ function daysFromSlots(slots: AvailabilitySlot[]): AgendaDay[] {
         blocked: [],
         origin: "date",
         fromExternal: false,
+        fromEvents: false,
     }));
 }
 
@@ -130,6 +131,10 @@ export function AvailabilityCalendar({ agenda, availabilitySlots = [] }: Availab
     const isPreviousDisabled = !isBefore(startOfMonth(today), currentMonth);
 
     const selectedDay = date ? byDate.get(toDateKey(date)) : undefined;
+    const workingDays = React.useMemo(
+        () => (agenda?.weeklyPattern?.length ? formatWeeklyPattern(agenda.weeklyPattern) : ""),
+        [agenda]
+    );
 
     const renderDayButton = (dimmed: boolean) =>
         // eslint-disable-next-line react/display-name
@@ -226,6 +231,14 @@ export function AvailabilityCalendar({ agenda, availabilitySlots = [] }: Availab
                 </div>
             </div>
 
+            {workingDays && (
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-border/50 bg-muted/30 px-4 py-3 text-sm">
+                    <Clock className="h-4 w-4 text-primary/70" />
+                    <span className="text-muted-foreground">Atende</span>
+                    <span className="font-medium text-foreground">{workingDays}</span>
+                </div>
+            )}
+
             <div className="mt-6">
                 <Legend showBusy={hasBusy} />
             </div>
@@ -288,7 +301,8 @@ export function AvailabilityCalendar({ agenda, availabilitySlots = [] }: Availab
                             </div>
                         )}
 
-                        {selectedDay?.status === "partial" && selectedDay.blocked.length > 0 && (
+                        {selectedDay && selectedDay.status !== "free" && selectedDay.blocked.length > 0 &&
+                            !(selectedDay.blocked.length === 1 && describeWindow(selectedDay.blocked[0]) === "Dia inteiro") && (
                             <p className="text-xs text-muted-foreground">
                                 Indisponível: {selectedDay.blocked.map(describeWindow).join(", ")}
                             </p>

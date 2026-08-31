@@ -48,6 +48,7 @@ export function AgendaPreview({ agenda, loading }: AgendaPreviewProps) {
       partial: days.filter((d) => d.status === "partial").length,
       busy: days.filter((d) => d.status === "busy").length,
       external: days.filter((d) => d.fromExternal).length,
+      events: days.filter((d) => d.fromEvents).length,
     };
   }, [agenda]);
 
@@ -74,6 +75,9 @@ export function AgendaPreview({ agenda, loading }: AgendaPreviewProps) {
           {props.children}
           {info?.fromExternal && (
             <span className="absolute bottom-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-sky-500" aria-hidden="true" />
+          )}
+          {info?.fromEvents && (
+            <span className="absolute bottom-0.5 left-0.5 h-1.5 w-1.5 rounded-full bg-violet-500" aria-hidden="true" />
           )}
         </button>
       );
@@ -115,6 +119,7 @@ export function AgendaPreview({ agenda, loading }: AgendaPreviewProps) {
                 <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500/60" /> parcial</span>
                 <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-rose-500/50" /> ocupado</span>
                 <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-sky-500" /> fechado por calendário conectado</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-violet-500" /> fechado por compromisso seu</span>
               </div>
             </div>
 

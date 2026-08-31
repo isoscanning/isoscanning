@@ -1276,6 +1276,13 @@ export interface AgendaDay {
   blocked: AgendaWindow[];
   origin: "rule" | "date" | "none";
   fromExternal: boolean;
+  fromEvents: boolean;
+}
+
+export interface WeeklyPatternDay {
+  /** 0 = domingo … 6 = sábado */
+  weekday: number;
+  windows: AgendaWindow[];
 }
 
 export interface AgendaView {
@@ -1286,6 +1293,8 @@ export interface AgendaView {
   days: AgendaDay[];
   hasRules: boolean;
   publishWeeklyRules: boolean;
+  /** Dias/horários de atendimento publicados (vazio se a semana padrão não é publicada). */
+  weeklyPattern: WeeklyPatternDay[];
   externalConnected: boolean;
 }
 
@@ -1446,5 +1455,53 @@ export function removeCalendarConnection(id: string): Promise<{ ok: boolean }> {
 
 export function syncCalendars(connectionId?: string): Promise<CalendarSyncSummary> {
   return agendaApi("sync", { method: "POST", body: JSON.stringify(connectionId ? { connectionId } : {}) });
+}
+
+// --- COMPROMISSOS PESSOAIS (agenda privada do profissional) ---
+// Só o dono lê/escreve. O público recebe apenas o efeito (data fechada) via
+// fetchAgenda — nunca título, notas ou local.
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  /** "YYYY-MM-DD" */
+  date: string;
+  endDate: string;
+  /** "HH:MM" ou null quando allDay */
+  startTime: string | null;
+  endTime: string | null;
+  allDay: boolean;
+  /** Falso = lembrete (aparece só para você, não fecha o perfil). */
+  blocksAgenda: boolean;
+  color: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export type CalendarEventDraft = Omit<CalendarEvent, "id" | "createdAt" | "updatedAt">;
+
+export async function fetchCalendarEvents(range?: { from?: string; to?: string }): Promise<CalendarEvent[]> {
+  const params = new URLSearchParams();
+  if (range?.from) params.set("from", range.from);
+  if (range?.to) params.set("to", range.to);
+  const qs = params.toString();
+  const response = await apiClient.get(`/availability/events${qs ? `?${qs}` : ""}`);
+  return Array.isArray(response.data) ? (response.data as CalendarEvent[]) : [];
+}
+
+export async function createCalendarEvent(draft: CalendarEventDraft): Promise<CalendarEvent> {
+  const response = await apiClient.post("/availability/events", draft);
+  return response.data as CalendarEvent;
+}
+
+export async function updateCalendarEvent(id: string, patch: Partial<CalendarEventDraft>): Promise<CalendarEvent> {
+  const response = await apiClient.put(`/availability/events/${id}`, patch);
+  return response.data as CalendarEvent;
+}
+
+export async function deleteCalendarEvent(id: string): Promise<void> {
+  await apiClient.delete(`/availability/events/${id}`);
 }
 

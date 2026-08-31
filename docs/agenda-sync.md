@@ -162,6 +162,38 @@ estrutura (`calendar_connections`, `syncConnection`) já suporta trocar o gatilh
 Status por dia: `free` (nada foi cortado), `partial`, `busy` (oferta toda
 cortada), ausente = sem informação.
 
+## 7. Agenda pessoal (compromissos)
+
+Migration `69-calendar-events.sql`. O profissional marca compromissos dentro
+do sistema (aba **Agenda** em `/dashboard/agenda`): título, dia inteiro ou
+horário, vários dias, local, notas, cor, e "bloqueia minha agenda" (desligado
+= lembrete).
+
+Privacidade: `calendar_events` não tem leitura pública (RLS só do dono). O
+motor lê os compromissos com o client de aplicação e entrega ao perfil
+público **somente** o horário fechado (`AgendaDay.blocked`, `fromEvents`),
+nunca o conteúdo. Um dia sem semana padrão mas com compromisso aparece como
+"fechado" para o visitante — é o comportamento pedido ("o público só vê as
+datas fechadas, sem saber quais eventos são").
+
+O feed `.ics` de exportação (privado do dono) inclui os compromissos com
+título, então eles aparecem no Google/Apple de quem assinou o feed.
+
+Rotas (todas autenticadas, dono pelo token): `GET/POST /availability/events`,
+`PUT/DELETE /availability/events/:id`.
+
+## 8. Público × privado (modelo mental da tela)
+
+- **Minha agenda** (aba 1): a agenda PRIVADA — compromissos com detalhes. Só o dono.
+- **Visão pública** (aba 2): exatamente o que um contratante vê no perfil —
+  dias de atendimento ("Atende Seg a Sex 09:00–18:00", vindo de
+  `AgendaView.weeklyPattern`), datas livres/parciais e datas fechadas. Nunca
+  o motivo do fechamento.
+- **Configurar agenda pública** (aba 3): as ferramentas que alimentam a visão
+  pública — dias de atendimento (semana padrão + preferências), exceções por
+  data (janela própria / bloqueio) e calendários conectados (Google/.ics +
+  feed de exportação). Um checklist no topo mostra o que falta configurar.
+
 ## Envs — resumo
 
 Frontend: `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`,

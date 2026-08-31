@@ -4,11 +4,12 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
-import { ArrowLeft, CalendarDays, CalendarRange, RefreshCw, Settings2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, CalendarRange, Eye, Link2, Settings2, SlidersHorizontal } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { AvailabilityManager } from "../perfil/components/availability-manager";
@@ -16,33 +17,58 @@ import { WeeklyRulesEditor } from "./components/weekly-rules-editor";
 import { AgendaSettingsCard } from "./components/agenda-settings-card";
 import { CalendarSyncPanel } from "./components/calendar-sync-panel";
 import { AgendaPreview } from "./components/agenda-preview";
+import { PersonalCalendar } from "./components/personal-calendar";
+import { AgendaSetupChecklist, type ConfigSection } from "./components/agenda-setup-checklist";
 import {
   applyAgendaRules,
   createAvailability,
+  createCalendarEvent,
   deleteAvailabilities,
   deleteAvailability,
+  deleteCalendarEvent,
   fetchAgendaOverview,
   fetchAvailability,
+  fetchCalendarEvents,
   fetchMyAgenda,
   saveAgendaRules,
   saveAgendaSettings,
+  updateCalendarEvent,
   type AgendaOverview,
   type AgendaRule,
   type AgendaSettings,
   type AgendaView,
   type AvailabilitySlot,
+  type CalendarEvent,
+  type CalendarEventDraft,
 } from "@/lib/data-service";
-import { addDaysToKey } from "@/lib/availability";
-import { todayKey } from "@/lib/availability";
+import { addDaysToKey, todayKey } from "@/lib/availability";
 
-// Minha Agenda — quatro abas:
-//   Visão geral      → prévia da agenda efetiva (o que o perfil mostra)
-//   Semana padrão    → recorrência + preferências
-//   Datas específicas → exceções: janelas próprias e bloqueios manuais
-//   Sincronização    → Google / .ics (importar) e feed .ics (exportar)
+// Minha Agenda — o modelo mental é "privado × público":
+//
+//   Minha agenda              → compromissos com detalhes (só o dono vê)
+//   Visão pública             → o que um contratante vê no perfil: dias de
+//                               atendimento + datas livres/fechadas, sem motivo
+//   Configurar agenda pública → as ferramentas que alimentam a visão pública:
+//                               dias de atendimento (semana padrão + preferências),
+//                               exceções por data, calendários conectados
+//
+// URLs antigas (?tab=weekly|dates|sync|overview|calendar) continuam válidas.
 
-type TabKey = "overview" | "weekly" | "dates" | "sync";
-const TABS: TabKey[] = ["overview", "weekly", "dates", "sync"];
+type TabKey = "calendar" | "public" | "config";
+
+const LEGACY_TABS: Record<string, { tab: TabKey; section?: ConfigSection }> = {
+  calendar: { tab: "calendar" },
+  overview: { tab: "public" },
+  public: { tab: "public" },
+  config: { tab: "config" },
+  weekly: { tab: "config", section: "weekly" },
+  dates: { tab: "config", section: "dates" },
+  sync: { tab: "config", section: "calendars" },
+};
+
+/** Janela de compromissos carregada de uma vez (a grade navega dentro dela). */
+const EVENTS_PAST_DAYS = 90;
+const EVENTS_FUTURE_DAYS = 365;
 
 /** Mensagens do retorno do OAuth do Google (?cal=…&reason=…). */
 const CAL_ERRORS: Record<string, string> = {
@@ -56,17 +82,30 @@ const CAL_ERRORS: Record<string, string> = {
   state: "Sessão de autorização expirada. Tente de novo.",
 };
 
+function apiErrorMessage(err: unknown, fallback: string): string {
+  const data = (err as { response?: { data?: { message?: string | string[] } } })?.response?.data;
+  const message = data?.message;
+  if (Array.isArray(message)) return message.join(" ");
+  if (typeof message === "string" && message) return message;
+  return fallback;
+}
+
 function AgendaPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { userProfile, loading } = useAuth();
 
-  const initialTab = (searchParams.get("tab") as TabKey | null) ?? "overview";
-  const [tab, setTab] = useState<TabKey>(TABS.includes(initialTab) ? initialTab : "overview");
+  const initial = LEGACY_TABS[searchParams.get("tab") ?? ""] ?? { tab: "calendar" as TabKey };
+  const [tab, setTab] = useState<TabKey>(initial.tab);
+  const [section, setSection] = useState<ConfigSection>(
+    (searchParams.get("section") as ConfigSection | null) ?? initial.section ?? "weekly"
+  );
 
   const [overview, setOverview] = useState<AgendaOverview | null>(null);
   const [agenda, setAgenda] = useState<AgendaView | null>(null);
   const [loadingAgenda, setLoadingAgenda] = useState(true);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
   const [savingRules, setSavingRules] = useState(false);
   const [applyingRules, setApplyingRules] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -106,6 +145,12 @@ function AgendaPageInner() {
     return () => clearTimeout(timer);
   }, [successMsg]);
 
+  const goToConfig = useCallback((next: ConfigSection) => {
+    setTab("config");
+    setSection(next);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
   // Retorno do OAuth do Google
   useEffect(() => {
     const cal = searchParams.get("cal");
@@ -119,7 +164,7 @@ function AgendaPageInner() {
       notify("error", `${CAL_ERRORS[reason] ?? "Não foi possível conectar o Google Agenda."}${detail ? ` (${detail})` : ""}`);
     }
     // Limpa a query para a mensagem não voltar num refresh
-    router.replace("/dashboard/agenda?tab=sync", { scroll: false });
+    router.replace("/dashboard/agenda?tab=config&section=calendars", { scroll: false });
   }, [searchParams, notify, router]);
 
   const loadOverview = useCallback(async () => {
@@ -133,12 +178,28 @@ function AgendaPageInner() {
   const loadAgenda = useCallback(async () => {
     setLoadingAgenda(true);
     try {
-      const from = todayKey();
-      setAgenda(await fetchMyAgenda({ from, to: addDaysToKey(from, 180) }));
+      // Um pouco de passado para a grade da agenda pessoal pintar o mês corrente inteiro
+      const from = addDaysToKey(todayKey(), -45);
+      setAgenda(await fetchMyAgenda({ from, to: addDaysToKey(from, 365) }));
     } finally {
       setLoadingAgenda(false);
     }
   }, []);
+
+  const loadEvents = useCallback(async () => {
+    setLoadingEvents(true);
+    try {
+      const today = todayKey();
+      setEvents(await fetchCalendarEvents({
+        from: addDaysToKey(today, -EVENTS_PAST_DAYS),
+        to: addDaysToKey(today, EVENTS_FUTURE_DAYS),
+      }));
+    } catch (err) {
+      notify("error", apiErrorMessage(err, "Erro ao carregar seus compromissos. A migration 69 foi aplicada?"));
+    } finally {
+      setLoadingEvents(false);
+    }
+  }, [notify]);
 
   const loadAvailability = useCallback(async () => {
     if (!userProfile?.id) return;
@@ -156,12 +217,44 @@ function AgendaPageInner() {
     if (!userProfile?.id) return;
     void loadOverview();
     void loadAgenda();
+    void loadEvents();
     void loadAvailability();
-  }, [userProfile?.id, loadOverview, loadAgenda, loadAvailability]);
+  }, [userProfile?.id, loadOverview, loadAgenda, loadEvents, loadAvailability]);
 
   const refreshAll = useCallback(async () => {
     await Promise.all([loadOverview(), loadAgenda()]);
   }, [loadOverview, loadAgenda]);
+
+  // ── Compromissos pessoais ──
+  const handleCreateEvent = async (draft: CalendarEventDraft) => {
+    try {
+      await createCalendarEvent(draft);
+      await Promise.all([loadEvents(), loadAgenda()]);
+      notify("success", draft.blocksAgenda ? "Compromisso criado — o horário já aparece fechado no seu perfil." : "Lembrete criado.");
+    } catch (err) {
+      throw new Error(apiErrorMessage(err, "Não foi possível salvar o compromisso."));
+    }
+  };
+
+  const handleUpdateEvent = async (id: string, draft: CalendarEventDraft) => {
+    try {
+      await updateCalendarEvent(id, draft);
+      await Promise.all([loadEvents(), loadAgenda()]);
+      notify("success", "Compromisso atualizado.");
+    } catch (err) {
+      throw new Error(apiErrorMessage(err, "Não foi possível salvar o compromisso."));
+    }
+  };
+
+  const handleDeleteEvent = async (id: string) => {
+    try {
+      await deleteCalendarEvent(id);
+      await Promise.all([loadEvents(), loadAgenda()]);
+      notify("success", "Compromisso excluído.");
+    } catch (err) {
+      throw new Error(apiErrorMessage(err, "Não foi possível excluir o compromisso."));
+    }
+  };
 
   // ── Semana padrão / preferências ──
   const handleSaveRules = async (rules: AgendaRule[]) => {
@@ -170,9 +263,9 @@ function AgendaPageInner() {
       const saved = await saveAgendaRules(rules);
       setOverview((prev) => (prev ? { ...prev, rules: saved } : prev));
       await loadAgenda();
-      notify("success", "Semana padrão salva.");
+      notify("success", "Dias de atendimento salvos — seu perfil já reflete a mudança.");
     } catch {
-      notify("error", "Erro ao salvar a semana padrão.");
+      notify("error", "Erro ao salvar os dias de atendimento.");
     } finally {
       setSavingRules(false);
     }
@@ -185,7 +278,7 @@ function AgendaPageInner() {
       await Promise.all([loadAvailability(), loadAgenda()]);
       notify("success", `${created} data(s) criada(s) a partir da semana padrão.`);
     } catch (err) {
-      notify("error", (err as Error).message || "Erro ao aplicar a semana padrão.");
+      notify("error", apiErrorMessage(err, "Erro ao aplicar a semana padrão."));
     } finally {
       setApplyingRules(false);
     }
@@ -228,8 +321,8 @@ function AgendaPageInner() {
       notify(
         "success",
         slotType === "blocked"
-          ? `${dates.length} data(s) bloqueada(s).`
-          : `${dates.length} disponibilidade(s) adicionada(s)!`
+          ? `${dates.length} data(s) fechada(s) no seu perfil.`
+          : `${dates.length} data(s) com horário próprio adicionada(s).`
       );
     } catch {
       notify("error", "Erro ao salvar as datas.");
@@ -320,7 +413,7 @@ function AgendaPageInner() {
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <Header />
-        <main className="flex-1 container max-w-5xl mx-auto py-8 px-4">
+        <main className="flex-1 container max-w-6xl mx-auto py-8 px-4">
           <div className="mb-6 flex items-center gap-4">
             <Skeleton className="h-10 w-10 rounded-full" />
             <div className="space-y-2">
@@ -328,16 +421,11 @@ function AgendaPageInner() {
               <Skeleton className="h-4 w-80" />
             </div>
           </div>
-          <Skeleton className="h-10 w-full max-w-md rounded-lg" />
+          <Skeleton className="h-10 w-full max-w-2xl rounded-lg" />
           <div className="mt-6 border rounded-xl p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <Skeleton className="h-72 rounded-xl" />
-              <div className="space-y-3">
-                <Skeleton className="h-6 w-40" />
-                {[...Array(4)].map((_, i) => (
-                  <Skeleton key={i} className="h-14 w-full rounded-lg" />
-                ))}
-              </div>
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
+              <Skeleton className="h-[480px] rounded-xl" />
+              <Skeleton className="h-64 rounded-xl" />
             </div>
           </div>
         </main>
@@ -348,12 +436,14 @@ function AgendaPageInner() {
 
   const connections = overview?.connections ?? [];
   const activeConnections = connections.filter((c) => c.syncEnabled && c.status === "active").length;
+  const needsSetup = !!overview && overview.rules.length === 0;
+  const profileUrl = `/profissionais/${userProfile.id}`;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
 
-      <main className="flex-1 container max-w-5xl mx-auto py-8 px-4">
+      <main className="flex-1 container max-w-6xl mx-auto py-8 px-4">
         <div className="mb-6 flex items-center gap-4">
           <Link href="/dashboard" className="p-2 rounded-full hover:bg-accent transition-colors">
             <ArrowLeft className="h-6 w-6" />
@@ -361,7 +451,8 @@ function AgendaPageInner() {
           <div className="space-y-1">
             <h1 className="text-3xl font-bold tracking-tight">Minha Agenda</h1>
             <p className="text-muted-foreground">
-              Defina sua semana padrão, marque exceções e deixe seus calendários fecharem as datas sozinhos.
+              Seus compromissos ficam só com você. Quem quer te contratar vê apenas quando você atende e
+              quais datas já estão fechadas.
             </p>
           </div>
         </div>
@@ -378,94 +469,140 @@ function AgendaPageInner() {
         )}
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="space-y-6">
-          <TabsList className="grid h-auto w-full grid-cols-2 gap-1 md:grid-cols-4">
-            <TabsTrigger value="overview" className="gap-2 py-2">
-              <CalendarDays className="h-4 w-4" /> Visão geral
+          <TabsList className="grid h-auto w-full grid-cols-1 gap-1 sm:grid-cols-3">
+            <TabsTrigger value="calendar" className="gap-2 py-2">
+              <CalendarDays className="h-4 w-4" /> Minha agenda
             </TabsTrigger>
-            <TabsTrigger value="weekly" className="gap-2 py-2">
-              <Settings2 className="h-4 w-4" /> Semana padrão
+            <TabsTrigger value="public" className="gap-2 py-2">
+              <Eye className="h-4 w-4" /> Visão pública
             </TabsTrigger>
-            <TabsTrigger value="dates" className="gap-2 py-2">
-              <CalendarRange className="h-4 w-4" /> Datas específicas
-            </TabsTrigger>
-            <TabsTrigger value="sync" className="gap-2 py-2">
-              <RefreshCw className="h-4 w-4" /> Sincronização
-              {activeConnections > 0 && (
-                <span className="ml-1 rounded-full bg-emerald-500/15 px-1.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
-                  {activeConnections}
-                </span>
+            <TabsTrigger value="config" className="gap-2 py-2">
+              <SlidersHorizontal className="h-4 w-4" /> Configurar agenda pública
+              {needsSetup && (
+                <span className="ml-1 h-2 w-2 rounded-full bg-amber-500" aria-label="Configuração pendente" />
               )}
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview">
+          {/* ── Privado ── */}
+          <TabsContent value="calendar" className="space-y-4">
+            {needsSetup && (
+              <div className="flex flex-col gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm md:flex-row md:items-center md:justify-between">
+                <p className="text-amber-800 dark:text-amber-300">
+                  Seu perfil ainda não mostra <strong>quando você atende</strong>. Defina seus dias de atendimento
+                  para aparecer disponível para quem procura.
+                </p>
+                <Button type="button" size="sm" onClick={() => goToConfig("weekly")}>
+                  <Settings2 className="mr-2 h-4 w-4" /> Definir dias de atendimento
+                </Button>
+              </div>
+            )}
+            <ScrollReveal>
+              <PersonalCalendar
+                events={events}
+                agenda={agenda}
+                loading={loadingEvents || loadingAgenda}
+                onCreate={handleCreateEvent}
+                onUpdate={handleUpdateEvent}
+                onDelete={handleDeleteEvent}
+              />
+            </ScrollReveal>
+          </TabsContent>
+
+          {/* ── Público ── */}
+          <TabsContent value="public" className="space-y-6">
+            <ScrollReveal>
+              <AgendaSetupChecklist overview={overview} agenda={agenda} profileUrl={profileUrl} onGo={goToConfig} />
+            </ScrollReveal>
             <ScrollReveal>
               <AgendaPreview agenda={agenda} loading={loadingAgenda} />
             </ScrollReveal>
           </TabsContent>
 
-          <TabsContent value="weekly" className="space-y-6">
-            <ScrollReveal>
-              {overview ? (
-                <WeeklyRulesEditor
-                  rules={overview.rules}
-                  saving={savingRules}
-                  onSave={handleSaveRules}
-                  onApply={handleApplyRules}
-                  applying={applyingRules}
-                />
-              ) : (
-                <Skeleton className="h-96 w-full rounded-xl" />
-              )}
-            </ScrollReveal>
-            <ScrollReveal>
-              {overview ? (
-                <AgendaSettingsCard settings={overview.settings} saving={savingSettings} onSave={handleSaveSettings} />
-              ) : (
-                <Skeleton className="h-64 w-full rounded-xl" />
-              )}
-            </ScrollReveal>
-          </TabsContent>
+          {/* ── Configuração ── */}
+          <TabsContent value="config" className="space-y-6">
+            <Tabs value={section} onValueChange={(v) => setSection(v as ConfigSection)} className="space-y-6">
+              <TabsList className="grid h-auto w-full grid-cols-1 gap-1 sm:grid-cols-3">
+                <TabsTrigger value="weekly" className="gap-2 py-2">
+                  <Settings2 className="h-4 w-4" /> Dias de atendimento
+                </TabsTrigger>
+                <TabsTrigger value="dates" className="gap-2 py-2">
+                  <CalendarRange className="h-4 w-4" /> Exceções por data
+                </TabsTrigger>
+                <TabsTrigger value="calendars" className="gap-2 py-2">
+                  <Link2 className="h-4 w-4" /> Calendários conectados
+                  {activeConnections > 0 && (
+                    <span className="ml-1 rounded-full bg-emerald-500/15 px-1.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                      {activeConnections}
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
 
-          <TabsContent value="dates">
-            <ScrollReveal>
-              <AvailabilityManager
-                title="Datas específicas"
-                description="Exceções à semana padrão: uma data com horário próprio substitui a recorrência daquele dia; um bloqueio fecha o período no seu perfil."
-                selectedDates={selectedDates}
-                handleDateSelect={handleDateSelect}
-                handleDayClick={handleDayClick}
-                availabilitySlots={availabilitySlots}
-                isAllDay={isAllDay}
-                setIsAllDay={setIsAllDay}
-                newSlot={newSlot}
-                setNewSlot={setNewSlot}
-                handleAddAvailability={handleAddAvailability}
-                loadingAvailability={loadingAvailability}
-                fetchingAvailability={fetchingAvailability}
-                handleSelectAll={handleSelectAll}
-                selectedSlotsToDelete={selectedSlotsToDelete}
-                toggleSlotSelection={toggleSlotSelection}
-                showBulkDeleteConfirm={showBulkDeleteConfirm}
-                setShowBulkDeleteConfirm={setShowBulkDeleteConfirm}
-                deletingBulk={deletingBulk}
-                handleBulkDelete={handleBulkDelete}
-                handleDeleteAvailability={handleDeleteAvailability}
-                slotType={slotType}
-                setSlotType={setSlotType}
-              />
-            </ScrollReveal>
-          </TabsContent>
+              <TabsContent value="weekly" className="space-y-6">
+                <ScrollReveal>
+                  {overview ? (
+                    <WeeklyRulesEditor
+                      rules={overview.rules}
+                      saving={savingRules}
+                      onSave={handleSaveRules}
+                      onApply={handleApplyRules}
+                      applying={applyingRules}
+                    />
+                  ) : (
+                    <Skeleton className="h-96 w-full rounded-xl" />
+                  )}
+                </ScrollReveal>
+                <ScrollReveal>
+                  {overview ? (
+                    <AgendaSettingsCard settings={overview.settings} saving={savingSettings} onSave={handleSaveSettings} />
+                  ) : (
+                    <Skeleton className="h-64 w-full rounded-xl" />
+                  )}
+                </ScrollReveal>
+              </TabsContent>
 
-          <TabsContent value="sync">
-            <ScrollReveal>
-              <CalendarSyncPanel
-                connections={connections}
-                feedUrl={overview?.feedUrl ?? null}
-                onChanged={refreshAll}
-                notify={notify}
-              />
-            </ScrollReveal>
+              <TabsContent value="dates">
+                <ScrollReveal>
+                  <AvailabilityManager
+                    title="Exceções por data"
+                    description="Uma data com horário próprio substitui os dias de atendimento naquele dia; um bloqueio fecha a data no seu perfil (folga, viagem, evento externo)."
+                    selectedDates={selectedDates}
+                    handleDateSelect={handleDateSelect}
+                    handleDayClick={handleDayClick}
+                    availabilitySlots={availabilitySlots}
+                    isAllDay={isAllDay}
+                    setIsAllDay={setIsAllDay}
+                    newSlot={newSlot}
+                    setNewSlot={setNewSlot}
+                    handleAddAvailability={handleAddAvailability}
+                    loadingAvailability={loadingAvailability}
+                    fetchingAvailability={fetchingAvailability}
+                    handleSelectAll={handleSelectAll}
+                    selectedSlotsToDelete={selectedSlotsToDelete}
+                    toggleSlotSelection={toggleSlotSelection}
+                    showBulkDeleteConfirm={showBulkDeleteConfirm}
+                    setShowBulkDeleteConfirm={setShowBulkDeleteConfirm}
+                    deletingBulk={deletingBulk}
+                    handleBulkDelete={handleBulkDelete}
+                    handleDeleteAvailability={handleDeleteAvailability}
+                    slotType={slotType}
+                    setSlotType={setSlotType}
+                  />
+                </ScrollReveal>
+              </TabsContent>
+
+              <TabsContent value="calendars">
+                <ScrollReveal>
+                  <CalendarSyncPanel
+                    connections={connections}
+                    feedUrl={overview?.feedUrl ?? null}
+                    onChanged={refreshAll}
+                    notify={notify}
+                  />
+                </ScrollReveal>
+              </TabsContent>
+            </Tabs>
           </TabsContent>
         </Tabs>
       </main>

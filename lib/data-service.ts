@@ -68,6 +68,8 @@ export interface Professional {
   isActive?: boolean;
   /** Tier efetivo (já rebaixado para free se a assinatura venceu). */
   subscriptionTier?: 'free' | 'standard' | 'pro' | 'vip';
+  /** Indicações convertidas — selo Embaixador a partir de 3. */
+  referralCount?: number;
   /** Selo Perfil Verificado (plano pago). */
   verified?: boolean;
   /** Posição nas buscas: 1 = Free, 2 = Pro, 3 = Ultra (Destaque). */

@@ -34,6 +34,7 @@ import {
   Clock,
   Handshake,
   Ticket,
+  Gift,
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
@@ -50,7 +51,7 @@ export default function DashboardPage() {
 
   // Resultado do cupom aplicado no callback do OAuth (uma vez, depois some)
   const [couponResult, setCouponResult] = useState<{
-    code?: string; success?: boolean; message?: string; trialDays?: number; trialEndsAt?: string;
+    code?: string; success?: boolean; message?: string; trialDays?: number | null; trialEndsAt?: string | null; subscribeBonusDays?: number;
   } | null>(null);
   useEffect(() => {
     try {
@@ -312,10 +313,15 @@ export default function DashboardPage() {
                   <p className="text-sm flex-1">
                     <span className="font-semibold">Cupom {couponResult.code} aplicado!</span>{" "}
                     <span className="text-muted-foreground">
-                      Você tem {couponResult.trialDays} dias do plano Pro
-                      {couponResult.trialEndsAt
-                        ? ` — até ${new Date(couponResult.trialEndsAt).toLocaleDateString("pt-BR")}`
-                        : ""}.
+                      {couponResult.trialDays && couponResult.trialDays > 0
+                        ? `Você tem ${couponResult.trialDays} dias do plano Pro${
+                            couponResult.trialEndsAt
+                              ? ` — até ${new Date(couponResult.trialEndsAt).toLocaleDateString("pt-BR")}`
+                              : ""
+                          }.`
+                        : couponResult.subscribeBonusDays
+                          ? `Você entrou por indicação: ao assinar, ganha ${couponResult.subscribeBonusDays} dias a mais no primeiro período.`
+                          : "Cupom registrado na sua conta."}
                     </span>
                   </p>
                 </div>
@@ -504,6 +510,29 @@ export default function DashboardPage() {
                 </Link>
               </ScrollReveal>
               {/* END: Agenda Card */}
+
+              {/* START: Referral Card */}
+              <ScrollReveal delay={0.17} duration={0.4}>
+                <Link href="/dashboard/indicacoes" className="block h-full group" id="quick-referrals">
+                  <Card className="h-full border-border hover:border-emerald-500/50 transition-all duration-300 hover:shadow-lg bg-card">
+                    <CardHeader>
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                        <Gift className="h-6 w-6" />
+                      </div>
+                      <CardTitle className="group-hover:text-emerald-500 transition-colors">Indique e Ganhe</CardTitle>
+                      <CardDescription>
+                        Cada amigo que assina vale 5% de desconto na sua fatura — até 50%. Ele ganha 14 dias a mais.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-end">
+                      <div className="w-8 h-8 rounded-full bg-background border flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white group-hover:border-emerald-500 transition-colors">
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </ScrollReveal>
+              {/* END: Referral Card */}
 
               {/* START: Equipments Card */}
               <ScrollReveal delay={0.2} duration={0.4}>

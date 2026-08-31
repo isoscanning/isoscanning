@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, BadgeCheck, MapPin, Sparkles, Star } from "lucide-react";
+import { ArrowRight, Award, BadgeCheck, MapPin, Sparkles, Star } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useState } from "react";
@@ -30,6 +30,9 @@ export function ProfessionalCard({ professional, index }: ProfessionalCardProps)
         professional.verified ??
         ["standard", "pro", "vip"].includes(professional.subscriptionTier ?? "");
     const isFeatured = professional.searchRank === 3;
+    // Espelha referral_settings.ambassador_min_referrals (SQL 67). O contador
+    // só é escrito pelo sistema, quando um indicado paga a 1ª fatura.
+    const isAmbassador = (professional.referralCount ?? 0) >= 3;
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -71,13 +74,24 @@ export function ProfessionalCard({ professional, index }: ProfessionalCardProps)
                             {/* Gradient Overlay */}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-                            {/* Destaque (Ultra) */}
-                            {isFeatured && (
-                                <div className="absolute top-4 left-4">
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500/90 backdrop-blur-sm text-white text-[10px] font-bold rounded-full uppercase tracking-wider shadow-lg">
-                                        <Sparkles className="h-3 w-3" />
-                                        Destaque
-                                    </span>
+                            {/* Destaque (Ultra) + Embaixador (indicações convertidas) */}
+                            {(isFeatured || isAmbassador) && (
+                                <div className="absolute top-4 left-4 flex flex-col items-start gap-1.5">
+                                    {isFeatured && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500/90 backdrop-blur-sm text-white text-[10px] font-bold rounded-full uppercase tracking-wider shadow-lg">
+                                            <Sparkles className="h-3 w-3" />
+                                            Destaque
+                                        </span>
+                                    )}
+                                    {isAmbassador && (
+                                        <span
+                                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600/90 backdrop-blur-sm text-white text-[10px] font-bold rounded-full uppercase tracking-wider shadow-lg"
+                                            title={`Embaixador IsoScanning — ${professional.referralCount} profissionais indicados`}
+                                        >
+                                            <Award className="h-3 w-3" />
+                                            Embaixador
+                                        </span>
+                                    )}
                                 </div>
                             )}
 

@@ -1,4 +1,5 @@
 import apiClient, { isNavigatingToLogin } from "./api-service";
+import { tokenManager } from "./token-manager";
 import { supabase } from "./supabase";
 import imageCompression from "browser-image-compression";
 
@@ -1249,3 +1250,201 @@ export async function notifySocialMediaComment(data: {
     // non-critical
   }
 }
+
+// --- AGENDA (recorrência, preferências, sincronização com calendários) ---
+//
+// A agenda EFETIVA (recorrência + datas − bloqueios − calendário externo) é
+// calculada no backend (GET /availability/agenda). As telas não devem somar
+// slots por conta própria — sempre desenhar a partir de `AgendaDay`.
+// Conexões com Google/.ics vivem em rotas /app/api/agenda (Next), porque é lá
+// que ficam o OAuth e a chave de criptografia dos tokens.
+
+export type AgendaDayStatus = "free" | "partial" | "busy" | "unset";
+
+export interface AgendaWindow {
+  /** "HH:MM" */
+  start: string;
+  /** "HH:MM" — "24:00" é fim do dia. */
+  end: string;
+}
+
+export interface AgendaDay {
+  date: string;
+  weekday: number;
+  status: AgendaDayStatus;
+  windows: AgendaWindow[];
+  blocked: AgendaWindow[];
+  origin: "rule" | "date" | "none";
+  fromExternal: boolean;
+}
+
+export interface AgendaView {
+  professionalId: string;
+  timezone: string;
+  from: string;
+  to: string;
+  days: AgendaDay[];
+  hasRules: boolean;
+  publishWeeklyRules: boolean;
+  externalConnected: boolean;
+}
+
+export interface AgendaRule {
+  id?: string;
+  /** 0 = domingo … 6 = sábado */
+  weekday: number;
+  startTime: string;
+  endTime: string;
+}
+
+export interface AgendaSettings {
+  timezone: string;
+  leadTimeHours: number;
+  horizonDays: number;
+  publishWeeklyRules: boolean;
+  autoBlockExternal: boolean;
+}
+
+export interface CalendarConnection {
+  id: string;
+  provider: "google" | "ics";
+  label: string | null;
+  calendarIds: string[];
+  syncEnabled: boolean;
+  lastSyncedAt: string | null;
+  lastError: string | null;
+  status: "active" | "error" | "revoked";
+  createdAt: string;
+}
+
+export interface AgendaOverview {
+  rules: AgendaRule[];
+  settings: AgendaSettings;
+  feedUrl: string | null;
+  connections: CalendarConnection[];
+}
+
+export interface CalendarSyncResult {
+  connectionId: string;
+  provider: "google" | "ics";
+  label: string | null;
+  busyRows: number;
+  from: string;
+  to: string;
+  warnings: string[];
+  error?: string;
+}
+
+export interface CalendarSyncSummary {
+  results: CalendarSyncResult[];
+  synced: number;
+  failed: number;
+}
+
+/** Agenda pública de um profissional (janela de publicação aplicada). */
+export async function fetchAgenda(
+  professionalId: string,
+  range?: { from?: string; to?: string }
+): Promise<AgendaView | null> {
+  try {
+    const params = new URLSearchParams({ professionalId });
+    if (range?.from) params.set("from", range.from);
+    if (range?.to) params.set("to", range.to);
+    const response = await apiClient.get(`/availability/agenda?${params.toString()}`);
+    return (response.data as AgendaView) ?? null;
+  } catch (error) {
+    if (!isNavigatingToLogin) console.warn("[data-service] Error fetching agenda:", error);
+    return null;
+  }
+}
+
+/** Agenda do próprio profissional (sem janela de publicação — vê tudo). */
+export async function fetchMyAgenda(range?: { from?: string; to?: string }): Promise<AgendaView | null> {
+  try {
+    const params = new URLSearchParams();
+    if (range?.from) params.set("from", range.from);
+    if (range?.to) params.set("to", range.to);
+    const qs = params.toString();
+    const response = await apiClient.get(`/availability/agenda/mine${qs ? `?${qs}` : ""}`);
+    return (response.data as AgendaView) ?? null;
+  } catch (error) {
+    if (!isNavigatingToLogin) console.warn("[data-service] Error fetching my agenda:", error);
+    return null;
+  }
+}
+
+export async function fetchAgendaOverview(): Promise<AgendaOverview> {
+  const response = await apiClient.get("/availability/overview");
+  return response.data as AgendaOverview;
+}
+
+export async function saveAgendaRules(rules: AgendaRule[]): Promise<AgendaRule[]> {
+  const response = await apiClient.put("/availability/rules", {
+    rules: rules.map(({ weekday, startTime, endTime }) => ({ weekday, startTime, endTime })),
+  });
+  return response.data as AgendaRule[];
+}
+
+export async function applyAgendaRules(weeks: number): Promise<{ created: number }> {
+  const response = await apiClient.post("/availability/rules/apply", { weeks });
+  return response.data as { created: number };
+}
+
+export async function saveAgendaSettings(patch: Partial<AgendaSettings>): Promise<AgendaSettings> {
+  const response = await apiClient.put("/availability/settings", patch);
+  return response.data as AgendaSettings;
+}
+
+export async function rotateAgendaFeedToken(): Promise<{ feedUrl: string }> {
+  const response = await apiClient.post("/availability/feed-token");
+  return response.data as { feedUrl: string };
+}
+
+// Rotas Next (/app/api/agenda) — fetch direto com o bearer da sessão.
+
+async function agendaApi<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`/api/agenda/${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...tokenManager.authHeader(),
+      ...(init?.headers ?? {}),
+    },
+  });
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string };
+  if (!res.ok) {
+    throw new Error(data?.error || `Erro (${res.status})`);
+  }
+  return data;
+}
+
+export function checkGoogleAgendaConfig(): Promise<{ configured: boolean; missing: string[] }> {
+  return agendaApi("google/connect");
+}
+
+export function startGoogleAgendaConnect(): Promise<{ url: string }> {
+  return agendaApi("google/connect", { method: "POST" });
+}
+
+export function addIcsConnection(
+  url: string,
+  label?: string
+): Promise<{ id: string; label: string; eventsFound: number; sync: CalendarSyncResult | null }> {
+  return agendaApi("connections", { method: "POST", body: JSON.stringify({ url, label }) });
+}
+
+export function updateCalendarConnection(
+  id: string,
+  patch: { syncEnabled?: boolean; calendarIds?: string[] }
+): Promise<{ ok: boolean; sync?: CalendarSyncResult | null }> {
+  return agendaApi(`connections/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
+}
+
+export function removeCalendarConnection(id: string): Promise<{ ok: boolean }> {
+  return agendaApi(`connections/${id}`, { method: "DELETE" });
+}
+
+export function syncCalendars(connectionId?: string): Promise<CalendarSyncSummary> {
+  return agendaApi("sync", { method: "POST", body: JSON.stringify(connectionId ? { connectionId } : {}) });
+}
+

@@ -75,3 +75,11 @@ export function slotsForDate(slots: AvailabilitySlot[], date: Date | string): Av
 export function availableDateKeys(slots: AvailabilitySlot[]): Set<string> {
   return new Set(slots.map((slot) => slot.date?.slice(0, 10)).filter(Boolean) as string[]);
 }
+
+/** "2026-09-15" + 3 → "2026-09-18". Aritmética em UTC para não sofrer com fuso. */
+export function addDaysToKey(date: string, days: number): string {
+  const [y, m, d] = date.slice(0, 10).split("-").map(Number);
+  const utc = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
+  utc.setUTCDate(utc.getUTCDate() + days);
+  return utc.toISOString().slice(0, 10);
+}

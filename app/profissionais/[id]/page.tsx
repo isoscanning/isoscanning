@@ -30,9 +30,8 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import apiClient from "@/lib/api-service";
-import { type Professional, type AvailabilitySlot, fetchAvailability } from "@/lib/data-service";
+import { type Professional, type AgendaView, fetchAgenda } from "@/lib/data-service";
 import { AvailabilityCalendar } from "@/components/availability-calendar";
-import { todayKey } from "@/lib/availability";
 import {
   getMockAvatar,
   generateMockPortfolioItems,
@@ -149,7 +148,7 @@ export default function ProfessionalProfilePage() {
   const [professional, setProfessional] = useState<Professional | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
-  const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
+  const [availability, setAvailability] = useState<AgendaView | null>(null);
   const [loading, setLoading] = useState(true);
   const [reviewModalOpen, setReviewModalOpen] = useState(false); // Modal state
   const [hasUserReviewed, setHasUserReviewed] = useState(false); // Checking state
@@ -280,7 +279,7 @@ export default function ProfessionalProfilePage() {
       try {
         // O corte por data vem do backend. O filtro que existia aqui usava
         // toISOString() (data em UTC) e, à noite no Brasil, escondia o dia atual.
-        const availabilityData = await fetchAvailability(professionalId, { from: todayKey() });
+        const availabilityData = await fetchAgenda(professionalId);
         setAvailability(availabilityData);
       } catch (error) {
         console.error("[profissional-detail] Error fetching availability:", error);
@@ -808,7 +807,7 @@ export default function ProfessionalProfilePage() {
                   Disponibilidade
                 </h2>
               </div>
-              <AvailabilityCalendar availabilitySlots={availability} />
+              <AvailabilityCalendar agenda={availability} />
             </TabsContent>
           </Tabs>
         </div>

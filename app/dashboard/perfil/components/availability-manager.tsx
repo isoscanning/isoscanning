@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2, Calendar as CalendarIcon, Loader2 } from "lucide-react";
+import { Trash2, Calendar as CalendarIcon, Loader2, Ban } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +43,16 @@ interface AvailabilityManagerProps {
     deletingBulk: boolean;
     handleBulkDelete: () => void;
     handleDeleteAvailability: (id: string) => void;
+    /**
+     * Tipo do slot a criar. Opcional: a tela de perfil só cadastra
+     * disponibilidade; a agenda completa também registra bloqueios manuais
+     * (folga, viagem) que fecham a data no perfil público.
+     */
+    slotType?: "available" | "blocked";
+    setSlotType?: (type: "available" | "blocked") => void;
+    /** Texto do cabeçalho — a agenda completa usa outro título. */
+    title?: string;
+    description?: string;
 }
 
 export function AvailabilityManager({
@@ -64,13 +74,18 @@ export function AvailabilityManager({
     setShowBulkDeleteConfirm,
     deletingBulk,
     handleBulkDelete,
-    handleDeleteAvailability
+    handleDeleteAvailability,
+    slotType = "available",
+    setSlotType,
+    title = "Minha Disponibilidade",
+    description = "Gerencie os dias e horários que você está disponível para serviços",
 }: AvailabilityManagerProps) {
+    const isBlocking = slotType === "blocked";
     return (
         <Card className="border-2 shadow-sm">
             <CardHeader className="space-y-1 pb-6">
-                <CardTitle className="text-2xl">Minha Disponibilidade</CardTitle>
-                <CardDescription className="text-base">Gerencie os dias e horários que você está disponível para serviços</CardDescription>
+                <CardTitle className="text-2xl">{title}</CardTitle>
+                <CardDescription className="text-base">{description}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-8">
@@ -85,8 +100,11 @@ export function AvailabilityManager({
                                 startMonth={new Date()}
                                 modifiers={{
                                     available: (date) => availabilitySlots.some(slot =>
-                                        slot.date && slot.date.slice(0, 10) === toDateKey(date)
-                                    )
+                                        slot.type !== "blocked" && slot.date && slot.date.slice(0, 10) === toDateKey(date)
+                                    ),
+                                    blocked: (date) => availabilitySlots.some(slot =>
+                                        slot.type === "blocked" && slot.date && slot.date.slice(0, 10) === toDateKey(date)
+                                    ),
                                 }}
                                 locale={ptBR}
                                 className="rounded-md"
@@ -98,6 +116,24 @@ export function AvailabilityManager({
                         )}
 
                         <div className="space-y-3">
+                            {setSlotType && (
+                                <div className="grid grid-cols-2 gap-2 rounded-lg border p-1 bg-muted/40">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSlotType("available")}
+                                        className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${!isBlocking ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                                    >
+                                        Disponível
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSlotType("blocked")}
+                                        className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${isBlocking ? "bg-background shadow-sm text-destructive" : "text-muted-foreground hover:text-foreground"}`}
+                                    >
+                                        Bloquear
+                                    </button>
+                                </div>
+                            )}
                             <div className="flex items-center gap-2">
                                 <Checkbox
                                     id="isAllDay"
@@ -128,17 +164,20 @@ export function AvailabilityManager({
 
                             <Button
                                 className="w-full"
+                                variant={isBlocking ? "destructive" : "default"}
                                 onClick={handleAddAvailability}
                                 disabled={loadingAvailability || selectedDates.length === 0}
                             >
-                                {loadingAvailability ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Adicionar Disponibilidade"}
+                                {loadingAvailability
+                                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    : isBlocking ? "Bloquear datas" : "Adicionar Disponibilidade"}
                             </Button>
                         </div>
                     </div>
 
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                            <h4 className="font-medium">Datas Disponíveis</h4>
+                            <h4 className="font-medium">{setSlotType ? "Datas marcadas" : "Datas Disponíveis"}</h4>
                             {availabilitySlots.length > 0 && (
                                 <div className="flex items-center gap-2">
                                     <Button variant="outline" size="sm" onClick={handleSelectAll} className="text-xs">
@@ -183,22 +222,32 @@ export function AvailabilityManager({
                                 [...availabilitySlots]
                                     .sort((a, b) => a.date.localeCompare(b.date))
                                     .map((slot) => (
-                                        <div key={slot.id} className="flex items-center gap-3 p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors">
+                                        <div key={slot.id} className={`flex items-center gap-3 p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors ${slot.type === "blocked" ? "border-destructive/30" : ""}`}>
                                             <Checkbox
                                                 checked={selectedSlotsToDelete.includes(slot.id)}
                                                 onCheckedChange={() => toggleSlotSelection(slot.id)}
                                             />
                                             <div className="flex items-center gap-3 flex-1">
-                                                <CalendarIcon className="h-5 w-5 text-primary" />
+                                                {slot.type === "blocked"
+                                                    ? <Ban className="h-5 w-5 text-destructive" />
+                                                    : <CalendarIcon className="h-5 w-5 text-primary" />}
                                                 <div>
                                                     <p className="font-medium">
                                                         {format(parseDateKey(slot.date), "dd 'de' MMMM, yyyy", { locale: ptBR })}
                                                     </p>
-                                                    {isAllDaySlot(slot) ? (
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">⭐ Dia Inteiro</span>
-                                                    ) : (
-                                                        <p className="text-sm text-muted-foreground">{describeSlot(slot)}</p>
-                                                    )}
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        {slot.type === "blocked" && (
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive">Bloqueado</span>
+                                                        )}
+                                                        {isAllDaySlot(slot) ? (
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">⭐ Dia Inteiro</span>
+                                                        ) : (
+                                                            <p className="text-sm text-muted-foreground">{describeSlot(slot)}</p>
+                                                        )}
+                                                        {slot.reason && slot.reason !== "Dia inteiro" && (
+                                                            <span className="text-xs text-muted-foreground">· {slot.reason}</span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                             <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteAvailability(slot.id)}>

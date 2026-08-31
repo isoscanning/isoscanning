@@ -3,6 +3,10 @@
     {
       "path": "/api/social-media/instagram/cron-sync",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/agenda/cron-sync",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

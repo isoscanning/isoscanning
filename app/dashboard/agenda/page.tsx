@@ -22,6 +22,7 @@ import { AgendaSetupChecklist, type ConfigSection } from "./components/agenda-se
 import {
   applyAgendaRules,
   createAvailability,
+  syncCalendars,
   createCalendarEvent,
   deleteAvailabilities,
   deleteAvailability,
@@ -225,11 +226,20 @@ function AgendaPageInner() {
     await Promise.all([loadOverview(), loadAgenda()]);
   }, [loadOverview, loadAgenda]);
 
+  // Espelha no Google na hora (fire-and-forget): o cron de 30 min é o plano B.
+  const maybePushToGoogle = useCallback(() => {
+    const hasPush = (overview?.connections ?? []).some(
+      (c) => c.provider === "google" && c.status === "active" && c.pushEnabled
+    );
+    if (hasPush) void syncCalendars(undefined, { pushOnly: true }).catch(() => { });
+  }, [overview]);
+
   // ── Compromissos pessoais ──
   const handleCreateEvent = async (draft: CalendarEventDraft) => {
     try {
       await createCalendarEvent(draft);
       await Promise.all([loadEvents(), loadAgenda()]);
+      maybePushToGoogle();
       notify("success", draft.blocksAgenda ? "Compromisso criado — o horário já aparece fechado no seu perfil." : "Lembrete criado.");
     } catch (err) {
       throw new Error(apiErrorMessage(err, "Não foi possível salvar o compromisso."));
@@ -240,6 +250,7 @@ function AgendaPageInner() {
     try {
       await updateCalendarEvent(id, draft);
       await Promise.all([loadEvents(), loadAgenda()]);
+      maybePushToGoogle();
       notify("success", "Compromisso atualizado.");
     } catch (err) {
       throw new Error(apiErrorMessage(err, "Não foi possível salvar o compromisso."));
@@ -250,6 +261,7 @@ function AgendaPageInner() {
     try {
       await deleteCalendarEvent(id);
       await Promise.all([loadEvents(), loadAgenda()]);
+      maybePushToGoogle();
       notify("success", "Compromisso excluído.");
     } catch (err) {
       throw new Error(apiErrorMessage(err, "Não foi possível excluir o compromisso."));

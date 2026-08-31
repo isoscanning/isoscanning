@@ -54,6 +54,10 @@ export interface CalendarConnectionRow {
   refresh_token: string | null;
   token_expires_at: string | null;
   sync_enabled: boolean;
+  /** Envio IsoScanning → Google ligado (exige o escopo calendar.app.created). */
+  push_enabled: boolean;
+  /** Id do calendário "IsoScanning" criado na conta do usuário. */
+  push_calendar_id: string | null;
   last_synced_at: string | null;
   last_error: string | null;
   status: "active" | "error" | "revoked";
@@ -147,7 +151,7 @@ export async function getProfessionalTimezone(admin: SupabaseClient, professiona
 
 // ── Busca de ocupação por provedor ──────────────────────────────────────────
 
-async function ensureGoogleAccessToken(
+export async function ensureGoogleAccessToken(
   admin: SupabaseClient,
   conn: CalendarConnection
 ): Promise<string> {

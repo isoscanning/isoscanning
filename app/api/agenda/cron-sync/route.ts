@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin, ADMIN_MISSING_MSG } from "@/lib/server/supabase-admin";
-import { loadActiveConnections, syncConnections } from "@/lib/server/calendar-sync";
+import { loadActiveConnections, loadConnection, syncConnections } from "@/lib/server/calendar-sync";
+import { pushConnections } from "@/lib/server/calendar-push";
 
 // Sincronização periódica de TODOS os calendários conectados.
 //
@@ -37,9 +38,24 @@ export async function GET(request: NextRequest) {
     }
 
     const summary = await syncConnections(admin, connections);
+
+    // Envio IsoScanning → Google (recarrega para pegar tokens renovados)
+    const freshForPush = [];
+    for (const conn of connections) {
+      if (conn.provider !== "google" || !conn.push_enabled) continue;
+      const { connection } = await loadConnection(admin, conn.id);
+      if (connection) freshForPush.push(connection);
+    }
+    const pushes = await pushConnections(admin, freshForPush);
+
     console.log(
       "agenda/cron-sync:",
-      JSON.stringify({ connections: connections.length, synced: summary.synced, failed: summary.failed })
+      JSON.stringify({
+        connections: connections.length,
+        synced: summary.synced,
+        failed: summary.failed,
+        pushed: pushes.filter((p) => !p.error && !p.skipped).length,
+      })
     );
 
     return NextResponse.json({
@@ -53,6 +69,7 @@ export async function GET(request: NextRequest) {
         error: r.error ?? null,
         warnings: r.warnings,
       })),
+      pushes,
     });
   } catch (error) {
     console.error("Error in agenda/cron-sync route:", error);

@@ -121,6 +121,25 @@ export function CalendarSyncPanel({ connections, feedUrl, onChanged, notify }: C
     }
   };
 
+  const togglePush = async (conn: CalendarConnection, enabled: boolean) => {
+    try {
+      setBusyId(conn.id);
+      await updateCalendarConnection(conn.id, { pushEnabled: enabled });
+      await onChanged();
+      notify(
+        "success",
+        enabled
+          ? 'Envio ligado — sua agenda aparece no calendário "IsoScanning" da sua conta Google.'
+          : 'Envio desligado — o calendário "IsoScanning" foi removido da sua conta Google.'
+      );
+    } catch (err) {
+      await onChanged();
+      notify("error", (err as Error).message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const toggle = async (conn: CalendarConnection, enabled: boolean) => {
     try {
       setBusyId(conn.id);
@@ -224,7 +243,9 @@ export function CalendarSyncPanel({ connections, feedUrl, onChanged, notify }: C
                   <GoogleIcon className="h-5 w-5" /> Google Agenda
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Um clique. Sincroniza sozinho a cada 30 minutos e sempre que você pedir.
+                  Mão dupla: compromissos do Google fecham suas datas aqui, e sua agenda do
+                  IsoScanning aparece num calendário "IsoScanning" na sua conta. Sincroniza
+                  sozinho a cada 30 minutos.
                 </p>
                 {googleConfig && !googleConfig.configured && (
                   <p className="flex items-start gap-2 rounded-md bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400">
@@ -328,6 +349,17 @@ export function CalendarSyncPanel({ connections, feedUrl, onChanged, notify }: C
                           </p>
                           {conn.lastError && (
                             <p className="text-xs text-destructive">{conn.lastError}</p>
+                          )}
+                          {conn.provider === "google" && conn.status === "active" && (
+                            <label className="flex w-fit cursor-pointer items-center gap-2 pt-1 text-xs text-muted-foreground">
+                              <Switch
+                                checked={conn.pushEnabled}
+                                onCheckedChange={(v) => togglePush(conn, v)}
+                                disabled={busyId === conn.id}
+                                aria-label="Enviar minha agenda para o Google"
+                              />
+                              Enviar minha agenda para o Google
+                            </label>
                           )}
                         </div>
                       </div>

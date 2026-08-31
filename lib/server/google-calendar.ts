@@ -24,7 +24,12 @@ export const GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 export const GOOGLE_FREEBUSY_URL = "https://www.googleapis.com/calendar/v3/freeBusy";
 
 export const GOOGLE_FREEBUSY_SCOPE = "https://www.googleapis.com/auth/calendar.freebusy";
-export const GOOGLE_SCOPES = ["openid", "email", GOOGLE_FREEBUSY_SCOPE].join(" ");
+/**
+ * Escopo de ESCRITA mínimo: o app só cria/edita calendários criados por ele
+ * mesmo (o "IsoScanning" na conta do usuário). Não enxerga os demais.
+ */
+export const GOOGLE_APP_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.app.created";
+export const GOOGLE_SCOPES = ["openid", "email", GOOGLE_FREEBUSY_SCOPE, GOOGLE_APP_CALENDAR_SCOPE].join(" ");
 
 export interface GoogleConfig {
   clientId: string;
@@ -255,4 +260,110 @@ export async function fetchGoogleFreeBusy(params: {
   }
 
   return { busy, errors: [...errors] };
+}
+
+// ── Calendário do app (escrita — escopo calendar.app.created) ───────────────
+
+const CALENDAR_BASE = "https://www.googleapis.com/calendar/v3";
+
+export interface GoogleEventPayload {
+  summary: string;
+  description?: string;
+  location?: string;
+  /** Dia inteiro usa `date` (fim EXCLUSIVO); com horário, `dateTime` + `timeZone`. */
+  start: { date?: string; dateTime?: string; timeZone?: string };
+  end: { date?: string; dateTime?: string; timeZone?: string };
+  transparency?: "opaque" | "transparent";
+}
+
+async function calendarApi<T>(
+  accessToken: string,
+  method: "GET" | "POST" | "PATCH" | "DELETE",
+  path: string,
+  body?: unknown
+): Promise<T> {
+  const res = await fetch(`${CALENDAR_BASE}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (res.status === 204) return undefined as T;
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown> & {
+    error?: { message?: string; status?: string };
+  };
+  if (!res.ok) {
+    throw new GoogleApiError(
+      data.error?.message || `Erro na Calendar API (${res.status})`,
+      res.status,
+      data.error?.status
+    );
+  }
+  return data as T;
+}
+
+export async function createGoogleCalendar(
+  accessToken: string,
+  summary: string,
+  timeZone: string
+): Promise<{ id: string }> {
+  return calendarApi<{ id: string }>(accessToken, "POST", "/calendars", { summary, timeZone });
+}
+
+/** Melhor esforço — 404/410 significa que já não existe. */
+export async function deleteGoogleCalendar(accessToken: string, calendarId: string): Promise<void> {
+  try {
+    await calendarApi(accessToken, "DELETE", `/calendars/${encodeURIComponent(calendarId)}`);
+  } catch (err) {
+    if (err instanceof GoogleApiError && (err.status === 404 || err.status === 410)) return;
+    throw err;
+  }
+}
+
+export async function insertGoogleEvent(
+  accessToken: string,
+  calendarId: string,
+  payload: GoogleEventPayload
+): Promise<{ id: string }> {
+  return calendarApi<{ id: string }>(
+    accessToken,
+    "POST",
+    `/calendars/${encodeURIComponent(calendarId)}/events`,
+    payload
+  );
+}
+
+export async function patchGoogleEvent(
+  accessToken: string,
+  calendarId: string,
+  eventId: string,
+  payload: GoogleEventPayload
+): Promise<void> {
+  await calendarApi(
+    accessToken,
+    "PATCH",
+    `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    payload
+  );
+}
+
+/** 404/410 é sucesso: o evento já não está lá. */
+export async function deleteGoogleEvent(
+  accessToken: string,
+  calendarId: string,
+  eventId: string
+): Promise<void> {
+  try {
+    await calendarApi(
+      accessToken,
+      "DELETE",
+      `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`
+    );
+  } catch (err) {
+    if (err instanceof GoogleApiError && (err.status === 404 || err.status === 410)) return;
+    throw err;
+  }
 }

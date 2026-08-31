@@ -1320,6 +1320,8 @@ export interface CalendarConnection {
   label: string | null;
   calendarIds: string[];
   syncEnabled: boolean;
+  /** Envio IsoScanning → Google ligado. */
+  pushEnabled: boolean;
   lastSyncedAt: string | null;
   lastError: string | null;
   status: "active" | "error" | "revoked";
@@ -1444,7 +1446,7 @@ export function addIcsConnection(
 
 export function updateCalendarConnection(
   id: string,
-  patch: { syncEnabled?: boolean; calendarIds?: string[] }
+  patch: { syncEnabled?: boolean; pushEnabled?: boolean; calendarIds?: string[] }
 ): Promise<{ ok: boolean; sync?: CalendarSyncResult | null }> {
   return agendaApi(`connections/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
 }
@@ -1453,8 +1455,27 @@ export function removeCalendarConnection(id: string): Promise<{ ok: boolean }> {
   return agendaApi(`connections/${id}`, { method: "DELETE" });
 }
 
-export function syncCalendars(connectionId?: string): Promise<CalendarSyncSummary> {
-  return agendaApi("sync", { method: "POST", body: JSON.stringify(connectionId ? { connectionId } : {}) });
+export interface CalendarPushResult {
+  connectionId: string;
+  inserted: number;
+  updated: number;
+  deleted: number;
+  unchanged: number;
+  skipped?: boolean;
+  error?: string;
+}
+
+export function syncCalendars(
+  connectionId?: string,
+  opts?: { pushOnly?: boolean }
+): Promise<CalendarSyncSummary & { pushes?: CalendarPushResult[] }> {
+  return agendaApi("sync", {
+    method: "POST",
+    body: JSON.stringify({
+      ...(connectionId ? { connectionId } : {}),
+      ...(opts?.pushOnly ? { pushOnly: true } : {}),
+    }),
+  });
 }
 
 // --- COMPROMISSOS PESSOAIS (agenda privada do profissional) ---

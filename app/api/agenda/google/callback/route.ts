@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRequestOrigin } from "@/lib/server/meta";
 import {
+  GOOGLE_APP_CALENDAR_SCOPE,
   GOOGLE_FREEBUSY_SCOPE,
   GoogleApiError,
   decodeGoogleIdToken,
@@ -11,6 +12,7 @@ import {
 import { verifyOAuthState } from "@/lib/server/oauth-state";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
 import { encryptionReady, loadConnection, sealSecret, syncConnection } from "@/lib/server/calendar-sync";
+import { pushConnection } from "@/lib/server/calendar-push";
 import type { GoogleAgendaState } from "../connect/route";
 
 // Callback do OAuth do Google. Chega via redirect (sem sessão) — a identidade
@@ -55,6 +57,9 @@ export async function GET(request: NextRequest) {
     if (!granted.includes(GOOGLE_FREEBUSY_SCOPE)) {
       return redirectTo(origin, { cal: "error", reason: "scope" });
     }
+    // Envio para o Google só se a permissão de "criar calendários" veio junto
+    // (o usuário pode desmarcar essa caixa e ficar só com a importação).
+    const pushGranted = granted.includes(GOOGLE_APP_CALENDAR_SCOPE);
     // prompt=consent garante o refresh_token; se mesmo assim faltar, a conta
     // ficaria inutilizável em 1 hora — melhor avisar já.
     if (!tokens.refresh_token) {
@@ -78,6 +83,7 @@ export async function GET(request: NextRequest) {
           refresh_token: sealSecret(tokens.refresh_token),
           token_expires_at: new Date(now.getTime() + (tokens.expires_in ?? 3600) * 1000).toISOString(),
           sync_enabled: true,
+          push_enabled: pushGranted,
           status: "active",
           last_error: null,
           updated_at: now.toISOString(),
@@ -93,9 +99,16 @@ export async function GET(request: NextRequest) {
       return redirectTo(origin, { cal: "error", reason, detail: (upsertErr?.message ?? "").slice(0, 180) });
     }
 
-    // Primeira sincronização — falha aqui não desfaz a conexão; o cron tenta de novo.
+    // Primeira sincronização (e primeiro envio) — falha aqui não desfaz a
+    // conexão; o cron tenta de novo.
     const { connection } = await loadConnection(admin, saved.id as string);
-    if (connection) await syncConnection(admin, connection);
+    if (connection) {
+      await syncConnection(admin, connection);
+      if (pushGranted) {
+        const { connection: fresh } = await loadConnection(admin, saved.id as string);
+        if (fresh) await pushConnection(admin, fresh);
+      }
+    }
 
     return redirectTo(origin, { cal: "connected", label: identity.email ?? "" });
   } catch (error) {

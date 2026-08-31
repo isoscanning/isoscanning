@@ -104,6 +104,19 @@ GOOGLE_CALENDAR_REDIRECT_URI=https://www.isoscanning.com/api/agenda/google/callb
 A tela "Sincronização" mostra "integração não configurada" enquanto essas envs
 faltarem (`GET /api/agenda/google/connect` devolve o que está faltando).
 
+### 4.2b Mão dupla (IsoScanning → Google)
+
+Migration `70-calendar-push.sql`. Além de importar o free/busy, o app pede o
+escopo `calendar.app.created` e cria um calendário **"IsoScanning"** na conta
+do usuário, espelhando nele compromissos e agendamentos (na hora ao
+criar/editar/excluir, e reconciliado a cada sync). O escopo só dá acesso a
+calendários criados pelo próprio app — os demais continuam invisíveis. No
+console do Google, adicione `.../auth/calendar.app.created` em Acesso a
+dados. Conexões feitas antes precisam RECONECTAR para conceder a permissão
+(o painel liga/desliga o envio por conexão; desligar apaga o calendário
+espelho da conta). Quem usa o envio não deve assinar também o feed .ics no
+Google — duplicaria.
+
 ### 4.3 Verificação do app (para abrir ao público)
 
 `calendar.freebusy` é um escopo **sensível**: em produção, para qualquer

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/server/api-auth";
+import { requireFeature, requireUser } from "@/lib/server/api-auth";
 import { getSupabaseAdmin, ADMIN_MISSING_MSG } from "@/lib/server/supabase-admin";
 import {
   CalendarConnection,
@@ -22,6 +22,9 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await requireUser(request);
     if (!auth) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+
+    const denied = await requireFeature(auth, "calendarSync");
+    if (denied) return denied;
 
     const admin = getSupabaseAdmin();
     if (!admin) return NextResponse.json({ error: ADMIN_MISSING_MSG }, { status: 500 });

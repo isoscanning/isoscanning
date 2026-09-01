@@ -19,6 +19,8 @@ import { CalendarSyncPanel } from "./components/calendar-sync-panel";
 import { AgendaPreview } from "./components/agenda-preview";
 import { PersonalCalendar } from "./components/personal-calendar";
 import { AgendaSetupChecklist, type ConfigSection } from "./components/agenda-setup-checklist";
+import { PlanBadge, PlanGate } from "@/components/plan/plan-gate";
+import { usePlan } from "@/lib/plans/use-plan";
 import {
   applyAgendaRules,
   createAvailability,
@@ -95,6 +97,11 @@ function AgendaPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { userProfile, loading } = useAuth();
+  // Agenda privada e sincronização são recursos Pro (decisão 2026-09-01);
+  // semana padrão, exceções e visão pública continuam no Free.
+  const plan = usePlan();
+  const canPersonalAgenda = plan.can("personalAgenda");
+  const canCalendarSync = plan.can("calendarSync");
 
   const initial = LEGACY_TABS[searchParams.get("tab") ?? ""] ?? { tab: "calendar" as TabKey };
   const [tab, setTab] = useState<TabKey>(initial.tab);
@@ -484,6 +491,7 @@ function AgendaPageInner() {
           <TabsList className="grid h-auto w-full grid-cols-1 gap-1 sm:grid-cols-3">
             <TabsTrigger value="calendar" className="gap-2 py-2">
               <CalendarDays className="h-4 w-4" /> Minha agenda
+              {!canPersonalAgenda && <PlanBadge />}
             </TabsTrigger>
             <TabsTrigger value="public" className="gap-2 py-2">
               <Eye className="h-4 w-4" /> Visão pública
@@ -510,21 +518,33 @@ function AgendaPageInner() {
               </div>
             )}
             <ScrollReveal>
-              <PersonalCalendar
-                events={events}
-                agenda={agenda}
-                loading={loadingEvents || loadingAgenda}
-                onCreate={handleCreateEvent}
-                onUpdate={handleUpdateEvent}
-                onDelete={handleDeleteEvent}
-              />
+              <PlanGate
+                feature="personalAgenda"
+                title="Agenda privada de compromissos"
+                description="Marque seus compromissos aqui dentro e o sistema fecha as datas no seu perfil — sem revelar o motivo para quem visita."
+                bullets={[
+                  "Grade mensal com seus compromissos, só para você",
+                  "Datas fechadas automaticamente no perfil público",
+                  "Lembretes que não bloqueiam a agenda",
+                  "Mão dupla com Google Agenda e iCloud",
+                ]}
+              >
+                <PersonalCalendar
+                  events={events}
+                  agenda={agenda}
+                  loading={loadingEvents || loadingAgenda}
+                  onCreate={handleCreateEvent}
+                  onUpdate={handleUpdateEvent}
+                  onDelete={handleDeleteEvent}
+                />
+              </PlanGate>
             </ScrollReveal>
           </TabsContent>
 
           {/* ── Público ── */}
           <TabsContent value="public" className="space-y-6">
             <ScrollReveal>
-              <AgendaSetupChecklist overview={overview} agenda={agenda} profileUrl={profileUrl} onGo={goToConfig} />
+              <AgendaSetupChecklist overview={overview} agenda={agenda} profileUrl={profileUrl} onGo={goToConfig} canSync={canCalendarSync} />
             </ScrollReveal>
             <ScrollReveal>
               <AgendaPreview agenda={agenda} loading={loadingAgenda} />
@@ -543,6 +563,7 @@ function AgendaPageInner() {
                 </TabsTrigger>
                 <TabsTrigger value="calendars" className="gap-2 py-2">
                   <Link2 className="h-4 w-4" /> Calendários conectados
+                  {!canCalendarSync && <PlanBadge />}
                   {activeConnections > 0 && (
                     <span className="ml-1 rounded-full bg-emerald-500/15 px-1.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
                       {activeConnections}
@@ -606,12 +627,24 @@ function AgendaPageInner() {
 
               <TabsContent value="calendars">
                 <ScrollReveal>
-                  <CalendarSyncPanel
-                    connections={connections}
-                    feedUrl={overview?.feedUrl ?? null}
-                    onChanged={refreshAll}
-                    notify={notify}
-                  />
+                  <PlanGate
+                    feature="calendarSync"
+                    title="Calendários conectados"
+                    description="Conecte Google Agenda, iCloud ou Outlook e o sistema fecha as datas do seu perfil sozinho, a cada 30 minutos."
+                    bullets={[
+                      "Google Agenda em mão dupla (seus compromissos aparecem lá também)",
+                      "iCloud / Apple, Outlook e qualquer link .ics",
+                      "Feed .ics para assinar a agenda do IsoScanning no seu calendário",
+                      "Só horários são lidos — nunca o conteúdo dos eventos",
+                    ]}
+                  >
+                    <CalendarSyncPanel
+                      connections={connections}
+                      feedUrl={overview?.feedUrl ?? null}
+                      onChanged={refreshAll}
+                      notify={notify}
+                    />
+                  </PlanGate>
                 </ScrollReveal>
               </TabsContent>
             </Tabs>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/server/api-auth";
+import { requireFeature, requireUser } from "@/lib/server/api-auth";
 import {
   GOOGLE_MISSING_MSG,
   buildGoogleAuthUrl,
@@ -38,6 +38,10 @@ export async function POST(request: NextRequest) {
     if (!auth) {
       return NextResponse.json({ error: "Não autorizado. Faça login novamente." }, { status: 401 });
     }
+
+    // Sincronização é recurso Pro (403 PLAN_FEATURE abre o modal de upgrade)
+    const denied = await requireFeature(auth, "calendarSync");
+    if (denied) return denied;
 
     const config = getGoogleConfig();
     if (!config) {

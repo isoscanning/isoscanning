@@ -207,6 +207,24 @@ Rotas (todas autenticadas, dono pelo token): `GET/POST /availability/events`,
   data (janela própria / bloqueio) e calendários conectados (Google/.ics +
   feed de exportação). Um checklist no topo mostra o que falta configurar.
 
+## 9. Planos (gating)
+
+Decisão de 2026-09-01: **agenda privada de compromissos** (`personalAgenda`)
+e **sincronização de calendários + feed .ics** (`calendarSync`) são recursos
+**Pro/Ultra**. Semana padrão, exceções por data e a visão pública seguem no
+Free. Onde o gate mora:
+
+- Matriz: `plan-limits.ts` (back e front), chaves `personalAgenda` e
+  `calendarSync`.
+- Backend: `CreateEventUseCase` (criar compromisso), `RotateFeedTokenUseCase`
+  e `GetAgendaFeedUseCase` (feed devolve 404 para quem voltou ao Free).
+- Next: `POST /api/agenda/google/connect`, `POST /api/agenda/connections`,
+  `POST /api/agenda/sync` (`requireFeature`), e o cron pula conexões de quem
+  perdeu o recurso (`connectionsAllowedByPlan`) — nada é apagado; volta a
+  sincronizar no upgrade.
+- UI: `PlanGate` nas abas "Minha agenda" e "Calendários conectados" +
+  `PlanBadge` nas abas; `/precos` lista as duas linhas.
+
 ## Envs — resumo
 
 Frontend: `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`,

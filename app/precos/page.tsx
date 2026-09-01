@@ -93,6 +93,13 @@ const COMPARE_SECTIONS: { title: string; rows: CompareRow[] }[] = [
         ],
     },
     {
+        title: "Agenda",
+        rows: [
+            { key: "personalAgenda", label: "Agenda privada de compromissos (o público vê só as datas fechadas)" },
+            { key: "calendarSync", label: "Sincronização com Google Agenda, iCloud e Outlook (mão dupla) + feed .ics" },
+        ],
+    },
+    {
         title: "Ferramentas e suporte",
         rows: [
             { key: "routeCalculationsPerMonth" },
@@ -253,7 +260,8 @@ export default function PricingPage() {
                 "Simulador de Feed e Relatório com IA",
                 "Análise de concorrentes",
                 "Refinar briefing com IA",
-                "Exportação do financeiro"
+                "Exportação do financeiro",
+                "Agenda privada e sincronização de calendários"
             ],
             cta: "Começar Grátis",
             ctaVariant: "outline" as const,
@@ -273,6 +281,7 @@ export default function PricingPage() {
                 "3 vagas publicadas por mês",
                 "5 equipamentos anunciados",
                 "20 arquivos no portfólio (5 vídeos)",
+                "Agenda privada + sincronização com Google e iCloud",
                 "Selo Perfil Verificado",
                 "WhatsApp e Instagram no seu perfil público",
                 "Prioridade nas buscas",

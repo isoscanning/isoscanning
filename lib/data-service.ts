@@ -1,5 +1,6 @@
 import apiClient, { isNavigatingToLogin } from "./api-service";
 import { tokenManager } from "./token-manager";
+import { notifyPlanLimit } from "./plans/plan-events";
 import { supabase } from "./supabase";
 import imageCompression from "browser-image-compression";
 
@@ -1422,9 +1423,11 @@ async function agendaApi<T>(path: string, init?: RequestInit): Promise<T> {
       ...(init?.headers ?? {}),
     },
   });
-  const data = (await res.json().catch(() => ({}))) as T & { error?: string };
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string; message?: string };
   if (!res.ok) {
-    throw new Error(data?.error || `Erro (${res.status})`);
+    // 403 de plano (PLAN_FEATURE) → modal de upgrade, igual ao interceptor do axios
+    if (res.status === 403) notifyPlanLimit(data);
+    throw new Error(data?.error || data?.message || `Erro (${res.status})`);
   }
   return data;
 }

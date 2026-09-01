@@ -52,6 +52,11 @@ export interface PlanLimits {
   routeCalculationsPerMonth: number | null;
   financeExport: boolean;
 
+  /** Agenda privada de compromissos (o público vê só as datas fechadas) */
+  personalAgenda: boolean;
+  /** Sincronização com Google/iCloud/Outlook + feed .ics de exportação */
+  calendarSync: boolean;
+
   supportChannel: SupportChannel;
 }
 
@@ -92,6 +97,8 @@ const FREE_LIMITS: PlanLimits = {
   customContractTemplates: false,
   routeCalculationsPerMonth: 3,
   financeExport: false,
+  personalAgenda: false,
+  calendarSync: false,
 
   supportChannel: "community",
 };
@@ -125,6 +132,8 @@ const PRO_LIMITS: PlanLimits = {
   customContractTemplates: true,
   routeCalculationsPerMonth: 50,
   financeExport: true,
+  personalAgenda: true,
+  calendarSync: true,
 
   supportChannel: "email",
 };
@@ -158,6 +167,8 @@ const ULTRA_LIMITS: PlanLimits = {
   customContractTemplates: true,
   routeCalculationsPerMonth: 200,
   financeExport: true,
+  personalAgenda: true,
+  calendarSync: true,
 
   supportChannel: "whatsapp",
 };
@@ -195,6 +206,8 @@ export const FEATURE_LABELS: Record<keyof PlanLimits, string> = {
   customContractTemplates: "contratos personalizados e modelos próprios",
   routeCalculationsPerMonth: "cálculos de rota por mês",
   financeExport: "exportação do financeiro",
+  personalAgenda: "agenda privada de compromissos",
+  calendarSync: "sincronização com Google Agenda, iCloud e Outlook",
   supportChannel: "canal de suporte",
 };
 

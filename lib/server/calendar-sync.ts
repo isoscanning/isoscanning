@@ -31,6 +31,7 @@ import {
   refreshGoogleToken,
 } from "@/lib/server/google-calendar";
 import { BusyInterval, parseIcsBusy } from "@/lib/server/ics-parse";
+import { getPlanLimits, resolveEffectiveTier } from "@/lib/plans/plan-limits";
 
 export const SYNC_PAST_DAYS = 1;
 export const SYNC_HORIZON_DAYS = 180;
@@ -137,6 +138,32 @@ export async function loadActiveConnections(
     .order("last_synced_at", { ascending: true, nullsFirst: true });
   if (error) return { connections: [], error };
   return { connections: ((data ?? []) as CalendarConnectionRow[]).map(unseal), error: null };
+}
+
+/**
+ * Sincronização é recurso Pro: conexões de quem voltou para o Free ficam
+ * dormentes (não importam nem enviam) até o upgrade — sem apagar nada.
+ */
+export async function connectionsAllowedByPlan(
+  admin: SupabaseClient,
+  connections: CalendarConnection[]
+): Promise<CalendarConnection[]> {
+  if (connections.length === 0) return [];
+  const ids = [...new Set(connections.map((c) => c.professional_id))];
+  const { data, error } = await admin
+    .from("profiles")
+    .select("id, subscription_tier, subscription_expires_at")
+    .in("id", ids);
+  if (error) {
+    console.warn("calendar-sync: não consegui ler planos, seguindo sem filtro:", error.message);
+    return connections;
+  }
+  const allowed = new Set(
+    ((data ?? []) as Array<{ id: string; subscription_tier: string | null; subscription_expires_at: string | null }>)
+      .filter((p) => getPlanLimits(resolveEffectiveTier(p.subscription_tier, p.subscription_expires_at)).calendarSync)
+      .map((p) => p.id)
+  );
+  return connections.filter((c) => allowed.has(c.professional_id));
 }
 
 export async function getProfessionalTimezone(admin: SupabaseClient, professionalId: string): Promise<string> {

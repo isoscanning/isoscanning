@@ -21,6 +21,8 @@ interface AgendaSetupChecklistProps {
   agenda: AgendaView | null;
   profileUrl: string;
   onGo: (section: ConfigSection) => void;
+  /** Sincronização é recurso Pro — no Free o item vira convite ao upgrade. */
+  canSync?: boolean;
 }
 
 interface Item {
@@ -32,7 +34,7 @@ interface Item {
   action: string;
 }
 
-export function AgendaSetupChecklist({ overview, agenda, profileUrl, onGo }: AgendaSetupChecklistProps) {
+export function AgendaSetupChecklist({ overview, agenda, profileUrl, onGo, canSync = true }: AgendaSetupChecklistProps) {
   const items = useMemo<Item[]>(() => {
     const rules = overview?.rules ?? [];
     const settings = overview?.settings;
@@ -59,11 +61,14 @@ export function AgendaSetupChecklist({ overview, agenda, profileUrl, onGo }: Age
         key: "calendars",
         icon: <Link2 className="h-4 w-4" />,
         title: "Fechar datas automaticamente",
-        done: activeConnections.length > 0,
+        // No Free o item nunca fica "pendente" (não é uma tarefa, é um upgrade)
+        done: activeConnections.length > 0 || !canSync,
         status: activeConnections.length > 0
           ? `${activeConnections.length} calendário${activeConnections.length === 1 ? "" : "s"} conectado${activeConnections.length === 1 ? "" : "s"} — compromissos de fora já bloqueiam seu perfil.`
-          : "Conecte Google, iCloud ou Outlook e o sistema fecha as datas sozinho a cada 30 min.",
-        action: activeConnections.length > 0 ? "Gerenciar" : "Conectar",
+          : canSync
+            ? "Conecte Google, iCloud ou Outlook e o sistema fecha as datas sozinho a cada 30 min."
+            : "Recurso Pro: conecte Google, iCloud ou Outlook e o sistema fecha as datas sozinho.",
+        action: activeConnections.length > 0 ? "Gerenciar" : canSync ? "Conectar" : "Ver plano Pro",
       },
       {
         key: "dates",
@@ -74,7 +79,7 @@ export function AgendaSetupChecklist({ overview, agenda, profileUrl, onGo }: Age
         action: "Marcar",
       },
     ];
-  }, [overview, agenda]);
+  }, [overview, agenda, canSync]);
 
   // Resultado: quantos dias abertos o visitante encontra no horizonte publicado
   const outlook = useMemo(() => {

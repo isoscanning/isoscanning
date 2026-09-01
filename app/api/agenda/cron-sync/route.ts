@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin, ADMIN_MISSING_MSG } from "@/lib/server/supabase-admin";
-import { loadActiveConnections, loadConnection, syncConnections } from "@/lib/server/calendar-sync";
+import { connectionsAllowedByPlan, loadActiveConnections, loadConnection, syncConnections } from "@/lib/server/calendar-sync";
 import { pushConnections } from "@/lib/server/calendar-push";
 
 // Sincronização periódica de TODOS os calendários conectados.
@@ -32,10 +32,12 @@ export async function GET(request: NextRequest) {
     const admin = getSupabaseAdmin();
     if (!admin) return NextResponse.json({ error: ADMIN_MISSING_MSG }, { status: 500 });
 
-    const { connections, error } = await loadActiveConnections(admin);
+    const { connections: all, error } = await loadActiveConnections(admin);
     if (error) {
       return NextResponse.json({ error: `Erro ao listar conexões: ${error.message}` }, { status: 500 });
     }
+    // Quem voltou para o Free fica dormente até o upgrade
+    const connections = await connectionsAllowedByPlan(admin, all);
 
     const summary = await syncConnections(admin, connections);
 

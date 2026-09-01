@@ -40,6 +40,9 @@ const NOTIFICATION_TOAST_TITLES: Partial<Record<AppNotification["type"], string>
     briefing_new_version: "Briefing atualizado — confirme a leitura",
     briefing_execution_started: "Execução iniciada!",
     briefing_incident: "Intercorrência registrada",
+    briefing_day_before: "Amanhã é dia de execução!",
+    briefing_confirm_reminder: "Confirme a leitura do briefing",
+    briefing_deliverable_due: "Entregável vence amanhã",
 };
 
 export function NotificationBell() {
@@ -173,7 +176,10 @@ export function NotificationBell() {
             type === "briefing_item_assigned" ||
             type === "briefing_approval_requested" ||
             type === "briefing_approved" ||
-            type === "briefing_new_version"
+            type === "briefing_new_version" ||
+            type === "briefing_day_before" ||
+            type === "briefing_confirm_reminder" ||
+            type === "briefing_deliverable_due"
         ) {
             router.push(
                 referenceId

@@ -105,6 +105,15 @@ export const briefingProService = {
     return data;
   },
 
+  /** Recalcula horários em cascata a partir do primeiro item com horário. */
+  async recalculateSchedule(
+    briefingId: string,
+    payload: { from_item_id?: string; default_duration_minutes?: number }
+  ): Promise<{ updated: number; finished_at: string | null }> {
+    const { data } = await apiClient.post(`/briefing-pro/${briefingId}/schedule/recalculate`, payload);
+    return data;
+  },
+
   // ─── Compartilhamento por link ────────────────────────────────────────────
 
   /** Ativa/atualiza o link público (só o dono). */

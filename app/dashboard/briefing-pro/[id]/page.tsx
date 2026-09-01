@@ -46,6 +46,7 @@ import {
   GripVertical, Timer, Printer, Share2, Link2 as LinkIcon, RefreshCw, Copy,
 } from "lucide-react";
 import { BriefingTimeShiftDialog } from "@/components/briefing-time-shift-dialog";
+import { BriefingRecalcDialog } from "@/components/briefing-recalc-dialog";
 import { BriefingIncidentsCard } from "@/components/briefing-incidents-card";
 import { toast } from "sonner";
 import { briefingProService } from "@/lib/briefing-pro-service";
@@ -253,6 +254,7 @@ export default function BriefingDetailPage() {
   const [contactsDialog, setContactsDialog] = useState(false);
   const [locationsDialog, setLocationsDialog] = useState(false);
   const [timeShiftOpen, setTimeShiftOpen] = useState(false);
+  const [recalcOpen, setRecalcOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -620,6 +622,10 @@ export default function BriefingDetailPage() {
                   <Button variant="outline" size="sm" className="gap-1" onClick={() => setTimeShiftOpen(true)}>
                     <Timer className="h-4 w-4" />
                     Ajustar horários
+                  </Button>
+                  <Button variant="outline" size="sm" className="gap-1" onClick={() => setRecalcOpen(true)}>
+                    <Clock className="h-4 w-4" />
+                    Recalcular
                   </Button>
                   <Button variant="outline" size="sm" className="gap-1" onClick={() => setSectionDialog({})}>
                     <Plus className="h-4 w-4" />
@@ -1257,6 +1263,13 @@ export default function BriefingDetailPage() {
         />
       )}
 
+      {recalcOpen && (
+        <BriefingRecalcDialog
+          briefingId={briefing.id}
+          onClose={() => setRecalcOpen(false)}
+          onApplied={() => { setRecalcOpen(false); refresh(); }}
+        />
+      )}
       {timeShiftOpen && (
         <BriefingTimeShiftDialog
           briefingId={briefingId}
@@ -2159,6 +2172,7 @@ function ItemDialog({
     item_type: item?.item_type ?? "task",
     priority: item?.priority ?? "medium",
     scheduled_time: item?.scheduled_time ?? "",
+    duration_minutes: item?.duration_minutes ? String(item.duration_minutes) : "",
     assigned_to: item?.assigned_to ?? "none",
     section_id: item?.section_id ?? sectionId,
   });
@@ -2176,6 +2190,9 @@ function ItemDialog({
       priority: form.priority,
       is_required: isRequired,
       scheduled_time: form.scheduled_time || undefined,
+      duration_minutes: form.duration_minutes
+        ? parseInt(form.duration_minutes, 10)
+        : (item ? null : undefined),
       assigned_to: form.assigned_to === "none" ? (item ? null : undefined) : form.assigned_to,
     };
     try {
@@ -2257,6 +2274,15 @@ function ItemDialog({
                 type="time"
                 value={form.scheduled_time}
                 onChange={(e) => set("scheduled_time", e.target.value)}
+              />
+              <Label className="block pt-1">Duração (min)</Label>
+              <Input
+                type="number"
+                min={1}
+                max={1440}
+                placeholder="ex.: 30"
+                value={form.duration_minutes}
+                onChange={(e) => set("duration_minutes", e.target.value)}
               />
             </div>
             <div className="space-y-2">

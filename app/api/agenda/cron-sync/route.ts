@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin, ADMIN_MISSING_MSG } from "@/lib/server/supabase-admin";
 import { connectionsAllowedByPlan, loadActiveConnections, loadConnection, syncConnections } from "@/lib/server/calendar-sync";
 import { pushConnections } from "@/lib/server/calendar-push";
+import { runBriefingReminders } from "@/lib/server/briefing-reminders";
 
 // Sincronização periódica de TODOS os calendários conectados.
 //
@@ -50,6 +51,15 @@ export async function GET(request: NextRequest) {
     }
     const pushes = await pushConnections(admin, freshForPush);
 
+    // Lembretes do Briefing Pro (D-1, leitura, entregáveis) — idempotentes,
+    // pegam carona neste cron de 30 min.
+    let briefingReminders = null;
+    try {
+      briefingReminders = await runBriefingReminders(admin);
+    } catch (err) {
+      console.error("cron-sync: lembretes de briefing falharam:", err);
+    }
+
     console.log(
       "agenda/cron-sync:",
       JSON.stringify({
@@ -72,6 +82,7 @@ export async function GET(request: NextRequest) {
         warnings: r.warnings,
       })),
       pushes,
+      briefingReminders,
     });
   } catch (error) {
     console.error("Error in agenda/cron-sync route:", error);

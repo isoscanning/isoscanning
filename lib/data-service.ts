@@ -205,6 +205,9 @@ export interface AppNotification {
     | "briefing_approval_requested"
     | "briefing_approved"
     | "briefing_new_version"
+    | "briefing_day_before"
+    | "briefing_confirm_reminder"
+    | "briefing_deliverable_due"
     | "briefing_execution_started"
     | "briefing_incident";
   referenceId?: string | null;

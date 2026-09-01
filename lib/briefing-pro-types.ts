@@ -19,7 +19,7 @@ export type BriefingStatus =
 
 export type MemberRole = "editor" | "viewer";
 export type EffectiveRole = "owner" | "editor" | "viewer";
-export type ItemType = "task" | "photo" | "video" | "material" | "note";
+export type ItemType = "task" | "photo" | "video" | "material" | "note" | "break";
 export type ItemPriority = "low" | "medium" | "high";
 export type ItemStatus = "pending" | "in_progress" | "done" | "skipped";
 export type DeliverableStatus = "pending" | "in_production" | "delivered" | "approved";
@@ -64,6 +64,12 @@ export interface Briefing {
   source_text: string | null;
   share_token: string | null;
   share_role: MemberRole;
+  /** Fase 2 (migration 72). */
+  d1_digest_sent_at: string | null;
+  confirm_reminder_sent_at: string | null;
+  agenda_blocked_at: string | null;
+  share_view_count: number;
+  share_last_viewed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -119,6 +125,8 @@ export interface BriefingItem {
   is_required: boolean;
   assigned_to: string | null;
   scheduled_time: string | null;
+  /** Duração no cronograma (min) — alimenta o recálculo em cascata. */
+  duration_minutes: number | null;
   status: ItemStatus;
   completed_by: string | null;
   completed_at: string | null;
@@ -361,6 +369,7 @@ export const ITEM_TYPE_LABELS: Record<ItemType, string> = {
   video: "Vídeo",
   material: "Material",
   note: "Observação",
+  break: "Intervalo",
 };
 
 export const PRIORITY_CONFIG: Record<ItemPriority, { label: string; className: string }> = {

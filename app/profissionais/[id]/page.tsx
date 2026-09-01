@@ -1,917 +1,112 @@
-"use client";
+import type { Metadata } from "next";
+import { cache } from "react";
+import { notFound } from "next/navigation";
+import ProfessionalProfilePage from "./professional-profile-client";
+import { JsonLd } from "@/components/community/json-ld";
+import { getPublicProfessional, isUuid, summarize } from "@/lib/server/public-catalog";
+import { absoluteUrl, SITE_NAME } from "@/lib/site";
 
-import { useState, useEffect, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context"; // Import useAuth
-import { trackEvent } from "@/lib/analytics";
-import { Header } from "@/components/header";
-import { Footer } from "@/components/footer";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ReviewModal } from "@/components/review-modal"; // Import ReviewModal
-import {
-  MapPin,
-  Star,
-  Linkedin,
-  Play,
-  ChevronLeft,
-  ChevronRight,
-  X,
-  MessageCircle,
-  Plus,
-  BadgeCheck,
-  Loader2,
-  Instagram,
-  Sparkles
-} from "lucide-react";
-import Link from "next/link";
-import Image from "next/image";
-import apiClient from "@/lib/api-service";
-import { type Professional, type AgendaView, fetchAgenda } from "@/lib/data-service";
-import { AvailabilityCalendar } from "@/components/availability-calendar";
-import {
-  getMockAvatar,
-  generateMockPortfolioItems,
-  getMockPortfolioImage,
-} from "@/lib/mock-data";
+// Server Component + ISR (5 min) só para o <head> (title/description/canonical/
+// OG) e o JSON-LD; a página em si continua sendo o client component (busca
+// portfólio, avaliações e agenda pela API com o token do visitante).
+// Mesmo padrão de app/c/[slug]/page.tsx.
+export const revalidate = 300;
 
-interface Review {
-  id: string;
-  clientName: string;
-  clientAvatar?: string;
-  rating: number;
-  comment: string;
-  qualities?: string[]; // Add qualities
-  createdAt: Date;
+// [] + dynamicParams: cada id é gerado sob demanda no 1º acesso e cacheado; id
+// inexistente responde 404 de verdade (sem isto o notFound() saía como 200).
+export async function generateStaticParams(): Promise<{ id: string }[]> {
+  return [];
 }
 
-interface PortfolioItem {
-  id: string;
-  title: string;
-  description?: string;
-  media: { url: string; type: 'image' | 'video' }[];
-  category?: string;
+type Props = { params: Promise<{ id: string }> };
+
+const load = cache(async (id: string) => (isUuid(id) ? getPublicProfessional(id) : null));
+
+function placeOf(city: string | null, state: string | null): string {
+  return [city, state].filter(Boolean).join("/");
 }
 
-/** "@handle", "handle" ou "https://instagram.com/handle/" → "handle". */
-function normalizeInstagramHandle(value?: string | null): string | null {
-  if (!value) return null;
-  const handle = value
-    .trim()
-    .replace(/^https?:\/\/(www\.)?instagram\.com\//i, "")
-    .replace(/^@/, "")
-    .replace(/[/?#].*$/, "")
-    .trim();
-  return handle || null;
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  const p = await load(id);
+  if (!p) {
+    return { title: `Profissional não encontrado | ${SITE_NAME}`, robots: { index: false, follow: false } };
+  }
+
+  const path = `/profissionais/${p.id}`;
+  const where = placeOf(p.city, p.state);
+  const title = `${p.name}${p.specialty ? ` — ${p.specialty}` : ""}${where ? ` em ${where}` : ""}`;
+  const description =
+    summarize(p.description) ||
+    `${p.name}${p.specialty ? `, ${p.specialty.toLowerCase()}` : ""}${where ? ` em ${where}` : ""}: veja portfólio, avaliações e disponibilidade e peça um orçamento na ${SITE_NAME}.`;
+
+  return {
+    title: `${title} | ${SITE_NAME}`,
+    description,
+    alternates: { canonical: path },
+    openGraph: {
+      type: "profile",
+      title,
+      description,
+      url: absoluteUrl(path),
+      siteName: SITE_NAME,
+      locale: "pt_BR",
+      ...(p.avatarUrl ? { images: [{ url: p.avatarUrl }] } : {}),
+    },
+    twitter: { card: p.avatarUrl ? "summary_large_image" : "summary", title, description },
+  };
 }
 
-function PortfolioThumbnail({ item, onClick }: { item: PortfolioItem; onClick: () => void }) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isHovered, setIsHovered] = useState(false);
-  const media = item.media || [];
+export default async function ProfessionalPage({ params }: Props) {
+  const { id } = await params;
+  const p = await load(id);
+  if (!p) notFound();
 
-  useEffect(() => {
-    if (media.length <= 1 || !isHovered) return;
-    const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % media.length);
-    }, 1500);
-    return () => clearInterval(interval);
-  }, [media.length, isHovered]);
+  const url = absoluteUrl(`/profissionais/${p.id}`);
+  const person: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: p.name,
+    url,
+    ...(p.specialty ? { jobTitle: p.specialty } : {}),
+    ...(p.avatarUrl ? { image: p.avatarUrl } : {}),
+    ...(p.description ? { description: summarize(p.description, 300) } : {}),
+    ...(p.city || p.state
+      ? {
+        address: {
+          "@type": "PostalAddress",
+          ...(p.city ? { addressLocality: p.city } : {}),
+          ...(p.state ? { addressRegion: p.state } : {}),
+          addressCountry: "BR",
+        },
+      }
+      : {}),
+    ...(p.totalReviews > 0 && p.averageRating > 0
+      ? {
+        aggregateRating: {
+          "@type": "AggregateRating",
+          ratingValue: Number(p.averageRating.toFixed(1)),
+          reviewCount: p.totalReviews,
+          bestRating: 5,
+        },
+      }
+      : {}),
+  };
 
-  const currentMedia = media[currentIndex];
-  if (!currentMedia) return null;
-
-  const isVideo = currentMedia.type === 'video';
+  const breadcrumb = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Profissionais", item: absoluteUrl("/profissionais") },
+      { "@type": "ListItem", position: 2, name: p.name, item: url },
+    ],
+  };
 
   return (
-    <div
-      className="group relative aspect-[4/3] bg-muted rounded-2xl overflow-hidden cursor-pointer border border-border/50 shadow-sm hover:shadow-md transition-shadow"
-      onClick={onClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => {
-        setIsHovered(false);
-        setCurrentIndex(0);
-      }}
-    >
-      {isVideo ? (
-        <>
-          <video
-            src={currentMedia.url}
-            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-            muted
-            loop
-            onMouseEnter={(e) => e.currentTarget.play()}
-            onMouseLeave={(e) => {
-              e.currentTarget.pause();
-              e.currentTarget.currentTime = 0;
-            }}
-          />
-          <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-colors pointer-events-none">
-            <div className="h-12 w-12 bg-white/90 rounded-full flex items-center justify-center shadow-lg backdrop-blur-sm">
-              <Play className="h-5 w-5 text-black ml-1" />
-            </div>
-          </div>
-        </>
-      ) : (
-        <Image
-          src={currentMedia.url}
-          alt={item.title}
-          fill
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
-        />
-      )}
-
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-4 flex flex-col justify-end opacity-90 group-hover:opacity-100 transition-opacity">
-        <div className="flex items-center gap-2 mb-1">
-          <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full text-white/90 backdrop-blur-sm ${media.length > 1 ? 'bg-purple-500/50' : isVideo ? 'bg-blue-500/50' : 'bg-primary/50'}`}>
-            {media.length > 1 ? `Álbum (${media.length})` : isVideo ? 'Vídeo' : 'Imagem'}
-          </span>
-        </div>
-        <h3 className="font-bold text-white line-clamp-1 drop-shadow-md text-sm md:text-base">
-          {item.title}
-        </h3>
-      </div>
-    </div>
+    <>
+      <JsonLd data={person} />
+      <JsonLd data={breadcrumb} />
+      <ProfessionalProfilePage />
+    </>
   );
 }
-
-export default function ProfessionalProfilePage() {
-  const params = useParams();
-  const router = useRouter();
-  const professionalId = params.id as string;
-  const { userProfile: currentUser } = useAuth(); // Get currentUser
-
-  const [professional, setProfessional] = useState<Professional | null>(null);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
-  const [availability, setAvailability] = useState<AgendaView | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [reviewModalOpen, setReviewModalOpen] = useState(false); // Modal state
-  const [hasUserReviewed, setHasUserReviewed] = useState(false); // Checking state
-  const [startingChat, setStartingChat] = useState(false);
-  const [reviewContractId, setReviewContractId] = useState<string | null>(null);
-
-  // Deep link do pedido de avaliação (?avaliar=1&contrato=<id>) vindo da notificação
-  // de conclusão de contrato — abre o modal de avaliação automaticamente.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const searchParams = new URLSearchParams(window.location.search);
-    if (searchParams.get("avaliar") === "1") {
-      setReviewContractId(searchParams.get("contrato"));
-      setReviewModalOpen(true);
-    }
-  }, []);
-
-  const handleStartChat = async () => {
-    if (!currentUser || !professional) return;
-    setStartingChat(true);
-    try {
-      const res = await apiClient.post("/chat/conversations", { participantId: professional.id });
-      router.push(`/dashboard/chat/${res.data.id}`);
-    } catch {
-      setStartingChat(false);
-    }
-  };
-
-  // Portfolio filter state
-  const [portfolioFilter, setPortfolioFilter] = useState<'all' | 'photo' | 'video'>('all');
-
-  // Limite de visualizações de perfil do plano
-  const [planLimitError, setPlanLimitError] = useState<string | null>(null);
-
-  // Lightbox state
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState(0);
-  const [imageLoading, setImageLoading] = useState(true);
-
-  useEffect(() => {
-    fetchProfessionalData();
-  }, [professionalId]);
-
-  const fetchProfessionalData = async () => {
-    setLoading(true);
-    try {
-      // Fetch professional profile. O 403 de limite de visualizações é tratado
-      // pelo card dedicado abaixo, então não abrimos também o modal global.
-      const profResponse = await apiClient.get(`/profiles/${professionalId}`, {
-        headers: { "X-Skip-Plan-Modal": "1" },
-      });
-      setProfessional(profResponse.data);
-      setPlanLimitError(null);
-
-      // Fetch portfolio for this professional
-      try {
-        const portfolioResponse = await apiClient.get(
-          `/portfolio?professionalId=${professionalId}`
-        );
-        const portfolioData = (portfolioResponse.data.data || []).map(
-          (item: any) => ({
-            id: item.id,
-            title: item.title,
-            description: item.description,
-            media: item.media || [],
-            category: item.category,
-          })
-        );
-
-        setPortfolio(portfolioData);
-      } catch (error) {
-        console.error("[profissional-detail] Error fetching portfolio:", error);
-      }
-
-      // Fetch reviews for this professional
-      try {
-        const reviewsResponse = await apiClient.get(
-          `/reviews?professionalId=${professionalId}`
-        );
-        const reviewsData = (reviewsResponse.data.data || []).map(
-          (review: any) => ({
-            id: review.id,
-            clientName: review.clientName,
-            clientAvatar: review.clientAvatar,
-            rating: review.rating,
-            comment: review.comment,
-            qualities: review.qualities || [],
-            createdAt: new Date(review.createdAt),
-            clientId: review.clientId // Need this to check ownership
-          })
-        );
-        setReviews(reviewsData);
-
-        // Calculate average rating and total from actual reviews
-        if (reviewsData.length > 0) {
-          const totalRating = reviewsData.reduce((sum: number, r: any) => sum + r.rating, 0);
-          const avgRating = totalRating / reviewsData.length;
-
-
-          // Update professional object with calculated values
-          setProfessional(prev => prev ? {
-            ...prev,
-            averageRating: avgRating,
-            totalReviews: reviewsData.length
-          } : null);
-        }
-
-        trackEvent({
-          action: 'view_professional',
-          category: 'Professionals',
-          label: profResponse.data.displayName || profResponse.data.artisticName,
-          value: reviewsData.length // sending review count as value
-        });
-
-        // Check if current user has reviewed
-        if (currentUser) {
-          const userReview = reviewsData.find((r: any) => r.clientId === currentUser.id);
-          if (userReview) {
-            setHasUserReviewed(true);
-          }
-        }
-
-      } catch (error) {
-        console.error("[profissional-detail] Error fetching reviews:", error);
-      }
-
-      // Fetch availability
-      try {
-        // O corte por data vem do backend. O filtro que existia aqui usava
-        // toISOString() (data em UTC) e, à noite no Brasil, escondia o dia atual.
-        const availabilityData = await fetchAgenda(professionalId);
-        setAvailability(availabilityData);
-      } catch (error) {
-        console.error("[profissional-detail] Error fetching availability:", error);
-      }
-    } catch (error: any) {
-      // Limite de visualizações de perfil do plano (403 do backend)
-      if (error?.response?.status === 403) {
-        setPlanLimitError(
-          error.response.data?.message ||
-          "Você atingiu o limite de visualizações de perfis do seu plano este mês."
-        );
-      }
-      console.error(
-        "[profissional-detail] Error fetching professional data:",
-        error
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Re-check hasUserReviewed when currentUser changes (in case of deep link login etc)
-  useEffect(() => {
-    if (currentUser && reviews.length > 0) {
-      const userReview = reviews.find((r: any) => r.clientId === currentUser.id);
-      if (userReview) setHasUserReviewed(true);
-    }
-  }, [currentUser, reviews]);
-
-  const flattenedMedia = useMemo(() => {
-    return portfolio.flatMap(item =>
-      (item.media || []).map(m => ({ url: m.url, type: m.type, title: item.title }))
-    );
-  }, [portfolio]);
-
-  const filteredPortfolio = useMemo(() => {
-    if (portfolioFilter === 'all') return portfolio;
-    if (portfolioFilter === 'photo') return portfolio.filter(item => item.media?.some(m => m.type === 'image'));
-    if (portfolioFilter === 'video') return portfolio.filter(item => item.media?.some(m => m.type === 'video'));
-    return portfolio;
-  }, [portfolio, portfolioFilter]);
-
-  // Lightbox functions
-  const openLightbox = (itemIndex: number) => {
-    let globalIndex = 0;
-    for (let i = 0; i < itemIndex; i++) {
-      globalIndex += portfolio[i].media?.length || 0;
-    }
-    setImageLoading(true);
-    setLightboxIndex(globalIndex);
-    setLightboxOpen(true);
-    trackEvent({ action: 'open_lightbox', category: 'Professionals', label: `Item: ${itemIndex}` });
-  };
-
-  const closeLightbox = () => {
-    setLightboxOpen(false);
-  };
-
-  const goToPrevious = () => {
-    setImageLoading(true);
-    setLightboxIndex((prev) => (prev === 0 ? flattenedMedia.length - 1 : prev - 1));
-  };
-
-  const goToNext = () => {
-    setImageLoading(true);
-    setLightboxIndex((prev) => (prev === flattenedMedia.length - 1 ? 0 : prev + 1));
-  };
-
-  // Handle keyboard navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!lightboxOpen) return;
-
-      switch (e.key) {
-        case 'Escape':
-          closeLightbox();
-          break;
-        case 'ArrowLeft':
-          goToPrevious();
-          break;
-        case 'ArrowRight':
-          goToNext();
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [lightboxOpen, flattenedMedia.length]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!professional && planLimitError) {
-    return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <Header />
-        <main className="flex-1 flex items-center justify-center">
-          <Card className="max-w-md bg-card border-border">
-            <CardContent className="pt-6 text-center space-y-4">
-              <p className="text-lg font-semibold">Limite do plano atingido</p>
-              <p className="text-muted-foreground">{planLimitError}</p>
-              <div className="flex gap-2 justify-center">
-                <Link href="/precos">
-                  <Button>Ver planos</Button>
-                </Link>
-                <Link href="/profissionais">
-                  <Button variant="outline">Voltar para busca</Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
-
-  if (!professional) {
-    return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <Header />
-        <main className="flex-1 flex items-center justify-center">
-          <Card className="max-w-md bg-card border-border">
-            <CardContent className="pt-6 text-center">
-              <p className="text-muted-foreground mb-4">
-                Profissional não encontrado
-              </p>
-              <Link href="/profissionais">
-                <Button>Voltar para busca</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
-
-  // Selo/destaque vêm do backend (tier efetivo); fallback pelo tier bruto.
-  const isVerified =
-    professional.verified ??
-    ["standard", "pro", "vip"].includes(professional.subscriptionTier ?? "");
-  const isFeatured = professional.searchRank === 3;
-  const instagramHandle = normalizeInstagramHandle(professional.instagram);
-  const whatsappUrl = professional.contactWhatsappUrl || null;
-
-  return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors duration-300">
-      <Header />
-
-      <main className="flex-1 py-12 px-4">
-        <div className="container mx-auto max-w-5xl space-y-12">
-          {/* Profile Header */}
-          <div className="flex flex-col items-center text-center space-y-6">
-            {/* Avatar */}
-            <div className="relative h-40 w-40 rounded-full p-1 bg-gradient-to-tr from-primary/20 to-primary/5 shadow-2xl flex items-center justify-center">
-              <Avatar className="h-full w-full border-4 border-background shadow-inner">
-                <AvatarImage
-                  src={professional.avatarUrl || undefined}
-                  alt={professional.displayName}
-                  className="object-cover"
-                />
-                <AvatarFallback className="text-4xl bg-muted text-muted-foreground">
-                  {professional.displayName?.charAt(0).toUpperCase() || "P"}
-                </AvatarFallback>
-              </Avatar>
-            </div>
-
-            {/* Info */}
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                <h1 className="text-4xl font-bold text-foreground tracking-tight">
-                  {professional.artisticName || professional.displayName}
-                </h1>
-                {isVerified && (
-                  <div title="Perfil Verificado">
-                    <BadgeCheck className="h-6 w-6 text-blue-500 fill-blue-500/10" />
-                  </div>
-                )}
-                {isFeatured && (
-                  <span
-                    title="Profissional em destaque nas buscas"
-                    className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400"
-                  >
-                    <Sparkles className="h-3 w-3" />
-                    Destaque
-                  </span>
-                )}
-              </div>
-
-              {/* Specialties */}
-              <div className="flex flex-wrap justify-center gap-2">
-                {professional.specialties && professional.specialties.length > 0 ? (
-                  professional.specialties.map((spec) => (
-                    <Badge
-                      key={spec}
-                      variant="secondary"
-                      className="bg-primary/10 text-primary border-primary/20 px-3 py-1 font-semibold hover:bg-primary/20"
-                    >
-                      {spec}
-                    </Badge>
-                  ))
-                ) : (
-                  <p className="text-lg text-muted-foreground font-medium">
-                    {professional.specialty || "Profissional"}
-                  </p>
-                )}
-              </div>
-
-              {/* Location */}
-              {(professional.city || professional.state) && (
-                <div className="flex items-center justify-center gap-1.5 text-muted-foreground bg-muted/50 px-4 py-2 rounded-full w-fit mx-auto border border-border shadow-sm">
-                  <MapPin className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-semibold">
-                    {professional.city}
-                    {professional.city && professional.state && ", "}
-                    {professional.state}
-                  </span>
-                </div>
-              )}
-
-              {/* Biography */}
-              {professional.description && (
-                <div className="max-w-2xl mx-auto pt-2">
-                  <p className="text-muted-foreground text-center leading-relaxed">
-                    {professional.description}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-col items-center gap-4">
-              {/* Chat Button */}
-              {currentUser && currentUser.id !== professional.id && (
-                <Button
-                  className="rounded-full px-8 h-12 gap-2 shadow-lg hover:-translate-y-0.5 transition-all duration-300"
-                  onClick={handleStartChat}
-                  disabled={startingChat}
-                >
-                  {startingChat ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <MessageCircle className="h-5 w-5" />
-                  )}
-                  <span className="font-bold">Enviar Mensagem</span>
-                </Button>
-              )}
-
-              {/* Contato direto — o backend só envia estes campos quando o dono está em plano pago */}
-              {(whatsappUrl || instagramHandle) && (
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  {whatsappUrl && (
-                    <a
-                      href={whatsappUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() =>
-                        trackEvent({
-                          action: "contact_professional",
-                          category: "Professionals",
-                          label: professional.displayName,
-                        })
-                      }
-                    >
-                      <Button className="rounded-full px-6 h-11 gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white shadow-lg hover:shadow-[#25D366]/20 transition-all duration-300">
-                        <MessageCircle className="h-5 w-5" />
-                        <span className="font-bold">Chamar no WhatsApp</span>
-                      </Button>
-                    </a>
-                  )}
-                  {instagramHandle && (
-                    <a
-                      href={`https://instagram.com/${instagramHandle}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-4 h-11 text-sm font-semibold text-foreground hover:border-pink-500/50 hover:text-pink-600 dark:hover:text-pink-400 transition-colors"
-                      onClick={() =>
-                        trackEvent({
-                          action: "click_social",
-                          category: "Professionals",
-                          label: professional.displayName,
-                        })
-                      }
-                    >
-                      <Instagram className="h-4 w-4" />
-                      @{instagramHandle}
-                    </a>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <Tabs defaultValue="portfolio" className="w-full">
-            <div className="flex justify-center mb-10">
-              <TabsList className="bg-muted/50 p-1.5 h-auto rounded-full gap-2 border border-border/50">
-                <TabsTrigger
-                  value="portfolio"
-                  className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm hover:text-primary/80"
-                  onClick={() => trackEvent({ action: 'tab_change', category: 'Professionals', label: 'Portfolio' })}
-                >
-                  Portfólio
-                </TabsTrigger>
-                <TabsTrigger
-                  value="avaliacoes"
-                  className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm hover:text-primary/80"
-                  onClick={() => trackEvent({ action: 'tab_change', category: 'Professionals', label: 'Reviews' })}
-                >
-                  Avaliações
-                </TabsTrigger>
-                <TabsTrigger
-                  value="disponibilidade"
-                  className="rounded-full px-6 py-2.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm hover:text-primary/80"
-                  onClick={() => trackEvent({ action: 'tab_change', category: 'Professionals', label: 'Availability' })}
-                >
-                  Disponibilidade
-                </TabsTrigger>
-              </TabsList>
-            </div>
-
-            <TabsContent value="portfolio" className="mt-0 space-y-8">
-              {portfolio.length > 0 ? (
-                <>
-                  <div className="flex items-center gap-2 mb-8">
-                    <button
-                      onClick={() => setPortfolioFilter('all')}
-                      className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors border ${portfolioFilter === 'all' ? 'bg-foreground text-background border-foreground shadow-sm' : 'bg-transparent text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground'}`}
-                    >
-                      Todos
-                    </button>
-                    <button
-                      onClick={() => setPortfolioFilter('photo')}
-                      className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors border ${portfolioFilter === 'photo' ? 'bg-foreground text-background border-foreground shadow-sm' : 'bg-transparent text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground'}`}
-                    >
-                      Fotos
-                    </button>
-                    <button
-                      onClick={() => setPortfolioFilter('video')}
-                      className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors border ${portfolioFilter === 'video' ? 'bg-foreground text-background border-foreground shadow-sm' : 'bg-transparent text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground'}`}
-                    >
-                      Vídeos
-                    </button>
-                  </div>
-
-                  {filteredPortfolio.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {filteredPortfolio.map((item) => (
-                        <PortfolioThumbnail
-                          key={item.id}
-                          item={item}
-                          onClick={() => openLightbox(portfolio.findIndex(p => p.id === item.id))}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12 border-2 border-dashed border-border rounded-xl bg-muted/20">
-                      <div className="flex flex-col items-center justify-center text-muted-foreground space-y-3">
-                        <p className="text-muted-foreground">
-                          Nenhum item encontrado nesta categoria.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-center py-12 border-2 border-dashed border-border rounded-xl bg-muted/20">
-                  <div className="flex flex-col items-center justify-center text-muted-foreground space-y-3">
-                    <p className="text-muted-foreground">
-                      Este profissional ainda não adicionou itens ao portfólio.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="avaliacoes" className="mt-0 space-y-8">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-6">
-                  <div>
-                    <h2 className="text-2xl font-bold text-foreground">Avaliações</h2>
-                    <p className="text-muted-foreground text-sm">O que outros profissionais dizem</p>
-                  </div>
-
-                  {/* Review Button - Only for other professionals who haven't reviewed yet */}
-                  {currentUser &&
-                    (currentUser.userType?.toLowerCase() === 'professional') &&
-                    currentUser.id !== professional.id &&
-                    !hasUserReviewed && (
-                      <Button onClick={() => setReviewModalOpen(true)} size="sm">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Avaliar Profissional
-                      </Button>
-                    )}
-                </div>
-
-                <div className="flex flex-col items-end gap-2">
-                  <div className="flex items-center gap-2 text-primary font-bold">
-                    <span className="text-3xl">
-                      {professional.totalReviews && professional.totalReviews > 0 && professional.averageRating ? professional.averageRating.toFixed(1) : "—"}
-                    </span>
-                    <div className="flex flex-col items-start">
-                      <div className="flex">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star
-                            key={star}
-                            className={`h-4 w-4 ${star <= Math.round(professional.averageRating || 0) && professional.totalReviews && professional.totalReviews > 0
-                              ? "fill-primary text-primary"
-                              : "text-muted"
-                              }`}
-                          />
-                        ))}
-                      </div>
-                      <span className="text-sm text-muted-foreground font-normal">
-                        {professional.totalReviews && professional.totalReviews > 0 ? `${professional.totalReviews} avaliações` : "Sem avaliação"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {currentUser &&
-                    currentUser.userType === 'professional' &&
-                    currentUser.id !== professional.id &&
-                    !hasUserReviewed && (
-                      <Button onClick={() => setReviewModalOpen(true)} size="sm">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Avaliar Profissional
-                      </Button>
-                    )}
-                </div>
-              </div>
-
-              {reviews.length > 0 ? (
-                <div className="space-y-6">
-                  {reviews.map((review) => (
-                    <div
-                      key={review.id}
-                      className="bg-card border border-border rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex items-start gap-4 mb-4">
-                        {review.clientAvatar ? (
-                          <div className="h-10 w-10 relative overflow-hidden rounded-full border border-border shadow-sm">
-                            <Image
-                              src={review.clientAvatar}
-                              alt={review.clientName || "Usuário"}
-                              width={40}
-                              height={40}
-                              className="object-cover w-full h-full"
-                              unoptimized
-                            />
-                          </div>
-                        ) : (
-                          <div className="h-10 w-10 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shadow-inner border border-primary/20">
-                            {(review.clientName || "Usuário").charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <div className="flex-1">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="font-bold text-foreground">
-                                {review.clientName || "Usuário"}
-                              </h3>
-                              <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                                {new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }).format(review.createdAt)}
-                              </p>
-                            </div>
-                            <div className="flex gap-0.5">
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <Star
-                                  key={star}
-                                  className={`h-4 w-4 ${star <= review.rating
-                                    ? "fill-primary text-primary"
-                                    : "text-muted"
-                                    }`}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Qualities Tags */}
-                      {review.qualities && review.qualities.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-3">
-                          {review.qualities.map((q: string, i: number) => (
-                            <Badge key={i} variant="outline" className="text-xs bg-muted text-muted-foreground border-border font-normal">
-                              {q}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-
-                      <p className="text-muted-foreground italic leading-relaxed text-sm bg-muted/30 p-3 rounded-lg border border-border/50">
-                        "{review.comment}"
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 border-2 border-dashed border-border rounded-xl bg-muted/20">
-                  <div className="flex flex-col items-center justify-center text-muted-foreground space-y-3">
-                    <MessageCircle className="h-12 w-12 text-muted-foreground/50" />
-                    <p className="text-muted-foreground">
-                      Este profissional ainda não possui avaliações.
-                    </p>
-                    {currentUser && currentUser.userType === 'professional' && currentUser.id !== professional.id && (
-                      <Button variant="link" onClick={() => setReviewModalOpen(true)}>
-                        Seja o primeiro a avaliar
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="disponibilidade" className="mt-0 space-y-8">
-              <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-foreground">
-                  Disponibilidade
-                </h2>
-              </div>
-              <AvailabilityCalendar agenda={availability} />
-            </TabsContent>
-          </Tabs>
-        </div>
-      </main>
-
-      <Footer />
-
-      {/* Lightbox Modal */}
-      {lightboxOpen && flattenedMedia[lightboxIndex] && (
-        <div
-          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
-          onClick={closeLightbox}
-        >
-          {/* Close Button */}
-          <button
-            onClick={closeLightbox}
-            className="absolute top-4 right-4 p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors z-50"
-            aria-label="Fechar"
-          >
-            <X className="h-8 w-8" />
-          </button>
-
-          {/* Previous Button */}
-          {flattenedMedia.length > 1 && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                goToPrevious();
-              }}
-              className="absolute left-4 top-1/2 -translate-y-1/2 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors z-50"
-              aria-label="Anterior"
-            >
-              <ChevronLeft className="h-10 w-10" />
-            </button>
-          )}
-
-          {/* Next Button */}
-          {flattenedMedia.length > 1 && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                goToNext();
-              }}
-              className="absolute right-4 top-1/2 -translate-y-1/2 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors z-50"
-              aria-label="Próximo"
-            >
-              <ChevronRight className="h-10 w-10" />
-            </button>
-          )}
-
-          {/* Media Content */}
-          <div
-            className="max-w-[90vw] max-h-[90vh] flex flex-col items-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="relative flex items-center justify-center max-h-[80vh]">
-              {imageLoading && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 rounded-lg backdrop-blur-sm">
-                  <Loader2 className="h-12 w-12 text-white animate-spin drop-shadow-lg" />
-                </div>
-              )}
-              {flattenedMedia[lightboxIndex].type === 'video' ? (
-                <video
-                  src={flattenedMedia[lightboxIndex].url}
-                  className={`max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl transition-opacity duration-300 ${imageLoading ? 'opacity-50' : 'opacity-100'}`}
-                  controls
-                  autoPlay
-                  onLoadedData={() => setImageLoading(false)}
-                />
-              ) : (
-                <img
-                  src={flattenedMedia[lightboxIndex].url || "/placeholder.svg"}
-                  alt={flattenedMedia[lightboxIndex].title}
-                  className={`max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl transition-opacity duration-300 ${imageLoading ? 'opacity-50' : 'opacity-100'}`}
-                  onLoad={() => setImageLoading(false)}
-                />
-              )}
-            </div>
-
-            {/* Title and Counter */}
-            <div className="mt-4 text-center">
-              <p className="text-white text-lg font-medium">{flattenedMedia[lightboxIndex].title}</p>
-              <p className="text-white/60 text-sm mt-1">
-                {lightboxIndex + 1} de {flattenedMedia.length}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Review Modal */}
-      {professional && (
-        <ReviewModal
-          open={reviewModalOpen}
-          onOpenChange={setReviewModalOpen}
-          professionalId={professional.id}
-          professionalName={professional.displayName}
-          contractId={reviewContractId}
-          onSuccess={() => {
-            // Refresh data
-            fetchProfessionalData();
-          }}
-        />
-      )}
-    </div>
-  );
-}
-

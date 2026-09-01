@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
-import EquipamentoDetalhesPage from '../page';
+import EquipamentoDetalhesPage from '../equipment-details-client';
 import apiClient from '@/lib/api-service';
 import { useAuth } from '@/lib/auth-context';
 import { trackEvent } from '@/lib/analytics';

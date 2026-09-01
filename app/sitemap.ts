@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { listSitemapEntries } from "@/lib/server/community-public";
+import { listCatalogSitemapEntries } from "@/lib/server/public-catalog";
 import { absoluteUrl } from "@/lib/site";
 import { communityPath, postPath } from "@/lib/community-paths";
 
@@ -51,6 +52,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Mantém as páginas estáticas mesmo se o banco falhar; a próxima
     // regeneração (1 h) tenta de novo.
     console.error("[sitemap] falha ao carregar comunidade:", error);
+  }
+
+  // Páginas de detalhe do marketplace (profissionais publicados, equipamentos
+  // disponíveis, vagas ativas) — cada uma tem metadata e JSON-LD próprios.
+  try {
+    const catalog = await listCatalogSitemapEntries();
+    for (const p of catalog.professionals) {
+      entries.push({ url: absoluteUrl(`/profissionais/${p.id}`), lastModified: new Date(p.updatedAt), changeFrequency: "weekly", priority: 0.6 });
+    }
+    for (const e of catalog.equipments) {
+      entries.push({ url: absoluteUrl(`/equipamentos/${e.id}`), lastModified: new Date(e.updatedAt), changeFrequency: "weekly", priority: 0.5 });
+    }
+    for (const j of catalog.jobOffers) {
+      entries.push({ url: absoluteUrl(`/vagas/${j.id}`), lastModified: new Date(j.updatedAt), changeFrequency: "daily", priority: 0.5 });
+    }
+  } catch (error) {
+    console.error("[sitemap] falha ao carregar catálogo:", error);
   }
 
   return entries;

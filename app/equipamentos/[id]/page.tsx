@@ -1,512 +1,143 @@
-"use client"
+import type { Metadata } from "next";
+import { cache } from "react";
+import { notFound } from "next/navigation";
+import EquipmentDetailsPage from "./equipment-details-client";
+import { JsonLd } from "@/components/community/json-ld";
+import { getPublicEquipment, isUuid, summarize } from "@/lib/server/public-catalog";
+import { absoluteUrl, SITE_NAME } from "@/lib/site";
 
-import { useState, useEffect } from "react"
-import Image from "next/image"
-import { useParams, useRouter } from "next/navigation"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { MapPin, Package, MessageSquare, User, ChevronLeft, ChevronRight, X, Maximize2, MessageCircle, Phone, Star, Shield, Calendar, ArrowLeft } from "lucide-react"
-import Link from "next/link"
-import { useAuth } from "@/lib/auth-context"
-import apiClient from "@/lib/api-service"
-import { trackEvent } from "@/lib/analytics"
-import { ScrollReveal } from "@/components/scroll-reveal"
-import { motion, AnimatePresence } from "framer-motion"
+// Server Component + ISR (5 min) para <head> e JSON-LD (Product); a página em
+// si continua sendo o client component. Padrão de app/c/[slug]/page.tsx.
+export const revalidate = 300;
 
-interface EquipmentDetails {
-  id: string
-  name: string
-  category: string
-  negotiationType: "sale" | "rent" | "free"
-  condition: "new" | "used" | "refurbished"
-  description: string
-  brand?: string
-  model?: string
-  price?: number
-  rentPeriod?: "day" | "week" | "month"
-  city: string
-  state: string
-  imageUrl?: string
-  imageUrls?: string[]
-  ownerId: string
-  ownerName: string
-  /** Dono em plano pago (selo Perfil Verificado). */
-  ownerVerified?: boolean
-  /** Contato direto — o backend só preenche quando o dono está em plano pago. */
-  ownerContactPhone?: string | null
-  ownerWhatsappUrl?: string | null
-  isAvailable: boolean
-  additionalConditions?: string
+export async function generateStaticParams(): Promise<{ id: string }[]> {
+  return [];
 }
 
-export default function EquipmentDetailsPage() {
-  const params = useParams()
-  const router = useRouter()
-  const { userProfile } = useAuth()
-  const equipmentId = params.id as string
+type Props = { params: Promise<{ id: string }> };
 
-  const [equipment, setEquipment] = useState<EquipmentDetails | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [isLightboxOpen, setIsLightboxOpen] = useState(false)
+const load = cache(async (id: string) => (isUuid(id) ? getPublicEquipment(id) : null));
 
-  const openLightbox = (index: number) => {
-    setCurrentImageIndex(index)
-    setIsLightboxOpen(true)
-    trackEvent({ action: 'open_lightbox', category: 'Equipment', label: `Image: ${index}` });
-  }
+const NEGOTIATION_LABEL: Record<string, string> = {
+  sale: "à venda",
+  sell: "à venda",
+  rent: "para alugar",
+  rental: "para alugar",
+  both: "venda ou aluguel",
+  exchange: "para troca",
+  trade: "para troca",
+};
 
-  const closeLightbox = () => {
-    setIsLightboxOpen(false)
-  }
+const CONDITION_LABEL: Record<string, string> = {
+  new: "novo",
+  used: "usado",
+  refurbished: "recondicionado",
+};
 
-  const nextImage = (e?: React.MouseEvent) => {
-    e?.stopPropagation()
-    setCurrentImageIndex((prev) => (prev === (equipment?.imageUrls?.length || 1) - 1 ? 0 : prev + 1))
-  }
-
-  const prevImage = (e?: React.MouseEvent) => {
-    e?.stopPropagation()
-    setCurrentImageIndex((prev) => (prev === 0 ? (equipment?.imageUrls?.length || 1) - 1 : prev - 1))
-  }
-
-  // Keyboard navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isLightboxOpen) return
-      if (e.key === "Escape") closeLightbox()
-      if (e.key === "ArrowRight") nextImage()
-      if (e.key === "ArrowLeft") prevImage()
-    }
-
-    document.addEventListener("keydown", handleKeyDown)
-    return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [isLightboxOpen])
-
-  useEffect(() => {
-    fetchEquipment()
-  }, [equipmentId])
-
-  async function fetchEquipment() {
-    try {
-      setLoading(true)
-      const response = await apiClient.get(`/equipments/${equipmentId}`)
-      console.log("[EquipmentDetails] Fetched data:", response.data);
-      setEquipment(response.data)
-      trackEvent({
-        action: 'view_equipment',
-        category: 'Equipment',
-        label: response.data.name,
-        value: response.data.price || 0
-      })
-    } catch (error) {
-      console.error("Erro ao buscar equipamento:", error)
-      setEquipment(null)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const getNegotiationLabel = (type: string) => {
-    switch (type) {
-      case "sale": return "Venda"
-      case "rent": return "Aluguel"
-      case "free": return "Gratuito"
-      default: return type
-    }
-  }
-
-  const getNegotiationColor = (type: string) => {
-    switch (type) {
-      case "sale": return "bg-green-500 hover:bg-green-600"
-      case "rent": return "bg-blue-500 hover:bg-blue-600"
-      case "free": return "bg-purple-500 hover:bg-purple-600"
-      default: return "bg-gray-500 hover:bg-gray-600"
-    }
-  }
-
-  const getConditionLabel = (condition: string) => {
-    switch (condition) {
-      case "new": return "Novo"
-      case "used": return "Usado"
-      case "refurbished": return "Seminovo"
-      default: return condition
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground animate-pulse">Carregando detalhes...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!equipment) {
-    return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <Header />
-        <main className="flex-1 flex items-center justify-center p-4">
-          <Card className="max-w-md w-full border-2 shadow-2xl">
-            <CardContent className="pt-10 pb-10 text-center space-y-6">
-              <div className="h-20 w-20 bg-muted rounded-full flex items-center justify-center mx-auto">
-                <Package className="h-10 w-10 text-muted-foreground" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold mb-2">Equipamento não encontrado</h2>
-                <p className="text-muted-foreground">Este item pode ter sido removido ou não existe.</p>
-              </div>
-              <Link href="/equipamentos">
-                <Button className="w-full">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Voltar para busca
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </main>
-        <Footer />
-      </div>
-    )
-  }
-
-  const displayImages = equipment.imageUrls && equipment.imageUrls.length > 0 ? equipment.imageUrls : (equipment.imageUrl ? [equipment.imageUrl] : [])
-
-  return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <Header />
-
-      <main className="flex-1 py-12 px-4">
-        {/* Breadcrumb / Back Navigation */}
-        <div className="container mx-auto max-w-7xl mb-6">
-          <Link href="/equipamentos" className="inline-flex items-center text-muted-foreground hover:text-primary transition-colors">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar para Marketplace
-          </Link>
-        </div>
-
-        <div className="container mx-auto max-w-7xl">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-
-            {/* Left Column: Images (7 columns) */}
-            <div className="lg:col-span-7 space-y-6">
-              <ScrollReveal>
-                <div
-                  className="aspect-[4/3] bg-muted rounded-2xl overflow-hidden relative cursor-pointer group shadow-lg border-2"
-                  onClick={() => openLightbox(currentImageIndex)}
-                >
-                  {displayImages[currentImageIndex] ? (
-                    <motion.div
-                      key={currentImageIndex}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.3 }}
-                      className="h-full w-full"
-                    >
-                      <Image
-                        src={displayImages[currentImageIndex] || "/placeholder.svg"}
-                        alt={equipment.name}
-                        fill
-                        sizes="(max-width: 768px) 100vw, 50vw"
-                        className="object-cover group-hover:scale-105 transition-transform duration-700"
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-                        <div className="scale-75 opacity-0 group-hover:opacity-100 group-hover:scale-100 bg-black/60 backdrop-blur-sm text-white px-4 py-2 rounded-full transition-all duration-300 flex items-center gap-2">
-                          <Maximize2 className="h-4 w-4" />
-                          <span className="text-sm font-medium">Expandir</span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <div className="h-full w-full flex items-center justify-center bg-muted/50">
-                      <Package className="h-24 w-24 text-muted-foreground/30" />
-                    </div>
-                  )}
-
-                  {/* Status Badge Overlay */}
-                  <div className="absolute top-4 left-4 z-10">
-                    {!equipment.isAvailable && (
-                      <Badge variant="destructive" className="text-sm px-3 py-1 shadow-lg">Indisponível</Badge>
-                    )}
-                  </div>
-                </div>
-              </ScrollReveal>
-
-              {/* Thumbnails */}
-              {displayImages.length > 1 && (
-                <ScrollReveal delay={0.1}>
-                  <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3">
-                    {displayImages.map((img, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setCurrentImageIndex(idx)}
-                        className={`aspect-square bg-muted rounded-xl overflow-hidden border-2 transition-all relative ${idx === currentImageIndex
-                          ? "border-primary shadow-md ring-2 ring-primary/20"
-                          : "border-transparent hover:border-primary/50 opacity-70 hover:opacity-100"
-                          }`}
-                      >
-                        <Image
-                          src={img || "/placeholder.svg"}
-                          alt={`${equipment.name} ${idx + 1}`}
-                          fill
-                          sizes="120px"
-                          className="object-cover"
-                        />
-                      </button>
-                    ))}
-                  </div>
-                </ScrollReveal>
-              )}
-
-              {/* Description & Details for Mobile (hidden on desktop, shown on mobile) */}
-              <div className="block lg:hidden space-y-6">
-                <DescriptionSection equipment={equipment} />
-              </div>
-
-              {/* Description & Details for Desktop */}
-              <div className="hidden lg:block space-y-8">
-                <DescriptionSection equipment={equipment} />
-              </div>
-            </div>
-
-            {/* Right Column: Key Info & Actions (5 columns) */}
-            <div className="lg:col-span-5 space-y-6">
-              <ScrollReveal delay={0.2}>
-                <div className="bg-card rounded-3xl border-2 shadow-xl p-6 md:p-8 space-y-8 sticky top-24">
-                  {/* Title & Price */}
-                  <div>
-                    <div className="flex items-start justify-between gap-4 mb-4">
-                      <div>
-                        <Badge className={`${getNegotiationColor(equipment.negotiationType)} text-white border-0 px-3 py-1 mb-3`}>
-                          {getNegotiationLabel(equipment.negotiationType)}
-                        </Badge>
-                        <h1 className="text-3xl font-bold leading-tight">{equipment.name}</h1>
-                      </div>
-                    </div>
-
-                    {(equipment.brand || equipment.model) && (
-                      <div className="text-lg text-muted-foreground mb-6">
-                        {equipment.brand} {equipment.model}
-                      </div>
-                    )}
-
-                    {equipment.price && equipment.price > 0 && (
-                      <div className="p-4 bg-muted/50 rounded-2xl border mb-6">
-                        <p className="text-sm text-muted-foreground uppercase font-semibold tracking-wider mb-1">Valor</p>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-4xl font-bold text-primary">
-                            R$ {equipment.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                          {equipment.negotiationType === "rent" && equipment.rentPeriod && (
-                            <span className="text-lg text-muted-foreground font-medium">
-                              /{equipment.rentPeriod === "day" ? "dia" : equipment.rentPeriod === "week" ? "semana" : "mês"}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Specs Grid */}
-                    <div className="grid grid-cols-2 gap-4 mb-8">
-                      <div className="p-3 rounded-xl bg-muted/30 border">
-                        <span className="text-xs text-muted-foreground block mb-1">Categoria</span>
-                        <span className="font-medium">{equipment.category}</span>
-                      </div>
-                      <div className="p-3 rounded-xl bg-muted/30 border">
-                        <span className="text-xs text-muted-foreground block mb-1">Condição</span>
-                        <span className="font-medium">{getConditionLabel(equipment.condition)}</span>
-                      </div>
-                      <div className="p-3 rounded-xl bg-muted/30 border col-span-2 flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <span className="text-xs text-muted-foreground block">Localização</span>
-                          <span className="font-medium">{equipment.city}, {equipment.state}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Seller Info */}
-                  <div className="pt-8 border-t">
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Vendedor</h3>
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className="h-12 w-12 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                        {equipment.ownerName.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-bold text-lg">{equipment.ownerName}</p>
-                        {equipment.ownerVerified && (
-                          <p className="text-sm text-muted-foreground flex items-center gap-1">
-                            <Shield className="h-3 w-3 text-green-500" />
-                            Perfil Verificado
-                          </p>
-                        )}
-                      </div>
-                      <Link href={`/profissionais/${equipment.ownerId}`} className="ml-auto">
-                        <Button variant="ghost" size="sm" className="rounded-full">
-                          Ver Perfil
-                        </Button>
-                      </Link>
-                    </div>
-
-                    <div className="space-y-3">
-                      {/* Contato direto: o backend só envia estes campos quando o dono está em plano pago */}
-                      {equipment.ownerWhatsappUrl && (
-                        <Button
-                          className="w-full h-12 text-base rounded-xl bg-[#25D366] hover:bg-[#128C7E] text-white shadow-lg hover:shadow-[#25D366]/20 transition-all duration-300"
-                          onClick={() => {
-                            trackEvent({
-                              action: 'contact_seller',
-                              category: 'Equipment',
-                              label: equipment.name,
-                            });
-                            window.open(equipment.ownerWhatsappUrl as string, '_blank', 'noopener,noreferrer');
-                          }}
-                        >
-                          <MessageCircle className="h-5 w-5 mr-2" />
-                          Conversar no WhatsApp
-                        </Button>
-                      )}
-
-                      {equipment.ownerContactPhone && (
-                        <a
-                          href={`tel:${equipment.ownerContactPhone.replace(/[^\d+]/g, '')}`}
-                          className="block"
-                          onClick={() => {
-                            trackEvent({
-                              action: 'contact_seller',
-                              category: 'Equipment',
-                              label: equipment.name,
-                            });
-                          }}
-                        >
-                          <Button variant="outline" className="w-full h-12 text-base rounded-xl">
-                            <Phone className="h-5 w-5 mr-2" />
-                            Ligar: {equipment.ownerContactPhone}
-                          </Button>
-                        </a>
-                      )}
-
-                      {userProfile && userProfile.id !== equipment.ownerId && equipment.isAvailable ? (
-                        <Link href={`/negociar-equipamento/${equipment.id}`} className="block" onClick={() => {
-                          trackEvent({
-                            action: 'negotiate_equipment_click',
-                            category: 'Equipment',
-                            label: equipment.name,
-                          });
-                        }}>
-                          <Button className="w-full h-12 text-base rounded-xl" variant="outline" size="lg">
-                            <MessageSquare className="h-5 w-5 mr-2" />
-                            {equipment.negotiationType === "sale" ? "Fazer Proposta na Plataforma" : "Solicitar Pela Plataforma"}
-                          </Button>
-                        </Link>
-                      ) : !userProfile ? (
-                        <Link href="/login" className="block">
-                          <Button variant="secondary" className="w-full h-12 rounded-xl">
-                            Faça login para negociar
-                          </Button>
-                        </Link>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              </ScrollReveal>
-            </div>
-
-          </div>
-        </div>
-      </main>
-
-      <Footer />
-
-      {/* Lightbox Modal */}
-      <AnimatePresence>
-        {isLightboxOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm"
-            onClick={closeLightbox}
-          >
-            <button
-              onClick={closeLightbox}
-              className="absolute top-6 right-6 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors z-50"
-            >
-              <X className="h-8 w-8" />
-            </button>
-
-            <motion.img
-              key={currentImageIndex}
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              src={displayImages[currentImageIndex] || "/placeholder.svg"}
-              alt={equipment.name}
-              className="max-w-full max-h-[90vh] object-contain select-none shadow-2xl rounded-sm"
-              onClick={(e) => e.stopPropagation()}
-            />
-
-            {displayImages.length > 1 && (
-              <>
-                <button
-                  onClick={prevImage}
-                  className="absolute left-6 top-1/2 -translate-y-1/2 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors"
-                >
-                  <ChevronLeft className="h-10 w-10" />
-                </button>
-                <button
-                  onClick={nextImage}
-                  className="absolute right-6 top-1/2 -translate-y-1/2 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors"
-                >
-                  <ChevronRight className="h-10 w-10" />
-                </button>
-
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/50 px-4 py-2 rounded-full text-white/90 text-sm font-medium backdrop-blur-md">
-                  {currentImageIndex + 1} / {displayImages.length}
-                </div>
-              </>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
+function money(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "";
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 }
 
-function DescriptionSection({ equipment }: { equipment: EquipmentDetails }) {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  const e = await load(id);
+  if (!e) {
+    return { title: `Equipamento não encontrado | ${SITE_NAME}`, robots: { index: false, follow: false } };
+  }
+
+  const path = `/equipamentos/${e.id}`;
+  const where = [e.city, e.state].filter(Boolean).join("/");
+  const deal = e.negotiationType ? NEGOTIATION_LABEL[e.negotiationType.toLowerCase()] ?? "" : "";
+  const fullName = [e.name, e.brand && !e.name.toLowerCase().includes(e.brand.toLowerCase()) ? e.brand : null]
+    .filter(Boolean)
+    .join(" ");
+  const title = `${fullName}${deal ? ` ${deal}` : ""}${where ? ` em ${where}` : ""}`;
+  const price = money(e.price);
+  const condition = e.condition ? CONDITION_LABEL[e.condition.toLowerCase()] ?? e.condition : "";
+  const description =
+    summarize(e.description) ||
+    `${fullName}${condition ? ` ${condition}` : ""}${deal ? ` ${deal}` : ""}${price ? ` por ${price}` : ""}${where ? ` em ${where}` : ""}. Negocie direto com o dono na ${SITE_NAME}.`;
+
+  return {
+    title: `${title} | ${SITE_NAME}`,
+    description,
+    alternates: { canonical: path },
+    // Equipamento já vendido/indisponível fica acessível mas sai do índice
+    ...(e.isAvailable ? {} : { robots: { index: false, follow: true } }),
+    openGraph: {
+      type: "website",
+      title,
+      description,
+      url: absoluteUrl(path),
+      siteName: SITE_NAME,
+      locale: "pt_BR",
+      ...(e.imageUrls.length ? { images: e.imageUrls.slice(0, 3).map((u) => ({ url: u })) } : {}),
+    },
+    twitter: { card: e.imageUrls.length ? "summary_large_image" : "summary", title, description },
+  };
+}
+
+export default async function EquipmentPage({ params }: Props) {
+  const { id } = await params;
+  const e = await load(id);
+  if (!e) notFound();
+
+  const url = absoluteUrl(`/equipamentos/${e.id}`);
+  const product: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: e.name,
+    url,
+    ...(e.imageUrls.length ? { image: e.imageUrls } : {}),
+    ...(e.description ? { description: summarize(e.description, 500) } : {}),
+    ...(e.brand ? { brand: { "@type": "Brand", name: e.brand } } : {}),
+    ...(e.model ? { model: e.model } : {}),
+    ...(e.category ? { category: e.category } : {}),
+    ...(e.price !== null
+      ? {
+        offers: {
+          "@type": "Offer",
+          url,
+          priceCurrency: "BRL",
+          price: e.price,
+          availability: e.isAvailable ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+          itemCondition:
+            e.condition && e.condition.toLowerCase() === "new"
+              ? "https://schema.org/NewCondition"
+              : "https://schema.org/UsedCondition",
+          ...(e.city || e.state
+            ? {
+              areaServed: {
+                "@type": "Place",
+                address: {
+                  "@type": "PostalAddress",
+                  ...(e.city ? { addressLocality: e.city } : {}),
+                  ...(e.state ? { addressRegion: e.state } : {}),
+                  addressCountry: "BR",
+                },
+              },
+            }
+            : {}),
+        },
+      }
+      : {}),
+  };
+
+  const breadcrumb = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Equipamentos", item: absoluteUrl("/equipamentos") },
+      { "@type": "ListItem", position: 2, name: e.name, item: url },
+    ],
+  };
+
   return (
     <>
-      <ScrollReveal delay={0.2}>
-        <div className="bg-card rounded-2xl border shadow-sm p-6 md:p-8">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <span className="w-1 h-6 bg-primary rounded-full" />
-            Descrição
-          </h2>
-          <div className="prose prose-neutral dark:prose-invert max-w-none text-muted-foreground whitespace-pre-wrap leading-relaxed">
-            {equipment.description}
-          </div>
-        </div>
-      </ScrollReveal>
-
-      {equipment.additionalConditions && (
-        <ScrollReveal delay={0.3}>
-          <div className="bg-card rounded-2xl border shadow-sm p-6 md:p-8">
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <span className="w-1 h-6 bg-orange-500 rounded-full" />
-              Condições e Observações
-            </h2>
-            <div className="p-4 bg-orange-500/10 text-orange-700 dark:text-orange-300 rounded-xl border border-orange-500/20">
-              <p className="whitespace-pre-wrap leading-relaxed">{equipment.additionalConditions}</p>
-            </div>
-          </div>
-        </ScrollReveal>
-      )}
+      <JsonLd data={product} />
+      <JsonLd data={breadcrumb} />
+      <EquipmentDetailsPage />
     </>
-  )
+  );
 }

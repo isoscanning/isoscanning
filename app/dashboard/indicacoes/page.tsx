@@ -36,12 +36,15 @@ interface ReferralSummary {
   enabled: boolean;
   code: string;
   link: string;
+  /** Indicador no plano anual: prêmios não viram desconto (regra 2026-09-01). */
+  annualPlan?: boolean;
   settings: {
     referredBonusDays: number;
     referredTrialDays: number;
     rewardPercent: number;
     maxDiscountPercent: number;
     ambassadorMinReferrals: number;
+    rewardValidityDays?: number;
   };
   stats: { signups: number; converted: number; referralCount: number; isAmbassador: boolean };
   rewards: {
@@ -51,6 +54,8 @@ interface ReferralSummary {
     availablePercent: number;
     nextInvoiceDiscountPercent: number;
     appliedTotalPercent: number;
+    expiredCount?: number;
+    nextExpiryAt?: string | null;
   };
   referred: Array<{
     displayName: string;
@@ -118,6 +123,7 @@ export default function IndicacoesPage() {
 
   const rewardPercent = summary?.settings.rewardPercent ?? 5;
   const maxPercent = summary?.settings.maxDiscountPercent ?? 50;
+  const validityDays = summary?.settings.rewardValidityDays ?? 90;
   const stepsToMax = Math.max(1, Math.floor(maxPercent / Math.max(rewardPercent, 1)));
   const nextPercent = summary?.rewards.nextInvoiceDiscountPercent ?? 0;
   const progress = Math.min(100, Math.round((nextPercent / maxPercent) * 100));
@@ -243,7 +249,7 @@ export default function IndicacoesPage() {
                         Desconto na sua próxima fatura
                       </CardTitle>
                       <CardDescription>
-                        Cada indicado que assina vale <strong>{rewardPercent}%</strong>. Acumula até <strong>{maxPercent}%</strong> por fatura; o que passar fica para a seguinte.
+                        Cada indicado que assina vale <strong>{rewardPercent}%</strong>. Acumula até <strong>{maxPercent}%</strong> por fatura; o que passar fica para a seguinte. Cada prêmio vale por <strong>{validityDays} dias</strong>.
                       </CardDescription>
                     </div>
                     <div className="text-right">
@@ -274,6 +280,22 @@ export default function IndicacoesPage() {
                   {summary.rewards.appliedTotalPercent > 0 && (
                     <p className="text-xs text-muted-foreground">
                       Já usados: {summary.rewards.appliedTotalPercent}% em {summary.rewards.appliedCount} fatura{summary.rewards.appliedCount === 1 ? "" : "s"}.
+                    </p>
+                  )}
+                  {summary.rewards.nextExpiryAt && (
+                    <p className="text-xs text-muted-foreground">
+                      Próximo prêmio vence em {new Date(summary.rewards.nextExpiryAt).toLocaleDateString("pt-BR")} — use antes para não perder.
+                    </p>
+                  )}
+                  {(summary.rewards.expiredCount ?? 0) > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {summary.rewards.expiredCount} prêmio{summary.rewards.expiredCount === 1 ? "" : "s"} venceu sem uso.
+                    </p>
+                  )}
+                  {summary.annualPlan && (
+                    <p className="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                      Você está no plano anual: o desconto de indicação vale apenas para o plano mensal. Seus prêmios
+                      ficam guardados (dentro da validade) caso você mude para o mensal.
                     </p>
                   )}
                 </CardContent>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import DetalhesVagaPage from '../page';
+import DetalhesVagaPage from '../job-offer-client';
 import { fetchJobOfferById, fetchJobApplication, applyToJob } from '@/lib/data-service';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter, useParams } from 'next/navigation';

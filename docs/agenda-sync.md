@@ -117,22 +117,22 @@ dados. Conexões feitas antes precisam RECONECTAR para conceder a permissão
 espelho da conta). Quem usa o envio não deve assinar também o feed .ics no
 Google — duplicaria.
 
-### 4.3 Verificação do app (para abrir ao público)
+### 4.3 Publicação (não precisa de verificação de escopos)
 
-`calendar.freebusy` é um escopo **sensível**: em produção, para qualquer
-conta (não só usuários de teste) o Google exige a **verificação do app**. É
-gratuita e pede: tela de consentimento completa, domínio verificado no Search
-Console, política de privacidade pública explicando o uso ("lemos apenas
-horários livre/ocupado para bloquear datas no seu perfil"), e um vídeo curto
-mostrando o fluxo. Prazo típico: alguns dias a poucas semanas. Enquanto isso:
-usuários de teste funcionam normalmente; os demais podem usar o link `.ics`
-(item 3), que não depende de verificação.
+Constatado em 2026-09-01 no console: `calendar.freebusy` e
+`calendar.app.created` são classificados como escopos **não sensíveis**
+("Escopos não confidenciais" em Acesso a dados). Portanto:
 
-Escopo mínimo é decisão consciente: se no futuro quisermos listar os
-calendários da conta (para o usuário escolher quais bloqueiam), seria preciso
-adicionar `calendar.calendars.readonly` — outro escopo sensível. Hoje usamos
-`primary`; IDs extras de calendário podem ser passados por `PATCH
-/api/agenda/connections/:id` (`calendarIds`).
+- basta **Público-alvo → Publicar app** ("Em produção") e qualquer usuário
+  conecta — sem tela de "app não verificado", sem teto de 100 usuários e sem
+  o processo de verificação de escopos (vídeo/justificativas);
+- a única revisão opcional é a **verificação da marca** (Branding), que faz o
+  logo aparecer na tela de consentimento — exige domínio verificado no Search
+  Console (feito) e política de privacidade citando os dados do Google
+  (`/privacidade`, seção 4 — feito);
+- se um dia adicionarmos um escopo sensível (ex.: `calendar.events.readonly`
+  para importar títulos), aí sim entra a verificação completa — roteiro em
+  `docs/google-verificacao.md`.
 
 ## 5. Sincronização automática
 

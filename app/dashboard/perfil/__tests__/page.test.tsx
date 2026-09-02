@@ -35,6 +35,9 @@ jest.mock('@/lib/data-service', () => ({
     deleteAvailability: jest.fn(),
     deleteAvailabilities: jest.fn(),
     fetchSpecialties: jest.fn(),
+    // Puro (sem rede): mantém o comportamento real para as reservas do fluxo de contrato/acordo
+    isFlowReservation: (slot: { contractId?: string | null; jobApplicationId?: string | null }) =>
+        !!slot.contractId || !!slot.jobApplicationId,
 }));
 
 // Avatar upload goes to Supabase Storage — keep it out of the test.

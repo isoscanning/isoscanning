@@ -32,6 +32,7 @@ import { usePlan, usePlanUsage } from "@/lib/plans/use-plan";
 interface Contract {
   id: string;
   title: string;
+  ownerName?: string;
   clientName: string;
   clientEmail: string;
   status: string;
@@ -39,7 +40,9 @@ interface Contract {
   contractValue?: number | null;
   serviceStartDate?: string | null;
   createdAt: string;
-  parties?: { partyRole: string; signedAt?: string | null }[];
+  parties?: { partyRole: string; userId?: string | null; signedAt?: string | null; signatureToken?: string }[];
+  viewerRole?: "owner" | "professional" | "party";
+  supersededBy?: string | null;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
@@ -47,6 +50,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
   sent: { label: "Enviado", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300", icon: Send },
   partially_signed: { label: "Parcialmente Assinado", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300", icon: Clock },
   fully_signed: { label: "Totalmente Assinado", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300", icon: CheckCircle2 },
+  rejected: { label: "Recusado", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300", icon: XCircle },
   cancelled: { label: "Cancelado", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300", icon: XCircle },
   expired: { label: "Expirado", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300", icon: AlertCircle },
 };
@@ -55,7 +59,10 @@ const SOURCE_LABELS: Record<string, string> = {
   standalone: "Independente",
   proposal: "Proposta",
   quote: "Orçamento",
+  job_application: "Vaga",
 };
+
+type ContractsTab = "owner" | "professional";
 
 export default function ContratosPage() {
   const router = useRouter();
@@ -65,6 +72,8 @@ export default function ContratosPage() {
   const [loadingContracts, setLoadingContracts] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
+  // "Meus" = contratos que criei | "Recebidos" = contratos em que sou a parte contratada
+  const [tab, setTab] = useState<ContractsTab>("owner");
 
   useEffect(() => {
     if (!loading && !userProfile) router.push("/login");
@@ -82,6 +91,8 @@ export default function ContratosPage() {
       setLoadingContracts(true);
       try {
         const params = new URLSearchParams();
+        params.set("role", tab);
+        params.set("limit", "100");
         if (filterStatus) params.set("status", filterStatus);
         const res = await apiClient.get(`/contracts?${params.toString()}`);
         setContracts(res.data.data ?? []);
@@ -93,14 +104,21 @@ export default function ContratosPage() {
       }
     };
     fetchContracts();
-  }, [userProfile, filterStatus]);
+  }, [userProfile, filterStatus, tab]);
 
   const filtered = contracts.filter((c) =>
     !searchTerm ||
     c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.clientEmail.toLowerCase().includes(searchTerm.toLowerCase())
+    c.clientEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (c.ownerName ?? "").toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  /** Na aba "Recebidos": contrato aguardando a minha assinatura. */
+  const awaitingMySignature = (c: Contract) =>
+    tab === "professional" &&
+    (c.status === "sent" || c.status === "partially_signed") &&
+    !!c.parties?.some((p) => p.userId === userProfile?.id && !p.signedAt);
 
   const statsCount = {
     draft: contracts.filter((c) => c.status === "draft").length,
@@ -185,6 +203,25 @@ export default function ContratosPage() {
           {/* Filters */}
           <ScrollReveal delay={0.2}>
             <div className="flex flex-col sm:flex-row gap-3">
+              <div className="inline-flex rounded-lg border bg-muted/40 p-1 self-start" role="tablist">
+                {([
+                  { key: "owner", label: "Meus contratos" },
+                  { key: "professional", label: "Recebidos" },
+                ] as { key: ContractsTab; label: string }[]).map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === t.key}
+                    onClick={() => setTab(t.key)}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                      tab === t.key ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input
@@ -220,14 +257,18 @@ export default function ContratosPage() {
                   <FileSignature className="h-8 w-8 text-indigo-500" />
                 </div>
                 <h3 className="text-xl font-semibold">
-                  {contracts.length === 0 ? "Nenhum contrato ainda" : "Nenhum resultado encontrado"}
+                  {contracts.length === 0
+                    ? (tab === "professional" ? "Nenhum contrato recebido" : "Nenhum contrato ainda")
+                    : "Nenhum resultado encontrado"}
                 </h3>
                 <p className="text-muted-foreground max-w-sm mx-auto">
                   {contracts.length === 0
-                    ? "Crie seu primeiro contrato digital e envie para assinatura em minutos."
+                    ? (tab === "professional"
+                      ? "Quando um contratante enviar um contrato para você assinar, ele aparecerá aqui."
+                      : "Crie seu primeiro contrato digital e envie para assinatura em minutos.")
                     : "Tente ajustar os filtros ou o termo de busca."}
                 </p>
-                {contracts.length === 0 && (
+                {contracts.length === 0 && tab === "owner" && (
                   <Link href="/dashboard/contratos/novo">
                     <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 mt-2">
                       <Plus className="h-4 w-4" /> Criar Primeiro Contrato
@@ -257,9 +298,17 @@ export default function ContratosPage() {
                             <Badge variant="outline" className="text-xs">
                               {SOURCE_LABELS[contract.source] ?? contract.source}
                             </Badge>
+                            {awaitingMySignature(contract) && (
+                              <Badge className="text-xs bg-indigo-600 hover:bg-indigo-600 text-white">Aguardando sua assinatura</Badge>
+                            )}
+                            {contract.supersededBy && (
+                              <Badge variant="outline" className="text-xs text-muted-foreground">Substituído por nova versão</Badge>
+                            )}
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {contract.clientName} · {contract.clientEmail}
+                            {tab === "professional"
+                              ? <>Contratante: {contract.ownerName ?? "—"}</>
+                              : <>{contract.clientName} · {contract.clientEmail}</>}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             Criado em {new Date(contract.createdAt).toLocaleDateString("pt-BR")}

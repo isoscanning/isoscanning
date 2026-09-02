@@ -16,11 +16,15 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
+  PenLine,
+  CalendarCheck,
 } from "lucide-react";
 import Link from "next/link";
+import { formatDateOnly } from "@/components/jobs/negotiation";
 
 // Este endpoint é público — sem autenticação
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+const REJECT_REASON_MIN = 10; // espelha o MinLength do RejectContractDto
 
 interface Party {
   id: string;
@@ -28,6 +32,13 @@ interface Party {
   name: string;
   email: string;
   signedAt?: string | null;
+  rejectedAt?: string | null;
+  rejectionReason?: string | null;
+}
+
+interface RejectedBy {
+  name: string;
+  reason?: string | null;
   rejectedAt?: string | null;
 }
 
@@ -45,9 +56,41 @@ interface ContractData {
   party: Party;
   signaturesCompleted: number;
   signaturesTotal: number;
+  /** Já resolvido pelo backend: false p/ rascunho, recusado, cancelado, expirado ou já assinado. */
+  canSign: boolean;
+  rejectedBy: RejectedBy[];
+  supersededBy?: string | null;
 }
 
-type SigningState = "loading" | "ready" | "confirming" | "signed" | "rejected" | "already_signed" | "cancelled" | "expired" | "error";
+type SigningState =
+  | "loading"
+  | "ready"
+  | "signed"
+  | "rejected"          // eu recusei
+  | "rejected_by_other" // a outra parte recusou — o contrato não segue
+  | "already_signed"
+  | "fully_signed"
+  | "draft"
+  | "cancelled"
+  | "expired"
+  | "error";
+
+/** Datas "YYYY-MM-DD" e timestamps: sem deslocamento de fuso. */
+const fmtDate = (value?: string | null) => {
+  if (!value) return "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? formatDateOnly(value) : new Date(value).toLocaleDateString("pt-BR");
+};
+
+const readMessage = async (res: Response, fallback: string) => {
+  try {
+    const data = await res.json();
+    const msg = data?.message;
+    if (Array.isArray(msg)) return msg.join(" ");
+    return typeof msg === "string" && msg ? msg : fallback;
+  } catch {
+    return fallback;
+  }
+};
 
 export default function AssinarContratoPage() {
   const params = useParams();
@@ -62,6 +105,7 @@ export default function AssinarContratoPage() {
   const [confirmName, setConfirmName] = useState("");
   const [showFullContract, setShowFullContract] = useState(false);
   const [signatureHash, setSignatureHash] = useState("");
+  const [signResult, setSignResult] = useState<{ completed: number; total: number; status?: string; message?: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectForm, setShowRejectForm] = useState(false);
@@ -72,16 +116,21 @@ export default function AssinarContratoPage() {
         const res = await fetch(`${API_URL}/contracts/sign/${token}`);
         if (!res.ok) throw new Error("Link inválido");
         const data: ContractData = await res.json();
-
-        if (data.status === "cancelled") { setState("cancelled"); return; }
-        if (data.status === "expired") { setState("expired"); return; }
-        if (data.party.signedAt) { setState("already_signed"); setContract(data); return; }
-        if (data.party.rejectedAt) { setState("rejected"); setContract(data); return; }
-
         setContract(data);
         setFullName(data.party.name);
+
+        // Ordem importa: o estado da MINHA parte vem antes do estado do contrato
+        if (data.party.signedAt) { setState(data.status === "fully_signed" ? "fully_signed" : "already_signed"); return; }
+        if (data.party.rejectedAt) { setState("rejected"); return; }
+        if (data.status === "rejected" || (data.rejectedBy?.length ?? 0) > 0) { setState("rejected_by_other"); return; }
+        if (data.status === "cancelled") { setState("cancelled"); return; }
+        if (data.status === "expired") { setState("expired"); return; }
+        if (data.status === "draft") { setState("draft"); return; }
+        if (data.status === "fully_signed") { setState("fully_signed"); return; }
+        if (!data.canSign) { setState("error"); setError("Este contrato não está disponível para assinatura no momento."); return; }
+
         setState("ready");
-      } catch (e) {
+      } catch {
         setState("error");
         setError("Link de assinatura inválido ou expirado.");
       }
@@ -103,12 +152,15 @@ export default function AssinarContratoPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fullName, document }),
       });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message ?? "Erro ao assinar");
-      }
+      if (!res.ok) throw new Error(await readMessage(res, "Erro ao assinar"));
       const data = await res.json();
       setSignatureHash(data.signatureHash ?? "");
+      setSignResult({
+        completed: data.signaturesCompleted ?? (contract?.signaturesCompleted ?? 0) + 1,
+        total: data.signaturesTotal ?? contract?.signaturesTotal ?? 2,
+        status: data.contractStatus,
+        message: data.message,
+      });
       setState("signed");
     } catch (e: unknown) {
       const err = e as Error;
@@ -119,17 +171,25 @@ export default function AssinarContratoPage() {
   };
 
   const handleReject = async () => {
-    if (!rejectReason.trim()) { setError("Informe o motivo da recusa."); return; }
+    const reason = rejectReason.trim();
+    if (reason.length < REJECT_REASON_MIN) {
+      setError(`Descreva o motivo da recusa com pelo menos ${REJECT_REASON_MIN} caracteres.`);
+      return;
+    }
+    setError("");
     setSubmitting(true);
     try {
-      await fetch(`${API_URL}/contracts/sign/${token}/reject`, {
+      const res = await fetch(`${API_URL}/contracts/sign/${token}/reject`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: rejectReason }),
+        body: JSON.stringify({ reason }),
       });
+      if (!res.ok) throw new Error(await readMessage(res, "Erro ao registrar recusa."));
+      setContract((prev) => prev ? { ...prev, status: "rejected", party: { ...prev.party, rejectedAt: new Date().toISOString(), rejectionReason: reason } } : prev);
       setState("rejected");
-    } catch {
-      setError("Erro ao registrar recusa.");
+    } catch (e: unknown) {
+      const err = e as Error;
+      setError(err.message ?? "Erro ao registrar recusa.");
     } finally {
       setSubmitting(false);
     }
@@ -163,6 +223,22 @@ export default function AssinarContratoPage() {
     );
   }
 
+  if (state === "draft") {
+    return (
+      <SigningLayout>
+        <div className="text-center space-y-5 py-12">
+          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto">
+            <PenLine className="h-8 w-8 text-gray-500" />
+          </div>
+          <h1 className="text-2xl font-bold">Contrato ainda em rascunho</h1>
+          <p className="text-muted-foreground">
+            {contract?.ownerName ?? "O remetente"} ainda não enviou este contrato para assinatura. Você será avisado quando ele estiver pronto.
+          </p>
+        </div>
+      </SigningLayout>
+    );
+  }
+
   if (state === "cancelled") {
     return (
       <SigningLayout>
@@ -171,7 +247,11 @@ export default function AssinarContratoPage() {
             <XCircle className="h-8 w-8 text-gray-500" />
           </div>
           <h1 className="text-2xl font-bold">Contrato cancelado</h1>
-          <p className="text-muted-foreground">Este contrato foi cancelado pelo remetente.</p>
+          <p className="text-muted-foreground">
+            {contract?.supersededBy
+              ? "Este contrato foi substituído por uma nova versão. Aguarde o novo link de assinatura."
+              : "Este contrato foi cancelado pelo remetente."}
+          </p>
         </div>
       </SigningLayout>
     );
@@ -185,7 +265,30 @@ export default function AssinarContratoPage() {
             <Clock className="h-8 w-8 text-orange-500" />
           </div>
           <h1 className="text-2xl font-bold">Prazo expirado</h1>
-          <p className="text-muted-foreground">O prazo para assinar este contrato expirou. Entre em contato com o remetente.</p>
+          <p className="text-muted-foreground">O prazo para assinar este contrato expirou. Entre em contato com o remetente para receber uma nova versão.</p>
+        </div>
+      </SigningLayout>
+    );
+  }
+
+  if (state === "fully_signed" && contract) {
+    return (
+      <SigningLayout>
+        <div className="text-center space-y-5 py-12">
+          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+            <CheckCircle2 className="h-8 w-8 text-green-500" />
+          </div>
+          <h1 className="text-2xl font-bold text-green-700">Contrato totalmente assinado</h1>
+          <p className="text-muted-foreground">
+            Todas as partes já assinaram este contrato
+            {contract.party.signedAt && <> — a sua assinatura foi registrada em {new Date(contract.party.signedAt).toLocaleString("pt-BR")}</>}.
+          </p>
+          {contract.serviceStartDate && (
+            <p className="text-sm text-muted-foreground flex items-center justify-center gap-1.5">
+              <CalendarCheck className="h-4 w-4 text-green-500" />
+              Serviço em {fmtDate(contract.serviceStartDate)}{contract.serviceEndDate && contract.serviceEndDate !== contract.serviceStartDate && ` a ${fmtDate(contract.serviceEndDate)}`} — data bloqueada na agenda.
+            </p>
+          )}
         </div>
       </SigningLayout>
     );
@@ -204,7 +307,7 @@ export default function AssinarContratoPage() {
             {contract.party.signedAt ? new Date(contract.party.signedAt).toLocaleString("pt-BR") : ""}.
           </p>
           <p className="text-sm text-muted-foreground">
-            {contract.signaturesCompleted}/{contract.signaturesTotal} partes assinaram este contrato.
+            {contract.signaturesCompleted}/{contract.signaturesTotal} partes assinaram — aguardando a outra parte.
           </p>
         </div>
       </SigningLayout>
@@ -220,14 +323,40 @@ export default function AssinarContratoPage() {
           </div>
           <h1 className="text-2xl font-bold">Assinatura recusada</h1>
           <p className="text-muted-foreground">
-            Você recusou assinar este contrato. O remetente foi notificado.
+            Você recusou assinar este contrato. {contract.ownerName} foi notificado e poderá enviar uma nova versão com os termos ajustados.
           </p>
+          {contract.party.rejectionReason && (
+            <p className="text-sm text-muted-foreground italic">Motivo informado: "{contract.party.rejectionReason}"</p>
+          )}
+        </div>
+      </SigningLayout>
+    );
+  }
+
+  if (state === "rejected_by_other" && contract) {
+    const other = contract.rejectedBy?.[0];
+    return (
+      <SigningLayout>
+        <div className="text-center space-y-5 py-12">
+          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+            <XCircle className="h-8 w-8 text-red-500" />
+          </div>
+          <h1 className="text-2xl font-bold">Contrato recusado</h1>
+          <p className="text-muted-foreground">
+            {other?.name ?? "A outra parte"} recusou assinar este contrato, por isso ele não pode mais ser assinado.
+            {other?.rejectedAt && <> Recusa registrada em {new Date(other.rejectedAt).toLocaleString("pt-BR")}.</>}
+          </p>
+          {other?.reason && <p className="text-sm text-muted-foreground italic">Motivo: "{other.reason}"</p>}
+          <p className="text-sm text-muted-foreground">Se os termos forem ajustados, uma nova versão será enviada com um novo link.</p>
         </div>
       </SigningLayout>
     );
   }
 
   if (state === "signed") {
+    const completed = signResult?.completed ?? 0;
+    const total = signResult?.total ?? 0;
+    const isComplete = signResult?.status === "fully_signed" || (total > 0 && completed >= total);
     return (
       <SigningLayout>
         <div className="text-center space-y-6 py-12">
@@ -239,17 +368,18 @@ export default function AssinarContratoPage() {
           <div>
             <h1 className="text-3xl font-bold text-green-700">Contrato assinado!</h1>
             <p className="text-muted-foreground mt-2">
-              Sua assinatura digital foi registrada com sucesso.
+              {signResult?.message ?? "Sua assinatura digital foi registrada com sucesso."}
             </p>
           </div>
-          {contract && (
+          {total > 0 && (
             <p className="text-sm text-muted-foreground">
-              {contract.signaturesCompleted + 1}/{contract.signaturesTotal} partes assinaram.
-              {contract.signaturesTotal > 1 && contract.signaturesCompleted < contract.signaturesTotal - 1 && (
-                <span className="block mt-1">Aguardando as demais partes assinarem.</span>
-              )}
-              {contract.signaturesCompleted + 1 === contract.signaturesTotal && (
-                <span className="block mt-1 font-medium text-green-600">Contrato totalmente assinado! Você receberá uma cópia por e-mail.</span>
+              {completed}/{total} partes assinaram.
+              {!isComplete && <span className="block mt-1">Aguardando a outra parte assinar.</span>}
+              {isComplete && (
+                <span className="block mt-1 font-medium text-green-600">
+                  Contrato totalmente assinado
+                  {contract?.serviceStartDate ? ` — a data de ${fmtDate(contract.serviceStartDate)} foi bloqueada na agenda das duas partes.` : "."}
+                </span>
               )}
             </p>
           )}
@@ -257,7 +387,7 @@ export default function AssinarContratoPage() {
             <div className="mt-4 rounded-xl bg-muted p-4 text-left space-y-1">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hash de validade</p>
               <p className="text-xs font-mono break-all text-muted-foreground">{signatureHash}</p>
-              <p className="text-xs text-muted-foreground">Este código comprova a autenticidade da sua assinatura.</p>
+              <p className="text-xs text-muted-foreground">Este código comprova a autenticidade da sua assinatura. Guarde-o.</p>
             </div>
           )}
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mt-4">
@@ -272,6 +402,7 @@ export default function AssinarContratoPage() {
   // ─── ESTADO PRINCIPAL: PRONTO PARA ASSINAR ───────────────────────────────
 
   if (state === "ready" && contract) {
+    const otherSigned = contract.signaturesCompleted > 0;
     return (
       <SigningLayout>
         <div className="space-y-6">
@@ -298,14 +429,17 @@ export default function AssinarContratoPage() {
               )}
               {contract.serviceStartDate && (
                 <div>
-                  <span className="text-muted-foreground">Data: </span>
-                  <strong>{new Date(contract.serviceStartDate).toLocaleDateString("pt-BR")}</strong>
+                  <span className="text-muted-foreground">Data do serviço: </span>
+                  <strong>
+                    {fmtDate(contract.serviceStartDate)}
+                    {contract.serviceEndDate && contract.serviceEndDate !== contract.serviceStartDate && ` a ${fmtDate(contract.serviceEndDate)}`}
+                  </strong>
                 </div>
               )}
               {contract.expiresAt && (
                 <div>
                   <span className="text-muted-foreground">Assinar até: </span>
-                  <strong className="text-orange-600">{new Date(contract.expiresAt).toLocaleDateString("pt-BR")}</strong>
+                  <strong className="text-orange-600">{fmtDate(contract.expiresAt)}</strong>
                 </div>
               )}
             </div>
@@ -313,6 +447,12 @@ export default function AssinarContratoPage() {
               <Shield className="h-3.5 w-3.5 text-indigo-500" />
               Assinatura digital com validade jurídica — sua identidade e IP serão registrados
             </div>
+            {contract.serviceStartDate && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground bg-white/60 dark:bg-black/20 rounded-lg px-3 py-2">
+                <CalendarCheck className="h-3.5 w-3.5 text-green-500" />
+                Quando as duas partes assinarem, a data do serviço é bloqueada automaticamente na agenda de ambos.
+              </div>
+            )}
           </div>
 
           {/* Conteúdo do Contrato (colapsável) */}
@@ -342,20 +482,29 @@ export default function AssinarContratoPage() {
               Partes do contrato ({contract.signaturesCompleted}/{contract.signaturesTotal} assinaram)
             </p>
             <div className="space-y-2">
+              {contract.party.partyRole === "recipient" && (
+                <div className="flex items-center gap-2 text-sm">
+                  {otherSigned
+                    ? <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    : <Clock className="h-4 w-4 text-yellow-500" />}
+                  <span className="font-medium">{contract.ownerName}</span>
+                  <span className="text-xs text-muted-foreground">(Remetente)</span>
+                </div>
+              )}
               <div className="flex items-center gap-2 text-sm">
-                {contract.signaturesCompleted > 0
-                  ? <CheckCircle2 className="h-4 w-4 text-green-500" />
-                  : <Clock className="h-4 w-4 text-yellow-500" />}
-                <span className="font-medium">{contract.ownerName}</span>
-                <span className="text-xs text-muted-foreground">(Prestador)</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                {contract.party.signedAt
-                  ? <CheckCircle2 className="h-4 w-4 text-green-500" />
-                  : <Clock className="h-4 w-4 text-yellow-500" />}
+                <Clock className="h-4 w-4 text-yellow-500" />
                 <span className="font-medium">{contract.party.name}</span>
-                <span className="text-xs text-muted-foreground">(Cliente — você)</span>
+                <span className="text-xs text-muted-foreground">(Você)</span>
               </div>
+              {contract.party.partyRole === "sender" && (
+                <div className="flex items-center gap-2 text-sm">
+                  {otherSigned
+                    ? <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    : <Clock className="h-4 w-4 text-yellow-500" />}
+                  <span className="font-medium">{contract.clientName}</span>
+                  <span className="text-xs text-muted-foreground">(Outra parte)</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -443,10 +592,11 @@ export default function AssinarContratoPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setShowRejectForm(true)}
-                  className="text-red-500 border-red-200 hover:bg-red-50 px-4"
+                  onClick={() => { setShowRejectForm(true); setError(""); }}
+                  className="text-red-500 border-red-200 hover:bg-red-50 px-4 gap-1.5"
+                  title="Recusar assinatura"
                 >
-                  <XCircle className="h-4 w-4" />
+                  <XCircle className="h-4 w-4" /> Recusar
                 </Button>
               </div>
 
@@ -463,7 +613,7 @@ export default function AssinarContratoPage() {
                 Recusar assinatura
               </h2>
               <p className="text-sm text-muted-foreground">
-                Informe o motivo da recusa. O remetente será notificado.
+                Explique o que precisa mudar. {contract.ownerName} será notificado, verá o motivo e poderá enviar uma nova versão do contrato.
               </p>
               <textarea
                 value={rejectReason}
@@ -472,6 +622,9 @@ export default function AssinarContratoPage() {
                 className="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-red-500/30 resize-none"
                 placeholder="Ex: O valor está diferente do acordado verbalmente..."
               />
+              <p className="text-xs text-muted-foreground text-right">
+                {rejectReason.trim().length}/{REJECT_REASON_MIN} caracteres mínimos
+              </p>
               {error && (
                 <div className="text-red-600 text-sm flex items-center gap-2">
                   <AlertCircle className="h-4 w-4" /> {error}
@@ -480,7 +633,7 @@ export default function AssinarContratoPage() {
               <div className="flex gap-2">
                 <Button
                   onClick={handleReject}
-                  disabled={submitting}
+                  disabled={submitting || rejectReason.trim().length < REJECT_REASON_MIN}
                   className="bg-red-600 hover:bg-red-700 text-white gap-2"
                 >
                   <XCircle className="h-4 w-4" />

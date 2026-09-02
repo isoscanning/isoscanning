@@ -45,6 +45,7 @@ import {
   deleteAvailability,
   deleteAvailabilities,
   fetchSpecialties,
+  isFlowReservation,
   type PortfolioItem,
   type AvailabilitySlot,
   type Specialty
@@ -916,7 +917,8 @@ export default function PerfilPage() {
 
   // Select all slots
   const handleSelectAll = () => {
-    const futureSlots = availabilitySlots;
+    // Reservas de contrato/acordo não são apagáveis à mão — ficam de fora da seleção
+    const futureSlots = availabilitySlots.filter(slot => !isFlowReservation(slot));
 
     if (selectedSlotsToDelete.length === futureSlots.length && futureSlots.length > 0) {
       setSelectedSlotsToDelete([])

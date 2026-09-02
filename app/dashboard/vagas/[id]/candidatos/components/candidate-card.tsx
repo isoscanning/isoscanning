@@ -16,13 +16,17 @@ import {
     MessageCircle,
     DollarSign,
     FileText,
-    Download
+    Download,
+    ArrowLeftRight,
+    History,
+    Clock,
+    CalendarDays,
+    FileSignature,
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -31,32 +35,62 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { type JobCandidate } from "@/lib/data-service";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { counterJobProposal, type JobCandidate } from "@/lib/data-service";
 import { useState } from "react";
 import apiClient from "@/lib/api-service";
 import { downloadAgreementPdf } from "@/lib/pdf-generator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/use-toast";
+import { isPlanErrorBody } from "@/lib/plans/plan-limits";
+import {
+    AgreementStatusBadge,
+    CounterProposalDialog,
+    NegotiationHistory,
+    formatBRL,
+    formatDateOnly,
+} from "@/components/jobs/negotiation";
 
 interface CandidateCardProps {
     candidate: JobCandidate;
     isProcessing: boolean;
-    onStatusUpdate: (id: string, status: 'accepted' | 'rejected', agreedValue?: number) => void;
+    onStatusUpdate: (id: string, status: 'accepted' | 'rejected') => void;
+    /** Chamado depois de uma contraproposta do contratante, para a página recarregar. */
+    onNegotiationChanged?: () => void;
     jobBudgetValue: number;
+    /** Abre o histórico já expandido (deep link ?candidatura=<id>). */
+    highlighted?: boolean;
 }
+
+const apiErrorMessage = (error: unknown, fallback: string) => {
+    const msg = (error as any)?.response?.data?.message;
+    if (Array.isArray(msg)) return msg.join(" ");
+    return typeof msg === "string" && msg ? msg : fallback;
+};
 
 export function CandidateCard({
     candidate,
     isProcessing,
     onStatusUpdate,
-    jobBudgetValue
+    onNegotiationChanged,
+    jobBudgetValue,
+    highlighted = false,
 }: CandidateCardProps) {
     const router = useRouter();
     const params = useParams();
+    const { toast } = useToast();
     const jobId = params.id as string;
     const [isAgreementModalOpen, setIsAgreementModalOpen] = useState(false);
+    const [isCounterOpen, setIsCounterOpen] = useState(false);
+    const [sendingCounter, setSendingCounter] = useState(false);
+    const [historyOpen, setHistoryOpen] = useState(highlighted);
+    const [historyRefresh, setHistoryRefresh] = useState(0);
     const [startingChat, setStartingChat] = useState(false);
     const [generatingContract, setGeneratingContract] = useState(false);
     const [contractId, setContractId] = useState<string | null>(candidate.contractId ?? null);
+
+    const agreementAccepted = candidate.agreementStatus === 'accepted';
+    const inNegotiation = candidate.status === 'pending' && !agreementAccepted;
 
     // Fluxo integrado: acordo aceito → contrato digital pré-preenchido → assinatura
     const handleGenerateContract = async () => {
@@ -71,6 +105,13 @@ export function CandidateCard({
             router.push(`/dashboard/contratos/${res.data.id}`);
         } catch (error: any) {
             console.error("Erro ao gerar contrato:", error);
+            if (!isPlanErrorBody(error?.response?.data)) {
+                toast({
+                    variant: "destructive",
+                    title: "Não foi possível gerar o contrato",
+                    description: apiErrorMessage(error, "Tente novamente em instantes."),
+                });
+            }
             setGeneratingContract(false);
         }
     };
@@ -91,26 +132,35 @@ export function CandidateCard({
         }
     };
 
-    const getStatusBadge = (status: string) => {
-        if (candidate.agreementStatus === 'pending_candidate') {
-            return <Badge className="bg-amber-500 hover:bg-amber-600 text-white">Aguardando Aceite</Badge>;
-        }
-        
-        switch (status) {
-            case "accepted":
-                return <Badge className="bg-emerald-500 hover:bg-emerald-600">Aprovado</Badge>;
-            case "rejected":
-                return <Badge variant="destructive">Rejeitado</Badge>;
-            case "withdrawn":
-                return <Badge variant="outline">Desistência</Badge>;
-            default:
-                return <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-300">Pendente</Badge>;
+    /** Contraproposta do contratante (POST :id/counter) — sem cota, notifica o candidato. */
+    const handleSendCounter = async (value: number, message: string) => {
+        setSendingCounter(true);
+        try {
+            await counterJobProposal(candidate.id, { value, message });
+            toast({ title: "Contraproposta enviada", description: `Você propôs ${formatBRL(value)} a ${candidate.profile.displayName}.` });
+            setIsCounterOpen(false);
+            setHistoryRefresh((k) => k + 1);
+            onNegotiationChanged?.();
+        } catch (error) {
+            console.error("Erro ao enviar contraproposta:", error);
+            if (!isPlanErrorBody((error as any)?.response?.data)) {
+                toast({ variant: "destructive", title: "Erro", description: apiErrorMessage(error, "Não foi possível enviar a contraproposta.") });
+            }
+        } finally {
+            setSendingCounter(false);
         }
     };
 
+    const serviceDates = (() => {
+        const start = candidate.agreementStartDate;
+        const end = candidate.agreementEndDate ?? start;
+        if (!start) return null;
+        return start === end ? formatDateOnly(start) : `${formatDateOnly(start)} – ${formatDateOnly(end)}`;
+    })();
+
     return (
         <>
-            <Card className="overflow-hidden hover:shadow-md transition-shadow">
+            <Card className={`overflow-hidden hover:shadow-md transition-shadow ${highlighted ? "ring-2 ring-primary" : ""}`}>
                 <CardContent className="p-6">
                     <div className="flex flex-col md:flex-row gap-6">
                         <div className="flex-shrink-0">
@@ -129,7 +179,12 @@ export function CandidateCard({
                                         <h3 className="text-xl font-bold text-foreground">
                                             {candidate.profile.displayName}
                                         </h3>
-                                        {getStatusBadge(candidate.status)}
+                                        <AgreementStatusBadge
+                                            status={candidate.status}
+                                            agreementStatus={candidate.agreementStatus}
+                                            contractId={contractId}
+                                            labels={{ pending: "Pendente", rejected: "Rejeitado" }}
+                                        />
                                     </div>
 
                                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
@@ -158,16 +213,22 @@ export function CandidateCard({
                                         <Calendar className="h-3.5 w-3.5" />
                                         <span>Aplicou em {format(new Date(candidate.createdAt), "d 'de' MMM", { locale: ptBR })}</span>
                                     </div>
-                                    {candidate.counterProposal && candidate.counterProposal > 0 && (
+                                    {!!candidate.counterProposal && candidate.counterProposal > 0 && (
                                         <div className="flex items-center gap-1.5 text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
                                             <DollarSign className="h-3.5 w-3.5" />
-                                            <span>Proposta: R$ {candidate.counterProposal}</span>
+                                            <span>Proposta do candidato: {formatBRL(candidate.counterProposal)}</span>
                                         </div>
                                     )}
-                                    {candidate.agreedValue && (
+                                    {!!candidate.employerCounterProposal && inNegotiation && (
+                                        <div className="flex items-center gap-1.5 text-amber-700 font-bold bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+                                            <ArrowLeftRight className="h-3.5 w-3.5" />
+                                            <span>Sua contraproposta: {formatBRL(candidate.employerCounterProposal)}</span>
+                                        </div>
+                                    )}
+                                    {agreementAccepted && candidate.agreementValue !== undefined && (
                                         <div className="flex items-center gap-1.5 text-emerald-600 font-bold bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
                                             <DollarSign className="h-3.5 w-3.5" />
-                                            <span>Fechado: R$ {candidate.agreedValue}</span>
+                                            <span>Fechado: {formatBRL(candidate.agreementValue)}</span>
                                         </div>
                                     )}
                                 </div>
@@ -181,6 +242,48 @@ export function CandidateCard({
                                     </div>
                                 </div>
                             )}
+
+                            {/* Resumo do acordo enviado */}
+                            {candidate.agreementText && (
+                                <div className="grid gap-1 rounded-md border bg-muted/30 p-3 text-sm sm:grid-cols-2">
+                                    <div className="flex items-center gap-2"><DollarSign className="h-3.5 w-3.5 text-muted-foreground" /> Valor: <strong>{formatBRL(candidate.agreementValue)}</strong></div>
+                                    {candidate.agreementDeadline && (
+                                        <div className="flex items-center gap-2"><Clock className="h-3.5 w-3.5 text-muted-foreground" /> Prazo: <strong>{candidate.agreementDeadline}</strong></div>
+                                    )}
+                                    {candidate.agreementLocation && (
+                                        <div className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-muted-foreground" /> Local: <strong>{candidate.agreementLocation}</strong></div>
+                                    )}
+                                    {serviceDates && (
+                                        <div className="flex items-center gap-2"><CalendarDays className="h-3.5 w-3.5 text-muted-foreground" /> Data: <strong>{serviceDates}</strong></div>
+                                    )}
+                                    {candidate.agreementStatus === 'rejected' && (
+                                        <p className="sm:col-span-2 text-destructive">O candidato recusou este acordo. Você pode reenviar novos termos.</p>
+                                    )}
+                                    {candidate.agreementStatus === 'countered' && (
+                                        <p className="sm:col-span-2 text-amber-700 dark:text-amber-300">
+                                            O candidato contrapropôs {formatBRL(candidate.counterProposal)}. Reenvie o acordo com o novo valor ou faça outra contraproposta.
+                                        </p>
+                                    )}
+                                    {agreementAccepted && !contractId && (
+                                        <p className="sm:col-span-2 text-emerald-700 dark:text-emerald-300">Acordo aceito — gere o contrato digital para formalizar e bloquear a agenda.</p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Histórico de negociação */}
+                            <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
+                                <CollapsibleTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground">
+                                        <History className="mr-1.5 h-3.5 w-3.5" />
+                                        {historyOpen ? "Ocultar negociação" : "Ver histórico da negociação"}
+                                    </Button>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent className="pt-3">
+                                    {historyOpen && (
+                                        <NegotiationHistory applicationId={candidate.id} viewerRole="employer" refreshKey={historyRefresh} />
+                                    )}
+                                </CollapsibleContent>
+                            </Collapsible>
 
                             <div className="flex flex-col sm:flex-row items-center gap-3 pt-2 justify-between">
                                 <div className="flex flex-wrap gap-2 w-full sm:w-auto">
@@ -218,7 +321,7 @@ export function CandidateCard({
                                             {generatingContract ? (
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                             ) : (
-                                                <FileText className="mr-2 h-4 w-4" />
+                                                <FileSignature className="mr-2 h-4 w-4" />
                                             )}
                                             {contractId ? "Ver Contrato Digital" : "Gerar Contrato Digital"}
                                         </Button>
@@ -262,8 +365,19 @@ export function CandidateCard({
                                     </DropdownMenu>
                                 </div>
 
-                                {candidate.status === 'pending' && (
-                                    <div className="flex gap-2 w-full sm:w-auto pt-2 sm:pt-0">
+                                {inNegotiation && (
+                                    <div className="flex flex-wrap gap-2 w-full sm:w-auto pt-2 sm:pt-0">
+                                        {candidate.agreementStatus !== 'pending_candidate' && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="flex-1 sm:flex-none"
+                                                onClick={() => setIsCounterOpen(true)}
+                                                disabled={isProcessing}
+                                            >
+                                                <ArrowLeftRight className="mr-1 h-4 w-4" /> Contrapropor
+                                            </Button>
+                                        )}
                                         <Button
                                             size="sm"
                                             className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none"
@@ -273,7 +387,7 @@ export function CandidateCard({
                                             {isProcessing ? (
                                                 <Loader2 className="h-4 w-4 animate-spin" />
                                             ) : (
-                                                <><Check className="mr-1 h-4 w-4" /> Gerar Acordo</>
+                                                <><Check className="mr-1 h-4 w-4" /> {candidate.agreementText ? "Reenviar Acordo" : "Gerar Acordo"}</>
                                             )}
                                         </Button>
                                         <Button
@@ -296,6 +410,7 @@ export function CandidateCard({
                     </div>
                 </CardContent>
             </Card>
+
             <Dialog open={isAgreementModalOpen} onOpenChange={setIsAgreementModalOpen}>
                 <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
                     <DialogHeader>
@@ -304,20 +419,20 @@ export function CandidateCard({
                             Revise os termos do acordo.
                         </DialogDescription>
                     </DialogHeader>
-                    
+
                     <div className="flex-1 overflow-y-auto p-4 bg-muted/30 border rounded-md font-mono text-sm whitespace-pre-wrap max-h-[50vh]">
                         {candidate.agreementText}
                     </div>
-                    
+
                     <DialogFooter className="gap-2 sm:gap-0 mt-4">
-                        <Button 
-                            variant="outline" 
+                        <Button
+                            variant="outline"
                             onClick={() => setIsAgreementModalOpen(false)}
                         >
                             Fechar
                         </Button>
-                        <Button 
-                            className="bg-primary hover:bg-primary/90 text-primary-foreground" 
+                        <Button
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground"
                             onClick={handleDownloadPdf}
                         >
                             <Download className="mr-2 h-4 w-4" /> Baixar PDF
@@ -325,6 +440,18 @@ export function CandidateCard({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <CounterProposalDialog
+                open={isCounterOpen}
+                onOpenChange={setIsCounterOpen}
+                title="Contraproposta ao candidato"
+                description="Proponha um valor. O candidato será notificado e poderá aceitar (você então envia o acordo) ou contrapropor."
+                referenceLabel={candidate.counterProposal ? "Proposta do candidato" : "Orçamento da vaga"}
+                referenceValue={candidate.counterProposal ?? (jobBudgetValue || null)}
+                initialValue={candidate.employerCounterProposal ?? candidate.counterProposal ?? (jobBudgetValue || null)}
+                submitting={sendingCounter}
+                onSubmit={handleSendCounter}
+            />
         </>
     );
 }

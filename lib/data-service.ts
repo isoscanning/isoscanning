@@ -209,7 +209,15 @@ export interface AppNotification {
     | "briefing_confirm_reminder"
     | "briefing_deliverable_due"
     | "briefing_execution_started"
-    | "briefing_incident";
+    | "briefing_incident"
+    | "negotiation_candidate"
+    | "negotiation_employer"
+    | "contract_received"
+    | "contract_signed"
+    | "contract_rejected"
+    | "contract_cancelled"
+    | "contract_completed"
+    | "review_request";
   referenceId?: string | null;
   isRead: boolean;
   createdAt: string;
@@ -650,7 +658,16 @@ export interface AvailabilitySlot {
   endTime: string;
   type?: string;
   reason?: string;
+  /** Reserva definitiva criada por um contrato assinado (não pode ser apagada à mão). */
+  contractId?: string | null;
+  /** Reserva provisória criada ao aceitar o acordo de uma vaga. */
+  jobApplicationId?: string | null;
   createdAt: Date;
+}
+
+/** Reserva gerada pelo fluxo de fechar trabalho — só é liberada pelo próprio fluxo. */
+export function isFlowReservation(slot: Pick<AvailabilitySlot, "contractId" | "jobApplicationId">): boolean {
+  return !!slot.contractId || !!slot.jobApplicationId;
 }
 
 /**
@@ -827,57 +844,81 @@ export async function deleteJobOffer(id: string): Promise<void> {
   }
 }
 
-export const checkJobApplication = async (jobId: string, candidateId: string): Promise<boolean> => {
-  try {
-    const { data, error } = await supabase
-      .from('job_applications')
-      .select('id, status')
-      .eq('job_offer_id', jobId)
-      .eq('candidate_id', candidateId)
-      .single();
+const JOB_APPLICATION_SELECT = `
+  id,
+  job_offer_id,
+  candidate_id,
+  status,
+  created_at,
+  message,
+  counter_proposal,
+  employer_counter_proposal,
+  counter_proposal_count,
+  agreement_status,
+  agreement_text,
+  agreement_value,
+  agreement_deadline,
+  agreement_location,
+  agreement_start_date,
+  agreement_end_date,
+  contract_id,
+  job_offers (
+    id,
+    title,
+    employer_id,
+    employer_name,
+    city,
+    state,
+    job_type,
+    location_type,
+    budget_min,
+    budget_max,
+    start_date,
+    end_date
+  )
+`;
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-      console.error("Error checking application:", error);
-      return false;
-    }
-
-    // Allow re-application if no record exists or if the application was withdrawn
-    if (!data || data.status === 'withdrawn') {
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error("Error checking application:", error);
-    return false;
-  }
-};
+function mapJobApplicationRow(app: any): JobApplication {
+  return {
+    id: app.id,
+    jobOfferId: app.job_offer_id,
+    candidateId: app.candidate_id,
+    status: app.status,
+    createdAt: app.created_at,
+    message: app.message ?? undefined,
+    counterProposal: app.counter_proposal ?? undefined,
+    employerCounterProposal: app.employer_counter_proposal ?? undefined,
+    counterProposalCount: app.counter_proposal_count ?? 0,
+    agreementStatus: app.agreement_status ?? 'none',
+    agreementText: app.agreement_text ?? undefined,
+    agreementValue: app.agreement_value ?? undefined,
+    agreementDeadline: app.agreement_deadline ?? undefined,
+    agreementLocation: app.agreement_location ?? undefined,
+    agreementStartDate: app.agreement_start_date ?? undefined,
+    agreementEndDate: app.agreement_end_date ?? undefined,
+    contractId: app.contract_id ?? null,
+    jobOffer: {
+      id: app.job_offers.id,
+      title: app.job_offers.title,
+      employerId: app.job_offers.employer_id,
+      employerName: app.job_offers.employer_name,
+      city: app.job_offers.city,
+      state: app.job_offers.state,
+      jobType: app.job_offers.job_type,
+      locationType: app.job_offers.location_type,
+      budgetMin: app.job_offers.budget_min,
+      budgetMax: app.job_offers.budget_max,
+      startDate: app.job_offers.start_date ?? undefined,
+      endDate: app.job_offers.end_date ?? undefined,
+    },
+  };
+}
 
 export const fetchJobApplication = async (jobId: string, candidateId: string): Promise<JobApplication | null> => {
   try {
     const { data, error } = await supabase
       .from('job_applications')
-      .select(`
-        id,
-        job_offer_id,
-        candidate_id,
-        status,
-        created_at,
-        message,
-        counter_proposal,
-        job_offers (
-          id,
-          title,
-          employer_id,
-          employer_name,
-          city,
-          state,
-          job_type,
-          location_type,
-          budget_min,
-          budget_max
-        )
-      `)
+      .select(JOB_APPLICATION_SELECT)
       .eq('job_offer_id', jobId)
       .eq('candidate_id', candidateId)
       .single();
@@ -888,28 +929,7 @@ export const fetchJobApplication = async (jobId: string, candidateId: string): P
       return null;
     }
 
-    const app = data as any;
-    return {
-      id: app.id,
-      jobOfferId: app.job_offer_id,
-      candidateId: app.candidate_id,
-      status: app.status,
-      createdAt: app.created_at,
-      message: app.message,
-      counterProposal: app.counter_proposal,
-      jobOffer: {
-        id: app.job_offers.id,
-        title: app.job_offers.title,
-        employerId: app.job_offers.employer_id,
-        employerName: app.job_offers.employer_name,
-        city: app.job_offers.city,
-        state: app.job_offers.state,
-        jobType: app.job_offers.job_type,
-        locationType: app.job_offers.location_type,
-        budgetMin: app.job_offers.budget_min,
-        budgetMax: app.job_offers.budget_max,
-      }
-    };
+    return mapJobApplicationRow(data);
   } catch (error) {
     console.error("Error fetching application details:", error);
     return null;
@@ -934,19 +954,35 @@ export const applyToJob = async (jobId: string, candidateId: string, message?: s
   }
 };
 
+/**
+ * Estado da negociação de uma candidatura:
+ * - none: só a proposta inicial (com ou sem contraproposta do candidato)
+ * - pending_candidate: contratante enviou acordo, aguardando o candidato
+ * - countered: candidato contrapropôs; bola com o contratante
+ * - accepted / rejected: resposta final do candidato ao acordo
+ */
+export type JobAgreementStatus = 'none' | 'pending_candidate' | 'countered' | 'accepted' | 'rejected';
+
 export interface JobApplication {
   id: string;
   jobOfferId: string;
   candidateId: string;
   status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
   message?: string;
+  /** Última contraproposta do candidato */
   counterProposal?: number;
-  agreedValue?: number;
-  agreementStatus?: 'none' | 'pending_candidate' | 'accepted' | 'rejected';
+  /** Última contraproposta do contratante */
+  employerCounterProposal?: number;
+  /** Quantas contrapropostas o candidato já usou nesta vaga (cota por plano) */
+  counterProposalCount?: number;
+  agreementStatus?: JobAgreementStatus;
   agreementText?: string;
   agreementValue?: number;
   agreementDeadline?: string;
   agreementLocation?: string;
+  agreementStartDate?: string;
+  agreementEndDate?: string;
+  contractId?: string | null;
   createdAt: string;
   jobOffer: {
     id: string;
@@ -959,6 +995,8 @@ export interface JobApplication {
     locationType: string;
     budgetMin?: number;
     budgetMax?: number;
+    startDate?: string;
+    endDate?: string;
   };
 }
 
@@ -966,33 +1004,7 @@ export const fetchUserApplications = async (userId: string): Promise<JobApplicat
   try {
     const { data, error } = await supabase
       .from('job_applications')
-      .select(`
-        id,
-        job_offer_id,
-        candidate_id,
-        status,
-        created_at,
-        message,
-        counter_proposal,
-        agreed_value,
-        agreement_status,
-        agreement_text,
-        agreement_value,
-        agreement_deadline,
-        agreement_location,
-        job_offers (
-          id,
-          title,
-          employer_id,
-          employer_name,
-          city,
-          state,
-          job_type,
-          location_type,
-          budget_min,
-          budget_max
-        )
-      `)
+      .select(JOB_APPLICATION_SELECT)
       .eq('candidate_id', userId)
       .order('created_at', { ascending: false });
 
@@ -1001,36 +1013,101 @@ export const fetchUserApplications = async (userId: string): Promise<JobApplicat
       throw error;
     }
 
-    return data.map((app: any) => ({
-      id: app.id,
-      jobOfferId: app.job_offer_id,
-      candidateId: app.candidate_id,
-      status: app.status,
-      createdAt: app.created_at,
-      message: app.message,
-      counterProposal: app.counter_proposal,
-      agreedValue: app.agreed_value,
-      agreementStatus: app.agreement_status,
-      agreementText: app.agreement_text,
-      agreementValue: app.agreement_value,
-      agreementDeadline: app.agreement_deadline,
-      agreementLocation: app.agreement_location,
-      jobOffer: {
-        id: app.job_offers.id,
-        title: app.job_offers.title,
-        employerId: app.job_offers.employer_id,
-        employerName: app.job_offers.employer_name,
-        city: app.job_offers.city,
-        state: app.job_offers.state,
-        jobType: app.job_offers.job_type,
-        locationType: app.job_offers.location_type,
-        budgetMin: app.job_offers.budget_min,
-        budgetMax: app.job_offers.budget_max,
-      }
-    }));
+    return (data as any[]).map(mapJobApplicationRow);
   } catch (error) {
     console.error("Error fetching applications:", error);
     return [];
+  }
+};
+
+// ── Negociação (contrapropostas em rodadas) ──────────────────────────────────
+
+export type NegotiationRoundKind = 'proposal' | 'counter' | 'agreement' | 'accept' | 'reject';
+
+export interface NegotiationRound {
+  id: string;
+  authorId: string;
+  authorRole: 'candidate' | 'employer';
+  kind: NegotiationRoundKind;
+  value: number | null;
+  message: string | null;
+  createdAt: string;
+}
+
+/** Estado da candidatura como o backend devolve nos endpoints de negociação. */
+export interface JobAgreementState {
+  id: string;
+  jobOfferId: string;
+  candidateId: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
+  counterProposal: number | null;
+  employerCounterProposal: number | null;
+  counterProposalCount: number;
+  agreementStatus: JobAgreementStatus | null;
+  agreementText: string | null;
+  agreementValue: number | null;
+  agreementDeadline: string | null;
+  agreementLocation: string | null;
+  agreementStartDate: string | null;
+  agreementEndDate: string | null;
+  contractId: string | null;
+  updatedAt: string;
+}
+
+export interface JobNegotiation {
+  role: 'candidate' | 'employer';
+  application: JobAgreementState;
+  jobOffer: {
+    id: string;
+    title: string;
+    employerId: string;
+    startDate: string | null;
+    endDate: string | null;
+    budgetMin: number | null;
+    budgetMax: number | null;
+  };
+  rounds: NegotiationRound[];
+  /** Só para o candidato. limit null = ilimitado (Ultra); 0 = plano sem contraproposta. */
+  counterProposalQuota: { limit: number | null; used: number } | null;
+}
+
+export const fetchJobNegotiation = async (applicationId: string): Promise<JobNegotiation | null> => {
+  try {
+    const response = await apiClient.get(`/job-applications/${applicationId}/negotiation`);
+    const raw = response.data?.data ?? response.data;
+    if (!raw || !raw.application) return null;
+    return {
+      role: raw.role,
+      application: raw.application,
+      jobOffer: raw.jobOffer,
+      rounds: Array.isArray(raw.rounds) ? raw.rounds : [],
+      counterProposalQuota: raw.counterProposalQuota ?? null,
+    };
+  } catch (error) {
+    if (!isNavigatingToLogin) console.warn("[data-service] Error fetching negotiation:", error);
+    return null;
+  }
+};
+
+/**
+ * Contraproposta de valor (candidato ou contratante) numa candidatura já
+ * existente. NÃO usar `applyToJob` para isso: o backend responde 409 para
+ * candidatura duplicada. O backend aplica a cota `counterProposalsPerJob`
+ * para o candidato e registra a rodada no histórico.
+ */
+export const counterJobProposal = async (
+  applicationId: string,
+  data: { value: number; message?: string }
+): Promise<JobAgreementState> => {
+  try {
+    const response = await apiClient.post(`/job-applications/${applicationId}/counter`, {
+      value: data.value,
+      message: data.message || undefined,
+    });
+    return response.data?.data ?? response.data;
+  } catch (error) {
+    console.error("Error sending counter proposal:", error);
+    throw error;
   }
 };
 
@@ -1041,12 +1118,15 @@ export interface JobCandidate {
   createdAt: string;
   message?: string;
   counterProposal?: number;
-  agreedValue?: number;
-  agreementStatus?: 'none' | 'pending_candidate' | 'accepted' | 'rejected';
+  employerCounterProposal?: number;
+  counterProposalCount?: number;
+  agreementStatus?: JobAgreementStatus;
   agreementText?: string;
   agreementValue?: number;
   agreementDeadline?: string;
   agreementLocation?: string;
+  agreementStartDate?: string;
+  agreementEndDate?: string;
   contractId?: string | null;
   profile: {
     id: string;
@@ -1073,12 +1153,15 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
         created_at,
         message,
         counter_proposal,
-        agreed_value,
+        employer_counter_proposal,
+        counter_proposal_count,
         agreement_status,
         agreement_text,
         agreement_value,
         agreement_deadline,
         agreement_location,
+        agreement_start_date,
+        agreement_end_date,
         contract_id,
         profiles (
           id,
@@ -1105,15 +1188,18 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
       candidateId: app.candidate_id,
       status: app.status,
       createdAt: app.created_at,
-      message: app.message,
-      counterProposal: app.counter_proposal,
-      agreedValue: app.agreed_value,
-      agreementStatus: app.agreement_status,
-      agreementText: app.agreement_text,
-      agreementValue: app.agreement_value,
-      agreementDeadline: app.agreement_deadline,
-      agreementLocation: app.agreement_location,
-      contractId: app.contract_id,
+      message: app.message ?? undefined,
+      counterProposal: app.counter_proposal ?? undefined,
+      employerCounterProposal: app.employer_counter_proposal ?? undefined,
+      counterProposalCount: app.counter_proposal_count ?? 0,
+      agreementStatus: app.agreement_status ?? 'none',
+      agreementText: app.agreement_text ?? undefined,
+      agreementValue: app.agreement_value ?? undefined,
+      agreementDeadline: app.agreement_deadline ?? undefined,
+      agreementLocation: app.agreement_location ?? undefined,
+      agreementStartDate: app.agreement_start_date ?? undefined,
+      agreementEndDate: app.agreement_end_date ?? undefined,
+      contractId: app.contract_id ?? null,
       profile: {
         id: app.profiles.id,
         displayName: app.profiles.display_name,
@@ -1133,14 +1219,11 @@ export const fetchJobCandidates = async (jobId: string): Promise<JobCandidate[]>
   }
 };
 
-export const updateJobApplicationStatus = async (applicationId: string, status: 'accepted' | 'rejected', agreedValue?: number): Promise<boolean> => {
+export const updateJobApplicationStatus = async (applicationId: string, status: 'accepted' | 'rejected'): Promise<boolean> => {
   try {
-    // Passa pelo backend: valida que o ator é o dono da vaga, bloqueia a
-    // agenda do candidato ao aceitar e dispara a notificação de status.
-    await apiClient.patch(`/job-applications/${applicationId}`, {
-      status,
-      ...(agreedValue !== undefined ? { agreedValue } : {}),
-    });
+    // Passa pelo backend: valida que o ator é o dono da vaga, libera reservas
+    // provisórias ao recusar e dispara a notificação de status.
+    await apiClient.patch(`/job-applications/${applicationId}`, { status });
 
     return true;
   } catch (error) {
@@ -1149,42 +1232,60 @@ export const updateJobApplicationStatus = async (applicationId: string, status: 
   }
 };
 
+export interface SendJobAgreementData {
+  agreementText: string;
+  agreementValue?: number;
+  agreementDeadline?: string;
+  agreementLocation?: string;
+  /** YYYY-MM-DD — datas que reservam a agenda do profissional ao aceitar */
+  agreementStartDate?: string;
+  agreementEndDate?: string;
+}
+
 export const sendJobAgreement = async (
-  applicationId: string, 
-  agreementData: {
-    agreementText: string;
-    agreementValue: number;
-    agreementDeadline: string;
-    agreementLocation: string;
-  }
-): Promise<boolean> => {
+  applicationId: string,
+  agreementData: SendJobAgreementData
+): Promise<JobAgreementState> => {
   try {
     // Backend valida que o ator é o dono da vaga, marca o acordo como
-    // pending_candidate e notifica o candidato.
-    await apiClient.post(`/job-applications/${applicationId}/agreement`, {
+    // pending_candidate, registra a rodada e notifica o candidato.
+    const response = await apiClient.post(`/job-applications/${applicationId}/agreement`, {
       agreementText: agreementData.agreementText,
       agreementValue: agreementData.agreementValue,
-      agreementDeadline: agreementData.agreementDeadline,
-      agreementLocation: agreementData.agreementLocation,
+      agreementDeadline: agreementData.agreementDeadline || undefined,
+      agreementLocation: agreementData.agreementLocation || undefined,
+      agreementStartDate: agreementData.agreementStartDate || undefined,
+      agreementEndDate: agreementData.agreementEndDate || undefined,
     });
-    return true;
+    return response.data?.data ?? response.data;
   } catch (error) {
     console.error("Error sending job agreement:", error);
     throw error;
   }
 };
 
+export interface RespondToJobAgreementResult extends JobAgreementState {
+  /** Dias reservados provisoriamente na agenda ao aceitar (0 = sem datas). */
+  reservedDays?: number;
+}
+
+/**
+ * Resposta do candidato ao acordo. `accepted` reserva a agenda provisoriamente;
+ * `rejected` encerra; `countered` devolve uma contraproposta (usa a cota do plano).
+ */
 export const respondToJobAgreement = async (
   applicationId: string,
-  response: 'accepted' | 'rejected'
-): Promise<boolean> => {
+  response: 'accepted' | 'rejected' | 'countered',
+  counter?: { value: number; message?: string }
+): Promise<RespondToJobAgreementResult> => {
   try {
-    // Backend valida que o ator é o candidato; ao aceitar, também marca a
-    // candidatura como accepted.
-    await apiClient.post(`/job-applications/${applicationId}/agreement/respond`, {
+    const res = await apiClient.post(`/job-applications/${applicationId}/agreement/respond`, {
       accept: response === 'accepted',
+      ...(response === 'countered' && counter
+        ? { counterValue: counter.value, counterMessage: counter.message || undefined }
+        : {}),
     });
-    return true;
+    return res.data?.data ?? res.data;
   } catch (error) {
     console.error("Error responding to job agreement:", error);
     throw error;

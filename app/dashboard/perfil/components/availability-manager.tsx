@@ -1,6 +1,7 @@
 "use client";
 
-import { Trash2, Calendar as CalendarIcon, Loader2, Ban } from "lucide-react";
+import Link from "next/link";
+import { Trash2, Calendar as CalendarIcon, Loader2, Ban, FileSignature, Handshake, Lock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,8 +21,38 @@ import {
 } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { type AvailabilitySlot } from "@/lib/data-service";
+import { isFlowReservation, type AvailabilitySlot } from "@/lib/data-service";
 import { describeSlot, isAllDaySlot, parseDateKey, toDateKey } from "@/lib/availability";
+
+/**
+ * Selo da reserva criada pelo fluxo "fechar trabalho". Contrato assinado leva
+ * ao contrato (as duas partes enxergam); acordo aceito é provisório e some
+ * sozinho se o acordo/contrato for desfeito.
+ */
+function FlowReservationBadge({ slot }: { slot: AvailabilitySlot }) {
+    if (slot.contractId) {
+        return (
+            <Link
+                href={`/dashboard/contratos/${slot.contractId}`}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20"
+                title="Data bloqueada por contrato assinado — abrir contrato"
+            >
+                <FileSignature className="h-3 w-3" /> Contrato
+            </Link>
+        );
+    }
+    if (slot.jobApplicationId) {
+        return (
+            <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                title="Reserva provisória do acordo de uma vaga — vira bloqueio definitivo na assinatura do contrato"
+            >
+                <Handshake className="h-3 w-3" /> Acordo
+            </span>
+        );
+    }
+    return null;
+}
 
 interface AvailabilityManagerProps {
     selectedDates: Date[];
@@ -81,6 +112,8 @@ export function AvailabilityManager({
     description = "Gerencie os dias e horários que você está disponível para serviços",
 }: AvailabilityManagerProps) {
     const isBlocking = slotType === "blocked";
+    // Reservas do fluxo de fechar trabalho não entram no "Selecionar Todos" nem têm lixeira
+    const deletableCount = availabilitySlots.filter((slot) => !isFlowReservation(slot)).length;
     return (
         <Card className="border-2 shadow-sm">
             <CardHeader className="space-y-1 pb-6">
@@ -178,10 +211,10 @@ export function AvailabilityManager({
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
                             <h4 className="font-medium">{setSlotType ? "Datas marcadas" : "Datas Disponíveis"}</h4>
-                            {availabilitySlots.length > 0 && (
+                            {deletableCount > 0 && (
                                 <div className="flex items-center gap-2">
                                     <Button variant="outline" size="sm" onClick={handleSelectAll} className="text-xs">
-                                        {selectedSlotsToDelete.length === availabilitySlots.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                                        {selectedSlotsToDelete.length === deletableCount ? 'Desmarcar Todos' : 'Selecionar Todos'}
                                     </Button>
                                     {selectedSlotsToDelete.length > 0 && (
                                         <AlertDialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
@@ -221,16 +254,21 @@ export function AvailabilityManager({
                             ) : (
                                 [...availabilitySlots]
                                     .sort((a, b) => a.date.localeCompare(b.date))
-                                    .map((slot) => (
+                                    .map((slot) => {
+                                        const locked = isFlowReservation(slot);
+                                        return (
                                         <div key={slot.id} className={`flex items-center gap-3 p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors ${slot.type === "blocked" ? "border-destructive/30" : ""}`}>
                                             <Checkbox
                                                 checked={selectedSlotsToDelete.includes(slot.id)}
                                                 onCheckedChange={() => toggleSlotSelection(slot.id)}
+                                                disabled={locked}
                                             />
                                             <div className="flex items-center gap-3 flex-1">
-                                                {slot.type === "blocked"
-                                                    ? <Ban className="h-5 w-5 text-destructive" />
-                                                    : <CalendarIcon className="h-5 w-5 text-primary" />}
+                                                {locked
+                                                    ? <Lock className="h-5 w-5 text-emerald-600" />
+                                                    : slot.type === "blocked"
+                                                        ? <Ban className="h-5 w-5 text-destructive" />
+                                                        : <CalendarIcon className="h-5 w-5 text-primary" />}
                                                 <div>
                                                     <p className="font-medium">
                                                         {format(parseDateKey(slot.date), "dd 'de' MMMM, yyyy", { locale: ptBR })}
@@ -244,17 +282,29 @@ export function AvailabilityManager({
                                                         ) : (
                                                             <p className="text-sm text-muted-foreground">{describeSlot(slot)}</p>
                                                         )}
+                                                        <FlowReservationBadge slot={slot} />
                                                         {slot.reason && slot.reason !== "Dia inteiro" && (
                                                             <span className="text-xs text-muted-foreground">· {slot.reason}</span>
                                                         )}
                                                     </div>
                                                 </div>
                                             </div>
-                                            <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteAvailability(slot.id)}>
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                            {locked ? (
+                                                <span
+                                                    className="inline-flex h-9 w-9 items-center justify-center text-muted-foreground/60"
+                                                    title="Reserva do fluxo de fechar trabalho — é liberada sozinha se o acordo ou o contrato for desfeito"
+                                                    aria-label="Reserva protegida"
+                                                >
+                                                    <Lock className="h-4 w-4" />
+                                                </span>
+                                            ) : (
+                                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteAvailability(slot.id)}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            )}
                                         </div>
-                                    ))
+                                        );
+                                    })
                             )}
                         </div>
                     </div>

@@ -43,6 +43,14 @@ const NOTIFICATION_TOAST_TITLES: Partial<Record<AppNotification["type"], string>
     briefing_day_before: "Amanhã é dia de execução!",
     briefing_confirm_reminder: "Confirme a leitura do briefing",
     briefing_deliverable_due: "Entregável vence amanhã",
+    negotiation_candidate: "Novidade na sua negociação",
+    negotiation_employer: "Novidade na negociação da vaga",
+    contract_received: "Contrato recebido para assinatura",
+    contract_signed: "Contrato assinado",
+    contract_rejected: "Contrato recusado",
+    contract_cancelled: "Contrato cancelado",
+    contract_completed: "Serviço concluído",
+    review_request: "Avalie o profissional",
 };
 
 export function NotificationBell() {
@@ -154,8 +162,33 @@ export function NotificationBell() {
             router.push("/dashboard/assinatura");
         } else if (type === "application_received") {
             router.push(referenceId ? `/dashboard/vagas/${referenceId}/candidatos` : "/dashboard/vagas");
-        } else if (type === "application_status") {
-            router.push("/dashboard/candidaturas");
+        } else if (type === "application_status" || type === "negotiation_candidate") {
+            // reference_id = id da candidatura → a página destaca e rola até o card
+            router.push(
+                referenceId
+                    ? `/dashboard/candidaturas?candidatura=${referenceId}`
+                    : "/dashboard/candidaturas"
+            );
+        } else if (type === "negotiation_employer") {
+            // reference_id = "jobOfferId:applicationId"
+            const [jobOfferId, applicationId] = (referenceId ?? "").split(":");
+            router.push(
+                jobOfferId
+                    ? `/dashboard/vagas/${jobOfferId}/candidatos${applicationId ? `?candidatura=${applicationId}` : ""}`
+                    : "/dashboard/vagas"
+            );
+        } else if (
+            type === "contract_received" ||
+            type === "contract_signed" ||
+            type === "contract_rejected" ||
+            type === "contract_cancelled" ||
+            type === "contract_completed"
+        ) {
+            router.push(referenceId ? `/dashboard/contratos/${referenceId}` : "/dashboard/contratos");
+        } else if (type === "review_request") {
+            // reference_id = "professionalId:contractId" → perfil público, onde fica o formulário de avaliação
+            const [professionalId] = (referenceId ?? "").split(":");
+            router.push(professionalId ? `/profissionais/${professionalId}` : "/dashboard/contratos");
         } else if (type === "proposal_received" || type === "proposal_status") {
             // A página pública do equipamento não mostra proposta alguma — o
             // vendedor precisa da tela onde dá para aceitar/recusar.

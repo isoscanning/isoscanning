@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { fetchJobCandidates, fetchJobOfferById, updateJobApplicationStatus, updateJobStatus, type JobCandidate, type JobOffer } from "@/lib/data-service";
 import { Header } from "@/components/header";
@@ -30,8 +30,20 @@ import { isPlanErrorBody } from "@/lib/plans/plan-limits";
 const isPlanError = (error: unknown) => isPlanErrorBody((error as any)?.response?.data);
 
 export default function CandidatosVagaPage() {
+    // useSearchParams exige Suspense no App Router
+    return (
+        <Suspense fallback={null}>
+            <CandidatosVagaInner />
+        </Suspense>
+    );
+}
+
+function CandidatosVagaInner() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    // Deep link vindo da notificação de negociação: ?candidatura=<applicationId>
+    const highlightedId = searchParams?.get("candidatura") ?? null;
     const { userProfile, loading: authLoading } = useAuth();
     const { toast } = useToast();
     const [candidates, setCandidates] = useState<JobCandidate[]>([]);
@@ -70,14 +82,31 @@ export default function CandidatosVagaPage() {
         loadData();
     }, [userProfile, authLoading, params.id, router]);
 
-    const handleStatusUpdate = async (applicationId: string, status: 'accepted' | 'rejected', agreedValue?: number) => {
+    /** Recarrega só a lista de candidatos (após contraproposta do contratante). */
+    const reloadCandidates = useCallback(async () => {
+        if (!params.id) return;
+        try {
+            setCandidates(await fetchJobCandidates(params.id as string));
+        } catch (error) {
+            console.error("Erro ao recarregar candidatos:", error);
+        }
+    }, [params.id]);
+
+    // Rola até o candidato destacado depois que a lista carrega
+    useEffect(() => {
+        if (!highlightedId || loading || candidates.length === 0) return;
+        const el = document.getElementById(`candidato-${highlightedId}`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, [highlightedId, loading, candidates.length]);
+
+    const handleStatusUpdate = async (applicationId: string, status: 'accepted' | 'rejected') => {
         setProcessingId(applicationId);
         try {
-            const success = await updateJobApplicationStatus(applicationId, status, agreedValue);
+            const success = await updateJobApplicationStatus(applicationId, status);
 
             if (!success) throw new Error("Falha ao atualizar status.");
 
-            setCandidates(candidates.map(c => c.id === applicationId ? { ...c, status, agreedValue: status === 'accepted' ? agreedValue : undefined } : c));
+            setCandidates(candidates.map(c => c.id === applicationId ? { ...c, status } : c));
 
             toast({
                 title: status === 'accepted' ? "Candidato aprovado!" : "Candidato rejeitado",
@@ -226,13 +255,16 @@ export default function CandidatosVagaPage() {
                                         {candidates
                                             .filter(c => tabValue === "all" || c.status === tabValue)
                                             .map((candidate) => (
-                                                <CandidateCard
-                                                    key={candidate.id}
-                                                    candidate={candidate}
-                                                    isProcessing={processingId === candidate.id}
-                                                    onStatusUpdate={handleStatusUpdate}
-                                                    jobBudgetValue={jobOffer.budgetMax || jobOffer.budgetMin || 0}
-                                                />
+                                                <div key={candidate.id} id={`candidato-${candidate.id}`}>
+                                                    <CandidateCard
+                                                        candidate={candidate}
+                                                        isProcessing={processingId === candidate.id}
+                                                        onStatusUpdate={handleStatusUpdate}
+                                                        onNegotiationChanged={reloadCandidates}
+                                                        jobBudgetValue={jobOffer.budgetMax || jobOffer.budgetMin || 0}
+                                                        highlighted={highlightedId === candidate.id}
+                                                    />
+                                                </div>
                                             ))}
                                     </div>
                                 )}

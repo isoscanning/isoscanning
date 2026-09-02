@@ -46,7 +46,7 @@ import {
     MoreHorizontal,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { fetchJobOfferById, type JobOffer, checkJobApplication, applyToJob, fetchJobApplication, type JobApplication } from "@/lib/data-service";
+import { fetchJobOfferById, type JobOffer, applyToJob, fetchJobApplication, type JobApplication } from "@/lib/data-service";
 import apiClient from "@/lib/api-service";
 import { trackEvent } from "@/lib/analytics";
 import Link from "next/link";

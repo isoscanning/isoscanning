@@ -33,6 +33,7 @@ import {
   fetchAvailability,
   fetchCalendarEvents,
   fetchMyAgenda,
+  isFlowReservation,
   saveAgendaRules,
   saveAgendaSettings,
   updateCalendarEvent,
@@ -404,10 +405,12 @@ function AgendaPageInner() {
   };
 
   const handleSelectAll = () => {
-    if (selectedSlotsToDelete.length === availabilitySlots.length && availabilitySlots.length > 0) {
+    // Reservas de contrato/acordo não são apagáveis à mão — ficam de fora da seleção
+    const deletable = availabilitySlots.filter((slot) => !isFlowReservation(slot));
+    if (selectedSlotsToDelete.length === deletable.length && deletable.length > 0) {
       setSelectedSlotsToDelete([]);
     } else {
-      setSelectedSlotsToDelete(availabilitySlots.map((slot) => slot.id));
+      setSelectedSlotsToDelete(deletable.map((slot) => slot.id));
     }
   };
 

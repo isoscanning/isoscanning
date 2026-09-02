@@ -9,6 +9,7 @@ import { useRouter, useParams } from 'next/navigation';
 jest.mock('next/navigation', () => ({
     useRouter: jest.fn(),
     useParams: jest.fn(),
+    useSearchParams: jest.fn(() => ({ get: () => null })),
 }));
 
 // Mock Auth Context
@@ -22,6 +23,8 @@ jest.mock('@/lib/data-service', () => ({
     fetchJobOfferById: jest.fn(),
     updateJobApplicationStatus: jest.fn(),
     updateJobStatus: jest.fn(),
+    counterJobProposal: jest.fn(),
+    fetchJobNegotiation: jest.fn().mockResolvedValue(null),
 }));
 
 // Mock components
@@ -172,9 +175,24 @@ describe('CandidatosVagaPage', () => {
         fireEvent.click(rejectButton);
 
         await waitFor(() => {
-            // 3º argumento é o valor acordado — só existe no fluxo de aprovação.
-            expect(updateJobApplicationStatus).toHaveBeenCalledWith('app1', 'rejected', undefined);
+            // O valor acordado vive no acordo (agreement_value), não no status.
+            expect(updateJobApplicationStatus).toHaveBeenCalledWith('app1', 'rejected');
         });
+    });
+
+    it('lets the employer open a counter-proposal while negotiating', async () => {
+        render(<CandidatosVagaPage />);
+
+        await waitFor(() => {
+            expect(screen.getByText(/João Silva/i)).toBeInTheDocument();
+        });
+
+        // Só o candidato pendente (app1) pode receber contraproposta
+        const counterButtons = screen.getAllByRole('button', { name: /contrapropor/i });
+        expect(counterButtons).toHaveLength(1);
+        fireEvent.click(counterButtons[0]);
+
+        expect(screen.getByText(/Contraproposta ao candidato/i)).toBeInTheDocument();
     });
 
     it('filters candidates by status tab', async () => {

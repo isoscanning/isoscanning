@@ -69,3 +69,19 @@ export function formatCpfCnpj(value: string): string {
     .replace(/\.(\d{3})(\d)/, ".$1/$2")
     .replace(/(\d{4})(\d)/, "$1-$2");
 }
+
+/**
+ * [F17] Sanitiza texto de busca interpolado em filtros do PostgREST
+ * (`.or("col.ilike.%<texto>%")`). Caracteres estruturais da gramática de
+ * filtros (`,` `.` `(` `)` `:` `"` `%` `*` `\`) permitiriam injetar cláusulas
+ * no WHERE da consulta. Allowlist: letras (com acento), dígitos, espaço,
+ * `_` e `-`; limite de 100 caracteres. Vazio ⇒ não monte o filtro.
+ * Espelha `sanitizeSearchQuery` do backend (shared/infrastructure/postgrest).
+ */
+export function sanitizeSearchTerm(raw: string): string {
+  return raw
+    .replace(/[^\p{L}\p{N}\s_-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 100);
+}

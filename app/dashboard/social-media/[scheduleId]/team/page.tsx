@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
+import { sanitizeSearchTerm } from "@/lib/utils";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -209,12 +210,19 @@ export default function TeamPage() {
   }
 
   async function runSearch(query: string) {
+    // [F17] o valor entra na string de filtro do PostgREST — allowlist
+    const q = sanitizeSearchTerm(query);
+    if (q.length < 2) {
+      setSearchResults([]);
+      setDropdownOpen(false);
+      return;
+    }
     setSearching(true);
     try {
       const { data } = await supabase
         .from("profiles")
         .select("id, display_name, avatar_url, username, email, specialties")
-        .or(`display_name.ilike.%${query}%,username.ilike.%${query}%`)
+        .or(`display_name.ilike.%${q}%,username.ilike.%${q}%`)
         .neq("id", userProfile?.id)
         .eq("is_active", true)
         .limit(8);

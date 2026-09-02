@@ -11,6 +11,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
+import { sanitizeSearchTerm } from "@/lib/utils";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import {
@@ -2805,7 +2806,8 @@ function TeamSheet({
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    const q = query.trim();
+    // [F17] o valor entra na string de filtro do PostgREST — allowlist
+    const q = sanitizeSearchTerm(query);
     if (q.length < 2) {
       setResults([]);
       return;

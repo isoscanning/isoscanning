@@ -22,6 +22,7 @@ export default function robots(): MetadataRoute.Robots {
           "/negociar-equipamento/",
           "/agendar/",
           "/assinar",
+          "/contratos/verificar",
           "/login",
           "/cadastro",
           "/recuperar-senha",

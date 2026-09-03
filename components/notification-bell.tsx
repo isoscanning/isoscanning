@@ -50,6 +50,9 @@ const NOTIFICATION_TOAST_TITLES: Partial<Record<AppNotification["type"], string>
     contract_rejected: "Contrato recusado",
     contract_cancelled: "Contrato cancelado",
     contract_completed: "Serviço concluído",
+    contract_expired: "Prazo de assinatura vencido",
+    contract_reminder: "Assinatura pendente",
+    contract_terminated: "Contrato encerrado (distrato)",
     review_request: "Avalie o profissional",
 };
 
@@ -182,7 +185,10 @@ export function NotificationBell() {
             type === "contract_signed" ||
             type === "contract_rejected" ||
             type === "contract_cancelled" ||
-            type === "contract_completed"
+            type === "contract_completed" ||
+            type === "contract_expired" ||
+            type === "contract_reminder" ||
+            type === "contract_terminated"
         ) {
             router.push(referenceId ? `/dashboard/contratos/${referenceId}` : "/dashboard/contratos");
         } else if (type === "review_request") {

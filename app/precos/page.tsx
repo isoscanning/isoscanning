@@ -79,7 +79,7 @@ const COMPARE_SECTIONS: { title: string; rows: CompareRow[] }[] = [
             { key: "smPremiumReports", label: "Simulador de Feed, Relatório mensal com IA e demografia" },
             { key: "competitorAnalysis" },
             { key: "teamMembersPerAccount", label: "Equipe de social media (membros por conta)" },
-            { key: "whiteLabel", label: "Relatórios e links públicos sem marca IsoScanning (white-label)" },
+            { key: "whiteLabel", label: "Relatórios, contratos e páginas de assinatura sem marca IsoScanning (white-label)" },
         ],
     },
     {
@@ -88,8 +88,9 @@ const COMPARE_SECTIONS: { title: string; rows: CompareRow[] }[] = [
             { key: "briefingsPerMonth" },
             { key: "briefingMembers" },
             { key: "briefingAiRefine" },
-            { key: "contractsPerMonth" },
-            { key: "customContractTemplates", label: "Editor de contratos e modelos próprios" },
+            { key: "contractsPerMonth", label: "Contratos enviados para assinatura por mês (editor e modelos do sistema em todos os planos)" },
+            { key: "customContractTemplates", label: "Modelos de contrato próprios" },
+            { key: "unlimitedContractRevisions", label: "Novas versões ilimitadas de um contrato" },
         ],
     },
     {
@@ -248,7 +249,7 @@ export default function PricingPage() {
                 "1 calendário com IA por mês",
                 "10 créditos de IA por mês",
                 "1 briefing por mês (até 2 membros)",
-                "1 contrato por mês (modelos do sistema)",
+                "2 contratos por mês com assinatura eletrônica (editor e modelos do sistema)",
                 "3 cálculos de rota por mês",
                 "Chat ilimitado",
                 "Suporte pela comunidade"
@@ -291,7 +292,7 @@ export default function PricingPage() {
                 "Simulador de Feed, Relatório mensal com IA e demografia",
                 "Análise de concorrentes",
                 "10 briefings por mês, refinar com IA, até 10 membros",
-                "10 contratos por mês, editor e modelos próprios",
+                "15 contratos por mês, modelos próprios e versões ilimitadas",
                 "50 cálculos de rota por mês",
                 "Financeiro completo + exportação",
                 "Suporte por e-mail"
@@ -320,9 +321,9 @@ export default function PricingPage() {
                 "Equipe de até 5 membros por conta",
                 "1.500 créditos de IA por mês",
                 "Simulador de Feed, Relatório com IA e análise de concorrentes",
-                "Relatórios e links públicos sem marca IsoScanning (white-label)",
+                "Relatórios, contratos e páginas de assinatura sem marca IsoScanning (white-label)",
                 "Briefings ilimitados",
-                "Contratos ilimitados",
+                "Contratos ilimitados com white-label",
                 "200 cálculos de rota por mês",
                 "Financeiro completo + exportação",
                 "Suporte prioritário por WhatsApp"

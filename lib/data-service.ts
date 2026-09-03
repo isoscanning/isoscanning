@@ -217,6 +217,9 @@ export interface AppNotification {
     | "contract_rejected"
     | "contract_cancelled"
     | "contract_completed"
+    | "contract_expired"
+    | "contract_reminder"
+    | "contract_terminated"
     | "review_request";
   referenceId?: string | null;
   isRead: boolean;

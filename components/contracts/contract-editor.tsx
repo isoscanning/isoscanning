@@ -6,6 +6,8 @@ import {
   List, ListOrdered, Heading1, Heading2, Type,
   Image as ImageIcon, Eye, PenLine, Minus,
 } from "lucide-react";
+import { escapeHtml, imageFileToDataUrl } from "@/lib/contracts/contract-utils";
+import { sanitizeContractHtml } from "@/components/contracts/contract-html";
 
 export interface ContractEditorHandle {
   insertImage: (src: string, alt?: string) => void;
@@ -20,20 +22,12 @@ interface ContractEditorProps {
   placeholder?: string;
 }
 
-function escapeHtml(str: string) {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
 function substituteVariables(html: string, vars: Record<string, string>): string {
   let result = html;
   for (const [key, value] of Object.entries(vars)) {
     if (value && value.trim()) {
-      const safe = escapeHtml(value);
-      const regex = new RegExp(`\\{\\{${key}\\}\\}`, "g");
+      const safe = escapeHtml(value).replace(/\n/g, "<br>");
+      const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, "g");
       result = result.replace(
         regex,
         `<span style="color:#6366f1;border-bottom:1.5px dotted #6366f1;padding:0 1px;border-radius:2px;font-weight:500;" title="Campo: ${key}">${safe}</span>`
@@ -96,6 +90,7 @@ export const ContractEditor = forwardRef<ContractEditorHandle, ContractEditorPro
     const editorRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [mode, setMode] = useState<"edit" | "preview">("edit");
+    const [imageError, setImageError] = useState("");
     const savedRangeRef = useRef<Range | null>(null);
 
     useEffect(() => {
@@ -157,13 +152,19 @@ export const ContractEditor = forwardRef<ContractEditorHandle, ContractEditorPro
 
     useImperativeHandle(ref, () => ({ insertImage, insertHtml, setContent }));
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Redimensiona no cliente: o corpo inteiro tem teto de 2 MB no backend e
+    // uma foto de celular crua estoura isso sozinha.
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => insertImage(ev.target?.result as string, file.name);
-      reader.readAsDataURL(file);
       e.target.value = "";
+      if (!file) return;
+      setImageError("");
+      try {
+        const src = await imageFileToDataUrl(file);
+        insertImage(src, file.name.replace(/\.[^.]+$/, ""));
+      } catch (err) {
+        setImageError((err as Error).message);
+      }
     };
 
     const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -184,7 +185,9 @@ export const ContractEditor = forwardRef<ContractEditorHandle, ContractEditorPro
       if (e.dataTransfer.types.includes("text/html")) e.preventDefault();
     };
 
-    const previewHtml = substituteVariables(value, variables);
+    // Sanitiza ANTES de marcar as variáveis: o conteúdo colado de Word/PDF pode trazer
+    // scripts/handlers; os spans de destaque são adicionados depois, já em HTML limpo.
+    const previewHtml = substituteVariables(sanitizeContractHtml(value), variables);
 
     const editorClasses =
       "min-h-[480px] max-h-[700px] overflow-y-auto p-5 text-sm leading-relaxed outline-none prose prose-sm dark:prose-invert max-w-none " +
@@ -311,6 +314,9 @@ export const ContractEditor = forwardRef<ContractEditorHandle, ContractEditorPro
             >
               <Minus className="h-4 w-4" />
             </ToolbarButton>
+            {imageError && (
+              <span className="ml-auto text-[11px] text-red-600">{imageError}</span>
+            )}
           </div>
         )}
 

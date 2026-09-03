@@ -7,14 +7,13 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import {
   FileSignature,
   Plus,
   Search,
-  Filter,
   Clock,
   CheckCircle2,
   XCircle,
@@ -23,7 +22,7 @@ import {
   AlertCircle,
   ChevronRight,
   FileText,
-  Upload,
+  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
@@ -53,6 +52,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
   rejected: { label: "Recusado", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300", icon: XCircle },
   cancelled: { label: "Cancelado", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300", icon: XCircle },
   expired: { label: "Expirado", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300", icon: AlertCircle },
+  terminated: { label: "Encerrado (distrato)", color: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300", icon: FileText },
 };
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -68,7 +68,6 @@ export default function ContratosPage() {
   const router = useRouter();
   const { userProfile, loading } = useAuth();
   const [contracts, setContracts] = useState<Contract[]>([]);
-  const [total, setTotal] = useState(0);
   const [loadingContracts, setLoadingContracts] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -96,7 +95,6 @@ export default function ContratosPage() {
         if (filterStatus) params.set("status", filterStatus);
         const res = await apiClient.get(`/contracts?${params.toString()}`);
         setContracts(res.data.data ?? []);
-        setTotal(res.data.total ?? 0);
       } catch (e) {
         console.error("Erro ao carregar contratos", e);
       } finally {
@@ -164,20 +162,28 @@ export default function ContratosPage() {
                   Gestão de Contratos
                 </h1>
                 <p className="text-muted-foreground mt-1">
-                  Crie, envie e acompanhe contratos digitais com assinatura eletrônica.
+                  Crie o contrato, compartilhe o link de assinatura e acompanhe tudo por aqui — com assinatura eletrônica e trilha de auditoria.
                 </p>
                 {contractLimit !== null && contractsUsed !== undefined && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    {contractsUsed}/{contractLimit} contratos enviados este mês no plano {plan.label}
+                    {contractsUsed}/{contractLimit} contratos avulsos enviados este mês no plano {plan.label}
                   </p>
                 )}
               </div>
-              <Link href="/dashboard/contratos/novo">
-                <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
-                  <Plus className="h-4 w-4" />
-                  Novo Contrato
-                </Button>
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link href="/contratos/verificar">
+                  <Button variant="outline" className="gap-2">
+                    <ShieldCheck className="h-4 w-4" />
+                    Verificar autenticidade
+                  </Button>
+                </Link>
+                <Link href="/dashboard/contratos/novo">
+                  <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
+                    <Plus className="h-4 w-4" />
+                    Novo Contrato
+                  </Button>
+                </Link>
+              </div>
             </div>
           </ScrollReveal>
 

@@ -47,8 +47,14 @@ export interface PlanLimits {
   briefingMembers: number | null;
   briefingAiRefine: boolean;
 
+  /** Contratos avulsos enviados por mês (contratos de vaga não contam) */
   contractsPerMonth: number | null;
+  /** Modelos próprios salvos (biblioteca do usuário) */
+  contractTemplates: number | null;
+  /** Salvar/usar modelos próprios (o editor em branco e os modelos do sistema são livres) */
   customContractTemplates: boolean;
+  /** "Nova versão" ilimitada por contrato (Free: 1 revisão por cadeia) */
+  unlimitedContractRevisions: boolean;
   routeCalculationsPerMonth: number | null;
   financeExport: boolean;
 
@@ -93,8 +99,10 @@ const FREE_LIMITS: PlanLimits = {
   briefingMembers: 2,
   briefingAiRefine: false,
 
-  contractsPerMonth: 1,
+  contractsPerMonth: 2,
+  contractTemplates: 0,
   customContractTemplates: false,
+  unlimitedContractRevisions: false,
   routeCalculationsPerMonth: 3,
   financeExport: false,
   personalAgenda: false,
@@ -128,8 +136,10 @@ const PRO_LIMITS: PlanLimits = {
   briefingMembers: 10,
   briefingAiRefine: true,
 
-  contractsPerMonth: 10,
+  contractsPerMonth: 15,
+  contractTemplates: 10,
   customContractTemplates: true,
+  unlimitedContractRevisions: true,
   routeCalculationsPerMonth: 50,
   financeExport: true,
   personalAgenda: true,
@@ -164,7 +174,9 @@ const ULTRA_LIMITS: PlanLimits = {
   briefingAiRefine: true,
 
   contractsPerMonth: null,
+  contractTemplates: null,
   customContractTemplates: true,
+  unlimitedContractRevisions: true,
   routeCalculationsPerMonth: 200,
   financeExport: true,
   personalAgenda: true,
@@ -198,12 +210,14 @@ export const FEATURE_LABELS: Record<keyof PlanLimits, string> = {
   aiCreditsPerMonth: "créditos de IA por mês",
   smPremiumReports: "Simulador de Feed e Relatório com IA",
   competitorAnalysis: "análise de concorrentes com IA",
-  whiteLabel: "relatórios sem marca IsoScanning",
+  whiteLabel: "relatórios, contratos e páginas de assinatura sem marca IsoScanning",
   briefingsPerMonth: "briefings por mês",
   briefingMembers: "membros por briefing",
   briefingAiRefine: "refinar seção do briefing com IA",
-  contractsPerMonth: "contratos enviados por mês",
-  customContractTemplates: "contratos personalizados e modelos próprios",
+  contractsPerMonth: "contratos avulsos enviados por mês",
+  contractTemplates: "modelos de contrato próprios",
+  customContractTemplates: "modelos de contrato próprios",
+  unlimitedContractRevisions: "novas versões ilimitadas por contrato",
   routeCalculationsPerMonth: "cálculos de rota por mês",
   financeExport: "exportação do financeiro",
   personalAgenda: "agenda privada de compromissos",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/header";
@@ -18,6 +18,8 @@ import {
   CheckCircle2,
   FileText,
   Sparkles,
+  Trash2,
+  BookMarked,
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
@@ -25,6 +27,7 @@ import { usePlan } from "@/lib/plans/use-plan";
 import { PlanBadge } from "@/components/plan/plan-gate";
 import { notifyPlanLimit } from "@/lib/plans/plan-events";
 import { buildPlanFeatureBody } from "@/lib/plans/plan-limits";
+import { useToast } from "@/components/ui/use-toast";
 
 interface Template {
   id: string;
@@ -44,14 +47,15 @@ const CATEGORY_LABELS: Record<string, string> = {
   general: "Geral",
 };
 
-type CreationPath = "choose" | "upload" | "template" | "blank";
+type CreationPath = "choose" | "template" | "blank";
 
 export default function NovoContratoPage() {
   const router = useRouter();
   const { userProfile, loading } = useAuth();
+  const { toast } = useToast();
   const [path, setPath] = useState<CreationPath>("choose");
-  // Contratos personalizados (do zero, upload de PDF, modelos próprios) — recurso Pro+.
-  // Modelos do sistema continuam livres. O backend também valida na criação/envio.
+  // Modelos do sistema e o editor em branco são livres em todos os planos.
+  // "Meus modelos" (salvar/usar) é Pro+ — o backend também valida.
   const plan = usePlan();
   const customAllowed = plan.can("customContractTemplates");
   const requireCustom = (next: () => void) => {
@@ -63,39 +67,28 @@ export default function NovoContratoPage() {
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [filterCategory, setFilterCategory] = useState("");
-
-  // Upload state
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadDrag, setUploadDrag] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !userProfile) router.push("/login");
   }, [userProfile, loading, router]);
 
-  useEffect(() => {
-    if (path === "template") {
-      const fetch = async () => {
-        setLoadingTemplates(true);
-        try {
-          const res = await apiClient.get(`/contracts/templates${filterCategory ? `?category=${filterCategory}` : ""}`);
-          setTemplates(res.data.systemTemplates ?? []);
-          setUserTemplates(res.data.userTemplates ?? []);
-        } catch (e) {
-          console.error(e);
-        } finally {
-          setLoadingTemplates(false);
-        }
-      };
-      fetch();
+  const fetchTemplates = useCallback(async () => {
+    setLoadingTemplates(true);
+    try {
+      const res = await apiClient.get(`/contracts/templates${filterCategory ? `?category=${filterCategory}` : ""}`);
+      setTemplates(res.data.systemTemplates ?? []);
+      setUserTemplates(res.data.userTemplates ?? []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingTemplates(false);
     }
-  }, [path, filterCategory]);
+  }, [filterCategory]);
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setUploadDrag(false);
-    const file = e.dataTransfer.files[0];
-    if (file?.type === "application/pdf") setUploadFile(file);
-  };
+  useEffect(() => {
+    if (path === "template") fetchTemplates();
+  }, [path, fetchTemplates]);
 
   const handleContinueWithTemplate = () => {
     if (!selectedTemplate) return;
@@ -106,11 +99,20 @@ export default function NovoContratoPage() {
     router.push("/dashboard/contratos/novo/editor");
   };
 
-  const handleContinueUpload = async () => {
-    if (!uploadFile) return;
-    // In a real implementation, upload the PDF to Supabase Storage first
-    // For now, pass a flag via query param and handle in the editor
-    router.push(`/dashboard/contratos/novo/editor?upload=1`);
+  const handleDeleteTemplate = async (tpl: Template) => {
+    if (!confirm(`Excluir o modelo "${tpl.name}"? Contratos já criados a partir dele não são afetados.`)) return;
+    setDeletingId(tpl.id);
+    try {
+      await apiClient.delete(`/contracts/templates/${tpl.id}`);
+      if (selectedTemplate?.id === tpl.id) setSelectedTemplate(null);
+      setUserTemplates((prev) => prev.filter((t) => t.id !== tpl.id));
+      toast({ title: "Modelo excluído" });
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast({ title: "Não foi possível excluir", description: msg ?? "Tente novamente.", variant: "destructive" });
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   if (loading || !userProfile) return null;
@@ -142,7 +144,7 @@ export default function NovoContratoPage() {
                   </div>
                   <h1 className="text-3xl font-bold">Como você quer criar seu contrato?</h1>
                   <p className="text-muted-foreground max-w-lg mx-auto">
-                    Escolha a melhor forma de criar ou adicionar seu contrato.
+                    Depois de pronto, você compartilha o link de assinatura com a outra parte por WhatsApp ou e-mail — ela assina sem precisar de conta.
                   </p>
                 </div>
               </ScrollReveal>
@@ -161,7 +163,7 @@ export default function NovoContratoPage() {
                           Usar um modelo
                         </CardTitle>
                         <CardDescription>
-                          Escolha entre nossos modelos profissionais prontos — fotografia, locação, audiovisual e mais. Edite e personalize.
+                          Modelos profissionais prontos — fotografia, locação, audiovisual e mais — ou os seus próprios modelos salvos. Edite e personalize.
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
@@ -179,16 +181,15 @@ export default function NovoContratoPage() {
                     </Card>
                   </div>
 
-                  {/* Opção 2: Criar do zero */}
-                  <div role="button" tabIndex={0} onClick={() => requireCustom(() => setPath("blank"))} onKeyDown={(e) => e.key === 'Enter' && requireCustom(() => setPath("blank"))} className="text-left group cursor-pointer">
+                  {/* Opção 2: Criar do zero (livre em todos os planos) */}
+                  <div role="button" tabIndex={0} onClick={() => setPath("blank")} onKeyDown={(e) => e.key === 'Enter' && setPath("blank")} className="text-left group cursor-pointer">
                     <Card className="h-full border-2 border-transparent hover:border-purple-500/60 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-background to-purple-500/5">
                       <CardHeader>
                         <div className="w-12 h-12 rounded-2xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                           <PenLine className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                         </div>
-                        <CardTitle className="group-hover:text-purple-600 transition-colors flex items-center gap-2">
+                        <CardTitle className="group-hover:text-purple-600 transition-colors">
                           Criar do zero
-                          {!customAllowed && <PlanBadge />}
                         </CardTitle>
                         <CardDescription>
                           Comece com uma tela em branco e escreva o contrato do jeito que quiser, com editor de texto completo.
@@ -202,25 +203,25 @@ export default function NovoContratoPage() {
                     </Card>
                   </div>
 
-                  {/* Opção 3: Fazer upload de PDF */}
-                  <div role="button" tabIndex={0} onClick={() => requireCustom(() => setPath("upload"))} onKeyDown={(e) => e.key === 'Enter' && requireCustom(() => setPath("upload"))} className="text-left group cursor-pointer">
-                    <Card className="h-full border-2 border-transparent hover:border-teal-500/60 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-background to-teal-500/5">
+                  {/* Opção 3: PDF pronto — ainda não disponível (sem o botão "fantasma" de antes) */}
+                  <div className="text-left opacity-70" aria-disabled="true">
+                    <Card className="h-full border-2 border-dashed border-border bg-muted/30">
                       <CardHeader>
-                        <div className="w-12 h-12 rounded-2xl bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                        <div className="w-12 h-12 rounded-2xl bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center mb-3">
                           <Upload className="h-6 w-6 text-teal-600 dark:text-teal-400" />
                         </div>
-                        <CardTitle className="group-hover:text-teal-600 transition-colors flex items-center gap-2">
+                        <CardTitle className="flex items-center gap-2">
                           Enviar PDF pronto
-                          {!customAllowed && <PlanBadge />}
+                          <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300">
+                            Em breve
+                          </span>
                         </CardTitle>
                         <CardDescription>
-                          Já tem um contrato pronto? Faça o upload em PDF e envie para assinatura digital das partes.
+                          Upload de um contrato já pronto em PDF para colher assinaturas. Enquanto isso, cole o texto no editor em branco: a formatação é preservada.
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <div className="flex items-center gap-1 text-teal-600 text-sm font-medium mt-4 group-hover:gap-2 transition-all">
-                          Fazer upload <ArrowRight className="h-4 w-4" />
-                        </div>
+                        <div className="text-sm text-muted-foreground mt-4">Disponível nos planos Pro e Ultra quando lançado.</div>
                       </CardContent>
                     </Card>
                   </div>
@@ -237,7 +238,7 @@ export default function NovoContratoPage() {
                   <div>
                     <h1 className="text-2xl font-bold">Escolha um modelo de contrato</h1>
                     <p className="text-muted-foreground text-sm mt-1">
-                      Modelos criados por especialistas, prontos para personalizar.
+                      Modelos da plataforma são livres. Os seus modelos salvos ficam em &quot;Meus Modelos&quot;.
                     </p>
                   </div>
                   <Button variant="ghost" onClick={() => setPath("choose")} className="gap-2">
@@ -314,30 +315,50 @@ export default function NovoContratoPage() {
                       </div>
                     )}
 
-                    {userTemplates.length > 0 && (
-                      <div>
-                        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-                          Meus Modelos
-                          {!customAllowed && <PlanBadge />}
-                        </h2>
+                    <div>
+                      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <BookMarked className="h-3.5 w-3.5" /> Meus Modelos
+                        {!customAllowed && <PlanBadge />}
+                      </h2>
+                      {userTemplates.length === 0 ? (
+                        <p className="text-sm text-muted-foreground rounded-xl border border-dashed p-4">
+                          {customAllowed
+                            ? "Você ainda não salvou nenhum modelo. No editor, use \"Salvar como modelo\" para reaproveitar um contrato nos próximos trabalhos."
+                            : "Salvar seus próprios modelos e reutilizá-los está disponível a partir do plano Pro."}
+                        </p>
+                      ) : (
                         <div className="grid md:grid-cols-2 gap-4">
                           {userTemplates.map((tpl) => (
-                            <button
+                            <div
                               key={tpl.id}
-                              onClick={() => requireCustom(() => setSelectedTemplate(tpl))}
-                              className={`text-left p-4 rounded-xl border-2 transition-all duration-200 ${
+                              className={`relative text-left p-4 rounded-xl border-2 transition-all duration-200 ${
                                 selectedTemplate?.id === tpl.id
                                   ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
                                   : "border-border hover:border-indigo-300 bg-card"
                               }`}
                             >
-                              <div className="font-medium text-sm">{tpl.name}</div>
-                              <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{tpl.description}</div>
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => requireCustom(() => setSelectedTemplate(tpl))}
+                                className="w-full text-left pr-8"
+                              >
+                                <div className="font-medium text-sm">{tpl.name}</div>
+                                <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{tpl.description || CATEGORY_LABELS[tpl.category] || tpl.category}</div>
+                              </button>
+                              <button
+                                type="button"
+                                title="Excluir modelo"
+                                disabled={deletingId === tpl.id}
+                                onClick={() => handleDeleteTemplate(tpl)}
+                                className="absolute top-3 right-3 p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           ))}
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )}
               </ScrollReveal>
@@ -367,7 +388,7 @@ export default function NovoContratoPage() {
                 <div>
                   <h1 className="text-2xl font-bold">Contrato em branco</h1>
                   <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-                    Você será direcionado ao editor para escrever seu contrato do zero, com todas as ferramentas de formatação.
+                    Você será direcionado ao editor para escrever seu contrato do zero, com todas as ferramentas de formatação. Dica: se já tem o texto em Word ou PDF, é só colar.
                   </p>
                 </div>
                 <div className="flex gap-3 justify-center">
@@ -380,93 +401,6 @@ export default function NovoContratoPage() {
                 </div>
               </div>
             </ScrollReveal>
-          )}
-
-          {/* STEP: Upload PDF */}
-          {path === "upload" && (
-            <>
-              <ScrollReveal delay={0.1}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h1 className="text-2xl font-bold">Enviar contrato em PDF</h1>
-                    <p className="text-muted-foreground text-sm mt-1">
-                      Faça o upload do seu contrato já pronto para enviar para assinatura.
-                    </p>
-                  </div>
-                  <Button variant="ghost" onClick={() => setPath("choose")} className="gap-2">
-                    <ArrowLeft className="h-4 w-4" /> Voltar
-                  </Button>
-                </div>
-              </ScrollReveal>
-
-              <ScrollReveal delay={0.2}>
-                <div
-                  onDrop={handleDrop}
-                  onDragOver={(e) => { e.preventDefault(); setUploadDrag(true); }}
-                  onDragLeave={() => setUploadDrag(false)}
-                  className={`border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-200 ${
-                    uploadDrag
-                      ? "border-teal-500 bg-teal-50 dark:bg-teal-900/20"
-                      : uploadFile
-                      ? "border-teal-500 bg-teal-50 dark:bg-teal-900/20"
-                      : "border-border hover:border-teal-400"
-                  }`}
-                >
-                  {uploadFile ? (
-                    <div className="space-y-3">
-                      <CheckCircle2 className="h-12 w-12 text-teal-500 mx-auto" />
-                      <p className="font-medium">{uploadFile.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {(uploadFile.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setUploadFile(null)}
-                        className="text-red-500 border-red-200 hover:bg-red-50"
-                      >
-                        Remover arquivo
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <Upload className="h-12 w-12 text-muted-foreground mx-auto" />
-                      <div>
-                        <p className="font-medium">Arraste o PDF aqui ou clique para selecionar</p>
-                        <p className="text-sm text-muted-foreground mt-1">Apenas arquivos PDF, máximo 10 MB</p>
-                      </div>
-                      <label className="cursor-pointer">
-                        <Button variant="outline" asChild>
-                          <span>Selecionar arquivo</span>
-                        </Button>
-                        <input
-                          type="file"
-                          accept="application/pdf"
-                          className="hidden"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) setUploadFile(f);
-                          }}
-                        />
-                      </label>
-                    </div>
-                  )}
-                </div>
-              </ScrollReveal>
-
-              {uploadFile && (
-                <ScrollReveal>
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={handleContinueUpload}
-                      className="bg-teal-600 hover:bg-teal-700 text-white gap-2"
-                    >
-                      Continuar <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </ScrollReveal>
-              )}
-            </>
           )}
         </div>
       </main>

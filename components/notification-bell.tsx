@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Bell } from "lucide-react";
-import { fetchNotifications, markNotificationAsRead, AppNotification } from "@/lib/data-service";
+import { useCallback, useEffect, useState } from "react";
+import { Bell, CheckCheck } from "lucide-react";
+import {
+    fetchNotifications,
+    markAllNotificationsAsRead,
+    markNotificationAsRead,
+    AppNotification,
+} from "@/lib/data-service";
+import { notificationClickUrl, notificationMeta } from "@/lib/notifications/notification-links";
 import { useAuth } from "@/lib/auth-context";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -13,47 +19,11 @@ import { ptBR } from "date-fns/locale";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
-const NOTIFICATION_TOAST_TITLES: Partial<Record<AppNotification["type"], string>> = {
-    job_match: "Ei, uma vaga deu Match com você!",
-    equipment_match: "Equipamento encontrado!",
-    review_received: "Nova avaliação recebida!",
-    post_review_needed: "Post aguarda aprovação",
-    post_approved: "Post aprovado! ✓",
-    post_rejected: "Post rejeitado",
-    post_comment: "Novo comentário no post",
-    post_published: "Post publicado!",
-    team_invite: "Você foi convidado para um cronograma",
-    billing_confirmed: "Pagamento confirmado!",
-    billing_overdue: "Atenção: fatura em atraso",
-    billing_cancelled: "Assinatura encerrada",
-    application_received: "Nova candidatura na sua vaga!",
-    application_status: "Atualização da sua candidatura",
-    proposal_received: "Nova proposta recebida!",
-    proposal_status: "Atualização da sua proposta",
-    booking_created: "Nova solicitação de agendamento!",
-    booking_status: "Atualização de agendamento",
-    briefing_invite: "Você entrou em um briefing!",
-    briefing_comment: "Novo comentário no briefing",
-    briefing_item_assigned: "Item atribuído a você",
-    briefing_approval_requested: "Briefing aguardando aprovação",
-    briefing_approved: "Briefing aprovado ✓",
-    briefing_new_version: "Briefing atualizado — confirme a leitura",
-    briefing_execution_started: "Execução iniciada!",
-    briefing_incident: "Intercorrência registrada",
-    briefing_day_before: "Amanhã é dia de execução!",
-    briefing_confirm_reminder: "Confirme a leitura do briefing",
-    briefing_deliverable_due: "Entregável vence amanhã",
-    negotiation_candidate: "Novidade na sua negociação",
-    negotiation_employer: "Novidade na negociação da vaga",
-    contract_received: "Contrato recebido para assinatura",
-    contract_signed: "Contrato assinado",
-    contract_rejected: "Contrato recusado",
-    contract_cancelled: "Contrato cancelado",
-    contract_completed: "Serviço concluído",
-    contract_expired: "Prazo de assinatura vencido",
-    contract_reminder: "Assinatura pendente",
-    contract_terminated: "Contrato encerrado (distrato)",
-    review_request: "Avalie o profissional",
+const TONE_DOT: Record<string, string> = {
+    success: "bg-emerald-500",
+    info: "bg-sky-500",
+    warning: "bg-amber-500",
+    error: "bg-red-500",
 };
 
 export function NotificationBell() {
@@ -61,33 +31,37 @@ export function NotificationBell() {
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [isOpen, setIsOpen] = useState(false);
+    const [markingAll, setMarkingAll] = useState(false);
     const router = useRouter();
+
+    const load = useCallback(async () => {
+        const result = await fetchNotifications({ limit: 20 });
+        setNotifications(result.data);
+        setUnreadCount(result.unreadCount);
+    }, []);
 
     useEffect(() => {
         if (!userProfile) return;
 
-        const loadNotifications = async () => {
-            const result = await fetchNotifications();
-            setNotifications(result.data);
-            setUnreadCount(result.unreadCount);
-        };
+        load();
 
-        loadNotifications();
-
-        // Subscribe to real-time notifications
+        // Realtime: INSERT na tabela (RLS já filtra pelo dono; o filter é só economia de eventos)
         const channel = supabase
-            .channel('realtime:notifications')
+            .channel(`realtime:notifications:${userProfile.id}`)
             .on(
-                'postgres_changes',
+                "postgres_changes",
                 {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'notifications',
-                    filter: `profile_id=eq.${userProfile.id}`
+                    event: "INSERT",
+                    schema: "public",
+                    table: "notifications",
+                    filter: `profile_id=eq.${userProfile.id}`,
                 },
                 (payload) => {
-                    const row = payload.new as any;
-                    const newNotification: AppNotification = {
+                    const row = payload.new as {
+                        id: string; profile_id: string; title: string; message: string;
+                        type: AppNotification["type"]; reference_id: string | null; is_read: boolean; created_at: string;
+                    };
+                    const incoming: AppNotification = {
                         id: row.id,
                         profileId: row.profile_id,
                         title: row.title,
@@ -97,16 +71,23 @@ export function NotificationBell() {
                         isRead: row.is_read,
                         createdAt: row.created_at,
                     };
-                    
-                    // Show toast popup
-                    toast.success(NOTIFICATION_TOAST_TITLES[newNotification.type] ?? "Nova notificação", {
-                        description: newNotification.title,
-                        duration: 5000,
+
+                    const meta = notificationMeta(incoming.type);
+                    const show = meta.tone === "error" ? toast.error
+                        : meta.tone === "warning" ? toast.warning
+                        : meta.tone === "success" ? toast.success
+                        : toast.info;
+                    show(meta.toast, {
+                        description: incoming.title,
+                        duration: 6000,
+                        action: {
+                            label: "Abrir",
+                            onClick: () => { void open(incoming); },
+                        },
                     });
 
-                    // Update state
-                    setNotifications((prev) => [newNotification, ...prev]);
-                    setUnreadCount((prev) => prev + 1);
+                    setNotifications((prev) => (prev.some((n) => n.id === incoming.id) ? prev : [incoming, ...prev]));
+                    if (!incoming.isRead) setUnreadCount((prev) => prev + 1);
                 }
             )
             .subscribe();
@@ -114,118 +95,26 @@ export function NotificationBell() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [userProfile]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userProfile, load]);
 
-    const handleNotificationClick = async (notification: AppNotification) => {
+    const open = async (notification: AppNotification) => {
         if (!notification.isRead) {
-            await markNotificationAsRead(notification.id);
-            setNotifications(prev =>
-                prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
-            );
-            setUnreadCount(prev => Math.max(0, prev - 1));
+            void markNotificationAsRead(notification.id);
+            setNotifications((prev) => prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n)));
+            setUnreadCount((prev) => Math.max(0, prev - 1));
         }
-
         setIsOpen(false);
+        router.push(notificationClickUrl(notification.type, notification.referenceId));
+    };
 
-        const { type, referenceId } = notification;
-
-        if (type === "job_match" && referenceId) {
-            router.push(`/vagas/${referenceId}`);
-        } else if (type === "equipment_match" && referenceId) {
-            router.push(`/equipamentos/${referenceId}`);
-        } else if (type === "review_received") {
-            router.push("/dashboard/perfil");
-        } else if (
-            type === "post_review_needed" ||
-            type === "post_approved" ||
-            type === "post_rejected" ||
-            type === "post_comment" ||
-            type === "post_published"
-        ) {
-            if (referenceId) {
-                const [scheduleId, postId] = referenceId.split("|");
-                const url = postId
-                    ? `/dashboard/social-media/${scheduleId}?post=${postId}`
-                    : `/dashboard/social-media/${scheduleId}`;
-                router.push(url);
-            } else {
-                router.push("/dashboard/social-media");
-            }
-        } else if (type === "team_invite") {
-            router.push(
-                referenceId
-                    ? `/dashboard/social-media/${referenceId}/team`
-                    : "/dashboard/social-media"
-            );
-        } else if (
-            type === "billing_confirmed" ||
-            type === "billing_overdue" ||
-            type === "billing_cancelled"
-        ) {
-            router.push("/dashboard/assinatura");
-        } else if (type === "application_received") {
-            router.push(referenceId ? `/dashboard/vagas/${referenceId}/candidatos` : "/dashboard/vagas");
-        } else if (type === "application_status" || type === "negotiation_candidate") {
-            // reference_id = id da candidatura → a página destaca e rola até o card
-            router.push(
-                referenceId
-                    ? `/dashboard/candidaturas?candidatura=${referenceId}`
-                    : "/dashboard/candidaturas"
-            );
-        } else if (type === "negotiation_employer") {
-            // reference_id = "jobOfferId:applicationId"
-            const [jobOfferId, applicationId] = (referenceId ?? "").split(":");
-            router.push(
-                jobOfferId
-                    ? `/dashboard/vagas/${jobOfferId}/candidatos${applicationId ? `?candidatura=${applicationId}` : ""}`
-                    : "/dashboard/vagas"
-            );
-        } else if (
-            type === "contract_received" ||
-            type === "contract_signed" ||
-            type === "contract_rejected" ||
-            type === "contract_cancelled" ||
-            type === "contract_completed" ||
-            type === "contract_expired" ||
-            type === "contract_reminder" ||
-            type === "contract_terminated"
-        ) {
-            router.push(referenceId ? `/dashboard/contratos/${referenceId}` : "/dashboard/contratos");
-        } else if (type === "review_request") {
-            // reference_id = "professionalId:contractId" → perfil público, onde fica o formulário de avaliação
-            const [professionalId] = (referenceId ?? "").split(":");
-            router.push(professionalId ? `/profissionais/${professionalId}` : "/dashboard/contratos");
-        } else if (type === "proposal_received" || type === "proposal_status") {
-            // A página pública do equipamento não mostra proposta alguma — o
-            // vendedor precisa da tela onde dá para aceitar/recusar.
-            router.push("/dashboard/propostas");
-        } else if (type === "booking_created") {
-            router.push("/dashboard/solicitacoes");
-        } else if (type === "booking_status") {
-            router.push("/dashboard/agenda");
-        } else if (type === "briefing_execution_started" || type === "briefing_incident") {
-            router.push(
-                referenceId
-                    ? `/dashboard/briefing-pro/${referenceId}/execucao`
-                    : "/dashboard/briefing-pro"
-            );
-        } else if (
-            type === "briefing_invite" ||
-            type === "briefing_comment" ||
-            type === "briefing_item_assigned" ||
-            type === "briefing_approval_requested" ||
-            type === "briefing_approved" ||
-            type === "briefing_new_version" ||
-            type === "briefing_day_before" ||
-            type === "briefing_confirm_reminder" ||
-            type === "briefing_deliverable_due"
-        ) {
-            router.push(
-                referenceId
-                    ? `/dashboard/briefing-pro/${referenceId}`
-                    : "/dashboard/briefing-pro"
-            );
-        }
+    const handleMarkAll = async () => {
+        if (unreadCount === 0 || markingAll) return;
+        setMarkingAll(true);
+        await markAllNotificationsAsRead();
+        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+        setMarkingAll(false);
     };
 
     if (!userProfile) return null;
@@ -233,20 +122,36 @@ export function NotificationBell() {
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative group hover:bg-accent transition-colors">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="relative group hover:bg-accent transition-colors"
+                    aria-label={unreadCount > 0 ? `Notificações: ${unreadCount} não lidas` : "Notificações"}
+                >
                     <Bell className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
                     {unreadCount > 0 && (
-                        <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full border border-zinc-950 animate-pulse" />
+                        <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border border-zinc-950">
+                            {unreadCount > 99 ? "99+" : unreadCount}
+                        </span>
                     )}
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-0 mr-4 border-zinc-800 bg-zinc-950/95 backdrop-blur-xl shadow-2xl" align="end">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/50">
                     <h4 className="font-semibold text-zinc-100">Notificações</h4>
-                    {unreadCount > 0 && (
-                        <span className="text-xs font-semibold bg-red-500 text-white px-2 py-0.5 rounded-full">
-                            {unreadCount} novas
-                        </span>
+                    {unreadCount > 0 ? (
+                        <button
+                            type="button"
+                            onClick={handleMarkAll}
+                            disabled={markingAll}
+                            className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-100 transition-colors disabled:opacity-50"
+                            title="Marcar todas como lidas"
+                        >
+                            <CheckCheck className="h-3.5 w-3.5" />
+                            {markingAll ? "Marcando..." : "Marcar todas"}
+                        </button>
+                    ) : (
+                        <span className="text-xs text-zinc-500">Tudo lido</span>
                     )}
                 </div>
                 {notifications.length === 0 ? (
@@ -256,33 +161,41 @@ export function NotificationBell() {
                 ) : (
                     <ScrollArea className="max-h-[60vh] md:max-h-80 select-none">
                         <div className="flex flex-col py-2">
-                            {notifications.map((notification) => (
-                                <button
-                                    key={notification.id}
-                                    onClick={() => handleNotificationClick(notification)}
-                                    className={`flex flex-col items-start p-3 px-4 transition-colors hover:bg-zinc-800/50 text-left cursor-pointer ${!notification.isRead ? "bg-zinc-900/40 relative" : "opacity-80"
-                                        }`}
-                                >
-                                    {!notification.isRead && (
-                                        <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-red-500 rounded-full" />
-                                    )}
-                                    <span className="text-sm font-semibold text-zinc-100 mb-1 leading-tight">
-                                        {notification.title}
-                                    </span>
-                                    <span className="text-xs text-zinc-400 line-clamp-2 leading-relaxed">
-                                        {notification.message}
-                                    </span>
-                                    <span className="text-[10px] text-zinc-500 mt-2 font-medium uppercase tracking-wider">
-                                        {formatDistanceToNow(new Date(notification.createdAt), {
-                                            addSuffix: true,
-                                            locale: ptBR,
-                                        })}
-                                    </span>
-                                </button>
-                            ))}
+                            {notifications.map((notification) => {
+                                const meta = notificationMeta(notification.type);
+                                return (
+                                    <button
+                                        key={notification.id}
+                                        onClick={() => open(notification)}
+                                        className={`relative flex flex-col items-start p-3 pl-5 pr-4 transition-colors hover:bg-zinc-800/50 text-left cursor-pointer ${!notification.isRead ? "bg-zinc-900/40" : "opacity-75"}`}
+                                    >
+                                        {!notification.isRead && (
+                                            <span className={`absolute left-2 top-4 w-1.5 h-1.5 rounded-full ${TONE_DOT[meta.tone] ?? TONE_DOT.info}`} />
+                                        )}
+                                        <span className="text-sm font-semibold text-zinc-100 mb-1 leading-tight">
+                                            {notification.title}
+                                        </span>
+                                        <span className="text-xs text-zinc-400 line-clamp-2 leading-relaxed">
+                                            {notification.message}
+                                        </span>
+                                        <span className="text-[10px] text-zinc-500 mt-2 font-medium uppercase tracking-wider">
+                                            {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true, locale: ptBR })}
+                                        </span>
+                                    </button>
+                                );
+                            })}
                         </div>
                     </ScrollArea>
                 )}
+                <div className="border-t border-zinc-800/50 px-4 py-2">
+                    <button
+                        type="button"
+                        onClick={() => { setIsOpen(false); router.push("/dashboard/notificacoes"); }}
+                        className="w-full text-center text-xs text-zinc-400 hover:text-zinc-100 transition-colors py-1"
+                    >
+                        Ver todas as notificações
+                    </button>
+                </div>
             </PopoverContent>
         </Popover>
     );

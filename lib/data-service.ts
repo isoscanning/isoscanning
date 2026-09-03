@@ -1,6 +1,7 @@
 import apiClient, { isNavigatingToLogin } from "./api-service";
 import { tokenManager } from "./token-manager";
 import { notifyPlanLimit } from "./plans/plan-events";
+import type { NotificationType } from "./notifications/notification-links";
 import { supabase } from "./supabase";
 import imageCompression from "browser-image-compression";
 
@@ -179,48 +180,8 @@ export interface AppNotification {
   profileId: string;
   title: string;
   message: string;
-  type:
-    | "job_match"
-    | "equipment_match"
-    | "system"
-    | "review_received"
-    | "post_review_needed"
-    | "post_approved"
-    | "post_rejected"
-    | "post_comment"
-    | "post_published"
-    | "team_invite"
-    | "billing_confirmed"
-    | "billing_overdue"
-    | "billing_cancelled"
-    | "application_received"
-    | "application_status"
-    | "proposal_received"
-    | "proposal_status"
-    | "booking_created"
-    | "booking_status"
-    | "briefing_invite"
-    | "briefing_comment"
-    | "briefing_item_assigned"
-    | "briefing_approval_requested"
-    | "briefing_approved"
-    | "briefing_new_version"
-    | "briefing_day_before"
-    | "briefing_confirm_reminder"
-    | "briefing_deliverable_due"
-    | "briefing_execution_started"
-    | "briefing_incident"
-    | "negotiation_candidate"
-    | "negotiation_employer"
-    | "contract_received"
-    | "contract_signed"
-    | "contract_rejected"
-    | "contract_cancelled"
-    | "contract_completed"
-    | "contract_expired"
-    | "contract_reminder"
-    | "contract_terminated"
-    | "review_request";
+  /** Ver lib/notifications/notification-links.ts (espelho do backend). */
+  type: NotificationType;
   referenceId?: string | null;
   isRead: boolean;
   createdAt: string;
@@ -1295,13 +1256,36 @@ export const respondToJobAgreement = async (
   }
 };
 
-export async function fetchNotifications(): Promise<{ data: AppNotification[], total: number, unreadCount: number }> {
+export interface FetchNotificationsOptions {
+  limit?: number;
+  offset?: number;
+  unreadOnly?: boolean;
+}
+
+export async function fetchNotifications(
+  options: FetchNotificationsOptions = {}
+): Promise<{ data: AppNotification[]; total: number; unreadCount: number }> {
+  const params = new URLSearchParams();
+  params.set("limit", String(options.limit ?? 20));
+  if (options.offset) params.set("offset", String(options.offset));
+  if (options.unreadOnly) params.set("unreadOnly", "true");
   try {
-    const response = await apiClient.get('/notifications?limit=20');
+    const response = await apiClient.get(`/notifications?${params.toString()}`);
     return response.data;
   } catch (error) {
     if (!isNavigatingToLogin) console.warn("[data-service] Error fetching notifications:", error);
     return { data: [], total: 0, unreadCount: 0 };
+  }
+}
+
+/** Marca todas as não lidas do usuário; devolve quantas foram marcadas (ou 0 em erro). */
+export async function markAllNotificationsAsRead(): Promise<number> {
+  try {
+    const response = await apiClient.patch("/notifications/read-all");
+    return Number(response.data?.updated ?? 0);
+  } catch (error) {
+    console.error("[data-service] Error marking all notifications as read:", error);
+    return 0;
   }
 }
 

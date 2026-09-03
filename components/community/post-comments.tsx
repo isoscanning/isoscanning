@@ -64,7 +64,7 @@ interface CommentItemProps {
 
 function CommentItem({ comment, depth, onLike, onReply }: CommentItemProps) {
   return (
-    <div className={`mt-4 flex gap-3 ${depth > 0 ? "ml-8 sm:ml-12" : ""}`}>
+    <div id={`comment-${comment.id}`} className={`mt-4 flex gap-3 scroll-mt-24 target:rounded-xl target:bg-primary/5 ${depth > 0 ? "ml-8 sm:ml-12" : ""}`}>
       <Avatar className="h-8 w-8 shrink-0">
         <AvatarImage src={comment.author.avatarUrl ?? undefined} alt={comment.author.name} />
         <AvatarFallback>{comment.author.name?.[0] || "U"}</AvatarFallback>

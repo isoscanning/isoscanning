@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -139,7 +139,18 @@ function errorMessage(err: unknown, fallback: string): string {
 }
 
 export default function PropostasPage() {
+  return (
+    <Suspense fallback={null}>
+      <PropostasInner />
+    </Suspense>
+  );
+}
+
+function PropostasInner() {
   const router = useRouter();
+  // Deep link das notificações: proposal_received → ?tab=received, proposal_status → ?tab=sent
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") === "sent" ? "sent" : "received";
   const { userProfile, loading: authLoading } = useAuth();
 
   const [proposals, setProposals] = useState<Proposal[]>([]);
@@ -472,7 +483,7 @@ export default function PropostasPage() {
               ))}
             </div>
           ) : (
-            <Tabs defaultValue="received" className="w-full">
+            <Tabs defaultValue={initialTab} className="w-full">
               <TabsList className="grid w-full max-w-md grid-cols-2">
                 <TabsTrigger value="received" className="flex items-center gap-2">
                   <Inbox className="h-4 w-4" />

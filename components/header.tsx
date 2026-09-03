@@ -10,22 +10,7 @@ import { UserNav } from "@/components/user-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { ChatBell } from "@/components/chat-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
-import {
-  Menu,
-  User,
-  LogOut,
-  Search,
-  Package,
-  UserPlus,
-  LogIn,
-  Settings,
-  Briefcase,
-  Zap,
-  MessageSquare,
-  Info,
-  UserCircle,
-  CreditCard,
-} from "lucide-react";
+import { Menu, User, LogOut, Search, Package, UserPlus, LogIn, Settings, Briefcase, Zap, MessageSquare, Info, UserCircle, CreditCard, Bell } from "lucide-react";
 import { useState, useEffect } from "react";
 import { trackEvent } from "@/lib/analytics";
 
@@ -301,6 +286,19 @@ export function Header() {
                     >
                       <MessageSquare className="h-4 w-4 mr-2 text-primary" />
                       <span className="font-medium">Mensagens</span>
+                    </Button>
+                  </Link>
+                  <Link
+                    href="/dashboard/notificacoes"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start bg-transparent border-accent/30 hover:bg-accent/10 hover:text-accent"
+                    >
+                      <Bell className="h-4 w-4 mr-2 text-amber-500" />
+                      <span className="font-medium">Notificações</span>
                     </Button>
                   </Link>
                   <Link

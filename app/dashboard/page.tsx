@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
+import { FinanceMonthWidget } from "@/components/dashboard/finance-month-widget";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { OnboardingTour, TourStep } from "@/components/onboarding-tour";
 import { usePlan } from "@/lib/plans/use-plan";
@@ -430,6 +431,12 @@ export default function DashboardPage() {
               </Card>
             </ScrollReveal>
           </div>
+
+          {isProfessional && (
+            <ScrollReveal>
+              <FinanceMonthWidget />
+            </ScrollReveal>
+          )}
 
           {/* Quick Actions Grid */}
           <div className="space-y-6">

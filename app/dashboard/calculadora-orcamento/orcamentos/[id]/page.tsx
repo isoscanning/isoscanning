@@ -433,6 +433,14 @@ export default function QuoteDetailPage() {
                   <ArrowLeft className="h-4 w-4" /> Voltar
                 </Button>
               </Link>
+              <Link
+                href={`/dashboard/financeiro?novo=1&titulo=${encodeURIComponent(quote.eventName || "Orçamento")}&valor=${quote.grandTotal.toFixed(2)}`}
+                title="Cria um lançamento a receber no financeiro com o valor deste orçamento"
+              >
+                <Button variant="outline" className="gap-2 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-600 border-emerald-200">
+                  <DollarSign className="h-4 w-4" /> Virar lançamento
+                </Button>
+              </Link>
               <Link href={`/dashboard/calculadora-orcamento/novo-orcamento?editId=${quote.id}`}>
                 <Button variant="outline" className="gap-2 text-amber-600 hover:bg-amber-500/10 hover:text-amber-600 border-amber-200">
                   <Pencil className="h-4 w-4" /> Editar

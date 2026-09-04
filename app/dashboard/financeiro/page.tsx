@@ -1,569 +1,621 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Plus, DollarSign, WalletCards, AlertCircle, Calendar, Pencil, Trash2, Check, Download } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/components/ui/use-toast";
 import { usePlan } from "@/lib/plans/use-plan";
 import { PlanBadge } from "@/components/plan/plan-gate";
 import { notifyPlanLimit } from "@/lib/plans/plan-events";
 import { buildPlanFeatureBody } from "@/lib/plans/plan-limits";
-import { fetchFinancialRecords, fetchFinancialSummary, fetchAnnualSummary, deleteFinancialRecord, updateFinancialRecord, FinancialRecord, FinancialSummary, AnnualSummary } from "@/lib/finances-service";
-import { useToast } from "@/components/ui/use-toast";
-import { ScrollReveal } from "@/components/scroll-reveal";
+import {
+  bulkUpdateFinancialRecords,
+  deleteFinancialRecord,
+  fetchFinanceClients,
+  fetchFinanceDashboard,
+  fetchFinancialRecord,
+  fetchFinancialRecords,
+  fetchNfFileUrl,
+  updateFinanceSettings,
+  type BulkAction,
+  type FinanceDashboard,
+  type FinancialRecord,
+  type FinancialRecordInput,
+  type TaxRegime,
+} from "@/lib/finances-service";
+import { formatBRL, MONTHS_PT } from "@/lib/finances/money";
+import {
+  BarChart3,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  FileText,
+  Plus,
+  Search,
+  Settings2,
+  X,
+} from "lucide-react";
 import { FinanceModal } from "./components/finance-modal";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ReceiveDialog } from "./components/receive-dialog";
+import { SettingsDialog } from "./components/settings-dialog";
+import { AnnualPanel } from "./components/annual-panel";
+import { KpiCards } from "./components/kpi-cards";
+import { RecordsTable, type SortKey } from "./components/records-table";
+import { FinanceChart } from "./components/finance-chart";
+import { buildFinanceCsv, downloadTextFile } from "./components/export-csv";
+import { FILTER_CHIPS, applyFilter, errorMessage, isFilterKey, type FilterKey } from "./components/labels";
 
 export default function FinancesDashboardPage() {
-    const router = useRouter();
-    const { userProfile, loading } = useAuth();
-    const { toast } = useToast();
-    // Exportação do financeiro (CSV) — recurso Pro+
-    const plan = usePlan();
-    const canExport = plan.can("financeExport");
-    
-    const [records, setRecords] = useState<FinancialRecord[]>([]);
-    const [summary, setSummary] = useState<FinancialSummary | null>(null);
-    const [annualSummary, setAnnualSummary] = useState<AnnualSummary | null>(null);
-    const [isLoadingData, setIsLoadingData] = useState(true);
-    const [taxRegime, setTaxRegime] = useState<'MEI' | 'SIMPLES'>('MEI');
-    
-    // Modal states
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedRecord, setSelectedRecord] = useState<FinancialRecord | null>(null);
-    
-    // Default to current month/year
-    const currentDate = new Date();
-    const [month, setMonth] = useState(currentDate.getMonth() + 1);
-    const [year, setYear] = useState(currentDate.getFullYear());
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <FinancesPageInner />
+    </Suspense>
+  );
+}
 
-    const loadData = useCallback(async () => {
-        if (!userProfile) return;
-        setIsLoadingData(true);
-        try {
-            const [summaryData, annualData, recordsData] = await Promise.all([
-                fetchFinancialSummary(month, year),
-                fetchAnnualSummary(year),
-                fetchFinancialRecords({ month, year })
-            ]);
-            setSummary(summaryData);
-            setAnnualSummary(annualData);
-            setRecords(recordsData);
-        } catch (error) {
-            console.error("Erro ao carregar dados financeiros:", error);
-            toast({ variant: "destructive", title: "Erro", description: "Não foi possível carregar os dados." });
-        } finally {
-            setIsLoadingData(false);
-        }
-    }, [userProfile, month, year, toast]);
-
-    useEffect(() => {
-        if (!loading && !userProfile) {
-            router.push("/login");
-        } else if (userProfile) {
-            loadData();
-        }
-    }, [userProfile, loading, router, loadData]);
-
-    const handlePrint = () => {
-        window.print();
-    };
-
-    // Exporta os lançamentos listados (mês/ano selecionados) em CSV — UTF-8 com BOM, separador ";"
-    const handleExportCsv = () => {
-        if (!canExport) {
-            notifyPlanLimit(buildPlanFeatureBody("financeExport", plan.tier));
-            return;
-        }
-        if (records.length === 0) {
-            toast({ title: "Nada para exportar", description: "Não há lançamentos neste período." });
-            return;
-        }
-        const SOURCE_LABELS: Record<string, string> = { internal: "Plataforma", external: "Externo" };
-        const STATUS_LABELS: Record<string, string> = { pending: "Pendente", received: "Recebido", cancelled: "Cancelado" };
-        const NF_LABELS: Record<string, string> = { not_applicable: "Não se aplica", pending: "Pendente", issued: "Emitida" };
-        const formatDate = (value: string) => {
-            const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-            return m ? `${m[3]}/${m[2]}/${m[1]}` : new Date(value).toLocaleDateString("pt-BR");
-        };
-        const escapeCell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
-        const header = ["Data", "Título", "Descrição", "Valor (R$)", "Origem", "Status", "Exige NF", "Status NF", "Detalhes NF"];
-        const rows = records.map((r) => [
-            formatDate(r.date),
-            r.title,
-            r.description ?? "",
-            Number(r.amount).toFixed(2).replace(".", ","),
-            SOURCE_LABELS[r.source] ?? r.source,
-            STATUS_LABELS[r.status] ?? r.status,
-            r.requiresNf ? "Sim" : "Não",
-            NF_LABELS[r.nfStatus] ?? r.nfStatus,
-            r.nfDetails ?? "",
-        ]);
-        const csv = "\uFEFF" + [header, ...rows].map((row) => row.map(escapeCell).join(";")).join("\r\n");
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `financeiro-${year}-${String(month).padStart(2, "0")}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-    };
-
-    const handleOpenNewModal = () => {
-        setSelectedRecord(null);
-        setIsModalOpen(true);
-    };
-
-    const handleEditRecord = (record: FinancialRecord) => {
-        setSelectedRecord(record);
-        setIsModalOpen(true);
-    };
-
-    const handleSaveRecord = (savedRecord: FinancialRecord) => {
-        // Reload data to ensure summary updates correctly
-        loadData();
-    };
-
-    const handleDeleteRecord = async (id: string) => {
-        if (!window.confirm("Certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita.")) {
-            return;
-        }
-        try {
-            await deleteFinancialRecord(id);
-            toast({
-                title: "Lançamento excluído",
-                description: "O registro foi apagado com sucesso.",
-            });
-            loadData();
-        } catch (error) {
-            console.error("Erro ao excluir lançamento:", error);
-            toast({
-                variant: "destructive",
-                title: "Erro",
-                description: "Não foi possível excluir o lançamento.",
-            });
-        }
-    };
-
-    const handleConfirmPayment = async (id: string) => {
-        try {
-            await updateFinancialRecord(id, { status: 'received' });
-            toast({
-                title: "Pagamento confirmado",
-                description: "O status do lançamento foi alterado para Recebido.",
-            });
-            loadData();
-        } catch (error) {
-            console.error("Erro ao confirmar pagamento:", error);
-            toast({
-                variant: "destructive",
-                title: "Erro",
-                description: "Não foi possível confirmar o pagamento.",
-            });
-        }
-    };
-
-    if (loading || isLoadingData) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-background">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-            </div>
-        );
-    }
-
-    if (!userProfile) return null;
-
-    return (
-        <div className="min-h-screen flex flex-col bg-background/50">
-            <Header />
-
-            <main className="flex-1 py-12 px-4 print:py-0 print:px-0">
-                <div className="container mx-auto max-w-6xl space-y-8 print:max-w-full">
-                    {/* Header Controls */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
-                        <div>
-                            <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-emerald-500 to-teal-500">
-                                Gestão Financeira
-                            </h1>
-                            <p className="text-muted-foreground mt-1">
-                                Acompanhe seu fluxo de caixa e obrigações fiscais.
-                            </p>
-                        </div>
-                        <div className="flex gap-2">
-                            <Button variant="outline" onClick={handleExportCsv} className="border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-500">
-                                <Download className="mr-2 h-4 w-4" /> Exportar CSV
-                                {!canExport && <PlanBadge className="ml-2" />}
-                            </Button>
-                            <Button variant="outline" onClick={handlePrint} className="border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-500">
-                                <FileText className="mr-2 h-4 w-4" /> Relatório PDF
-                            </Button>
-                            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleOpenNewModal}>
-                                <Plus className="mr-2 h-4 w-4" /> Novo Lançamento
-                            </Button>
-                        </div>
-                    </div>
-
-                    {/* Annual Summary Highlights */}
-                    {annualSummary && (
-                        <div className="space-y-4 print:hidden">
-                            <div className="flex items-center gap-3 mb-2">
-                                <span className="text-sm font-medium text-muted-foreground">Regime Tributário:</span>
-                                <div className="flex bg-muted/50 p-1 rounded-full border border-muted">
-                                    <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        onClick={() => setTaxRegime('MEI')}
-                                        className={`rounded-full h-8 px-5 text-sm font-medium transition-all ${taxRegime === 'MEI' ? 'bg-emerald-600 text-white shadow-md hover:bg-emerald-700' : 'text-muted-foreground hover:text-foreground'}`}
-                                    >
-                                        MEI
-                                    </Button>
-                                    <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        onClick={() => setTaxRegime('SIMPLES')}
-                                        className={`rounded-full h-8 px-5 text-sm font-medium transition-all ${taxRegime === 'SIMPLES' ? 'bg-indigo-600 text-white shadow-md hover:bg-indigo-700' : 'text-muted-foreground hover:text-foreground'}`}
-                                    >
-                                        Simples Nacional
-                                    </Button>
-                                </div>
-                            </div>
-                            
-                            {taxRegime === 'MEI' ? (
-                                <ScrollReveal delay={0.05}>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gradient-to-br from-emerald-900/20 to-teal-900/20 border border-emerald-500/20 rounded-2xl p-6 shadow-lg shadow-emerald-500/5">
-                                        <div>
-                                            <p className="text-sm font-medium text-emerald-400 mb-1">Faturamento Total Bruto ({year})</p>
-                                            <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-teal-400">
-                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(annualSummary.totalAnnualInvoiced)}
-                                            </h2>
-                                            <p className="text-xs text-muted-foreground mt-2">Soma absoluta de todos os valores registrados no ano.</p>
-                                        </div>
-                                        <div className="border-t md:border-t-0 md:border-l border-emerald-500/20 pt-4 md:pt-0 md:pl-6">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <p className="text-sm font-medium text-teal-400 mb-1">Saldo Restante Teto MEI</p>
-                                                    <h2 className="text-3xl font-bold text-white">
-                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(annualSummary.meiLimitRemaining)}
-                                                    </h2>
-                                                </div>
-                                                <div className="text-right flex flex-col items-end">
-                                                    <p className="text-xs text-muted-foreground mb-1">Limite Anual</p>
-                                                    <span className="bg-emerald-500/10 text-emerald-500 text-xs px-2 py-1 rounded-full font-medium border border-emerald-500/20">
-                                                        R$ 81.000,00
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="w-full bg-black/40 rounded-full h-2.5 mt-5 overflow-hidden border border-white/5">
-                                                <div 
-                                                    className="bg-gradient-to-r from-teal-500 to-emerald-400 h-full rounded-full transition-all duration-1000 ease-out relative" 
-                                                    style={{ width: `${Math.min(100, (annualSummary.meiNfIssuedAmount / 81000) * 100)}%` }}
-                                                >
-                                                    <div className="absolute inset-0 bg-white/20 w-full h-full animate-pulse"></div>
-                                                </div>
-                                            </div>
-                                            <div className="flex justify-between items-center mt-2">
-                                                <p className="text-xs font-medium text-emerald-500/80">
-                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(annualSummary.meiNfIssuedAmount)} contabilizado
-                                                </p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {((annualSummary.meiNfIssuedAmount / 81000) * 100).toFixed(1)}% atingido
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </ScrollReveal>
-                            ) : (
-                                <ScrollReveal delay={0.05}>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gradient-to-br from-indigo-900/20 to-blue-900/20 border border-indigo-500/30 rounded-2xl p-6 shadow-lg shadow-indigo-500/5">
-                                        <div>
-                                            <p className="text-sm font-medium text-indigo-400 mb-1">Notas Emitidas (Simples Nacional - {year})</p>
-                                            <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-blue-400">
-                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(annualSummary.meiNfIssuedAmount)}
-                                            </h2>
-                                            <p className="text-xs text-indigo-200/60 mt-2">Valor contabilizado como receita para tributação (NFs emitidas).</p>
-                                            <div className="mt-4 pt-4 border-t border-indigo-500/20">
-                                                <p className="text-xs font-medium text-muted-foreground mb-1">Faturamento Bruto Total do Ano</p>
-                                                <p className="text-sm font-semibold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(annualSummary.totalAnnualInvoiced)}</p>
-                                            </div>
-                                        </div>
-                                        <div className="border-t md:border-t-0 md:border-l border-indigo-500/20 pt-4 md:pt-0 md:pl-6">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <p className="text-sm font-medium text-blue-400 mb-1">Saldo Restante Teto Simples</p>
-                                                    <h2 className="text-3xl font-bold text-white">
-                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(4800000 - annualSummary.meiNfIssuedAmount)}
-                                                    </h2>
-                                                </div>
-                                                <div className="text-right flex flex-col items-end">
-                                                    <p className="text-xs text-indigo-200/60 mb-1">Teto Anual Global</p>
-                                                    <span className="bg-indigo-500/10 text-indigo-400 text-xs px-2 py-1 rounded-full font-medium border border-indigo-500/20">
-                                                        R$ 4.800.000,00
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="w-full bg-black/40 rounded-full h-2.5 mt-5 overflow-hidden border border-white/5">
-                                                <div 
-                                                    className="bg-gradient-to-r from-blue-500 to-indigo-400 h-full rounded-full transition-all duration-1000 ease-out relative" 
-                                                    style={{ width: `${Math.min(100, (annualSummary.meiNfIssuedAmount / 4800000) * 100)}%` }}
-                                                >
-                                                </div>
-                                            </div>
-                                            <div className="flex justify-between items-center mt-3">
-                                                <div className="flex flex-col">
-                                                    <p className="text-[11px] font-medium text-indigo-400 uppercase tracking-widest mb-0.5">
-                                                        Imposto Estimado (Anexo III - 6%)
-                                                    </p>
-                                                    <p className="text-lg font-bold text-rose-400 flex items-center gap-1">
-                                                        <DollarSign className="w-4 h-4" />
-                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(annualSummary.meiNfIssuedAmount * 0.06)}
-                                                    </p>
-                                                </div>
-                                                <p className="text-xs text-muted-foreground mt-4">
-                                                    {((annualSummary.meiNfIssuedAmount / 4800000) * 100).toFixed(2)}% atingido
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </ScrollReveal>
-                            )}
-                        </div>
-                    )}
-
-                    {/* KPI Cards */}
-                    {summary && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <ScrollReveal delay={0.1}>
-                                <Card className="border-emerald-500/10 hover:border-emerald-500/30 transition-all bg-card/80 backdrop-blur">
-                                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                        <CardTitle className="text-sm font-medium">Receita no Mês</CardTitle>
-                                        <DollarSign className="h-4 w-4 text-emerald-500" />
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary.monthlyRevenue)}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </ScrollReveal>
-
-                            <ScrollReveal delay={0.2}>
-                                <Card className="border-amber-500/10 hover:border-amber-500/30 transition-all bg-card/80 backdrop-blur">
-                                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                        <CardTitle className="text-sm font-medium">A Receber</CardTitle>
-                                        <WalletCards className="h-4 w-4 text-amber-500" />
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary.pendingToReceive)}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </ScrollReveal>
-                            
-                            <ScrollReveal delay={0.3}>
-                                <Card className="border-blue-500/10 hover:border-blue-500/30 transition-all bg-card/80 backdrop-blur">
-                                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                        <CardTitle className="text-sm font-medium">Faturamento Total</CardTitle>
-                                        <WalletCards className="h-4 w-4 text-blue-500" />
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary.totalInvoiced)}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </ScrollReveal>
-
-                            <ScrollReveal delay={0.4}>
-                                <Card className="border-rose-500/10 hover:border-rose-500/30 transition-all bg-card/80 backdrop-blur">
-                                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                        <CardTitle className="text-sm font-medium">NFs Pendentes</CardTitle>
-                                        <AlertCircle className="h-4 w-4 text-rose-500" />
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="text-2xl font-bold text-rose-600 dark:text-rose-400">
-                                            {summary.pendingNfCount}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </ScrollReveal>
-                        </div>
-                    )}
-
-                    {/* Empty State / List */}
-                    <Card className="print:shadow-none print:border-none">
-                        <CardHeader className="print:px-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 mb-4">
-                            <div>
-                                <CardTitle>Lançamentos</CardTitle>
-                                <CardDescription>
-                                    Listagem completa de faturamentos e notas fiscais para o período.
-                                </CardDescription>
-                            </div>
-                            <div className="flex items-center gap-2 print:hidden z-10 relative">
-                                <Select value={month.toString()} onValueChange={(val) => setMonth(parseInt(val))}>
-                                    <SelectTrigger className="w-[140px] bg-background">
-                                        <SelectValue placeholder="Mês" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="1">Janeiro</SelectItem>
-                                        <SelectItem value="2">Fevereiro</SelectItem>
-                                        <SelectItem value="3">Março</SelectItem>
-                                        <SelectItem value="4">Abril</SelectItem>
-                                        <SelectItem value="5">Maio</SelectItem>
-                                        <SelectItem value="6">Junho</SelectItem>
-                                        <SelectItem value="7">Julho</SelectItem>
-                                        <SelectItem value="8">Agosto</SelectItem>
-                                        <SelectItem value="9">Setembro</SelectItem>
-                                        <SelectItem value="10">Outubro</SelectItem>
-                                        <SelectItem value="11">Novembro</SelectItem>
-                                        <SelectItem value="12">Dezembro</SelectItem>
-                                    </SelectContent>
-                                </Select>
-
-                                <Select value={year.toString()} onValueChange={(val) => setYear(parseInt(val))}>
-                                    <SelectTrigger className="w-[100px] bg-background">
-                                        <SelectValue placeholder="Ano" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={(currentDate.getFullYear() - 1).toString()}>{currentDate.getFullYear() - 1}</SelectItem>
-                                        <SelectItem value={currentDate.getFullYear().toString()}>{currentDate.getFullYear()}</SelectItem>
-                                        <SelectItem value={(currentDate.getFullYear() + 1).toString()}>{currentDate.getFullYear() + 1}</SelectItem>
-                                        <SelectItem value={(currentDate.getFullYear() + 2).toString()}>{currentDate.getFullYear() + 2}</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="print:px-0">
-                            {records.length === 0 ? (
-                                <div className="text-center py-16 border-dashed border-2 rounded-lg border-emerald-500/20">
-                                    <div className="bg-emerald-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <DollarSign className="h-10 w-10 text-emerald-500" />
-                                    </div>
-                                    <p className="text-lg font-medium">Nenhum lançamento encontrado</p>
-                                    <p className="text-muted-foreground mt-2 max-w-sm mx-auto">
-                                        Você não possui registros financeiros para este mês.
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm text-left">
-                                        <thead className="text-xs text-muted-foreground uppercase bg-muted/50 rounded-lg">
-                                            <tr>
-                                                <th className="px-4 py-3">Data</th>
-                                                <th className="px-4 py-3">Descrição</th>
-                                                <th className="px-4 py-3">Origem</th>
-                                                <th className="px-4 py-3">Status</th>
-                                                <th className="px-4 py-3">NFe</th>
-                                                <th className="px-4 py-3">Valor</th>
-                                                <th className="px-4 py-3 print:hidden">Ações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {records.map((r) => (
-                                                <tr key={r.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
-                                                    <td className="px-4 py-3 whitespace-nowrap">
-                                                        <div className="flex items-center gap-2">
-                                                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                                                            {r.date ? r.date.split('T')[0].split('-').reverse().join('/') : ''}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-3 font-medium">
-                                                        {r.title}
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <span className="px-2 py-1 bg-secondary rounded-full text-xs">
-                                                            {r.source === 'internal' ? 'ISOSCANNING' : 'Externo'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <span className={`px-2 py-1 rounded-full text-xs ${
-                                                            r.status === 'received' ? 'bg-emerald-500/10 text-emerald-600' : 
-                                                            r.status === 'pending' ? 'bg-amber-500/10 text-amber-600' : 'bg-rose-500/10 text-rose-600'
-                                                        }`}>
-                                                            {r.status === 'received' ? 'Recebido' : r.status === 'pending' ? 'Pendente' : 'Cancelado'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        {!r.requiresNf ? (
-                                                            <span className="text-muted-foreground text-xs">Não exige</span>
-                                                        ) : (
-                                                            <span className={`px-2 py-1 rounded-full text-xs ${
-                                                                r.nfStatus === 'issued' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
-                                                            }`}>
-                                                                {r.nfStatus === 'issued' ? 'Emitida' : 'Pendente'}
-                                                            </span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-3 font-medium">
-                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(r.amount)}
-                                                    </td>
-                                                    <td className="px-4 py-3 print:hidden flex items-center justify-start gap-1">
-                                                        {r.status !== 'received' && (
-                                                            <Button 
-                                                                variant="ghost" 
-                                                                size="icon" 
-                                                                onClick={() => handleConfirmPayment(r.id)}
-                                                                title="Confirmar Pagamento"
-                                                                className="h-8 w-8 text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10"
-                                                            >
-                                                                <Check className="h-4 w-4" />
-                                                            </Button>
-                                                        )}
-                                                        <Button 
-                                                            variant="ghost" 
-                                                            size="icon" 
-                                                            onClick={() => handleEditRecord(r)}
-                                                            title="Editar"
-                                                            className="h-8 w-8 text-muted-foreground hover:text-emerald-600"
-                                                        >
-                                                            <Pencil className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button 
-                                                            variant="ghost" 
-                                                            size="icon" 
-                                                            onClick={() => handleDeleteRecord(r.id)}
-                                                            title="Excluir"
-                                                            className="h-8 w-8 text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                        <tfoot className="font-bold text-base bg-muted/30">
-                                            <tr>
-                                                <td colSpan={5} className="px-4 py-3 text-right">Total:</td>
-                                                <td className="px-4 py-3 text-emerald-600">
-                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                                                        records.reduce((acc, curr) => acc + curr.amount, 0)
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                </div>
-            </main>
-
-            <Footer />
-
-            <FinanceModal 
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSave={handleSaveRecord}
-                initialData={selectedRecord}
-            />
+function PageSkeleton() {
+  return (
+    <div className="min-h-screen flex flex-col bg-background/50">
+      <Header />
+      <main className="flex-1 py-12 px-4">
+        <div className="container mx-auto max-w-6xl space-y-8">
+          <Skeleton className="h-10 w-72" />
+          <Skeleton className="h-44 w-full rounded-2xl" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
+          </div>
+          <Skeleton className="h-80 w-full rounded-xl" />
         </div>
-    );
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
+const BULK_LABELS: Record<BulkAction, { label: string; title: string; description: string }> = {
+  mark_received: { label: "Marcar recebido", title: "Marcar como recebido?", description: "Os lançamentos pendentes selecionados passam a recebidos com a data de hoje. Cancelados e já recebidos são ignorados." },
+  mark_nf_issued: { label: "NF emitida", title: "Marcar nota como emitida?", description: "Só os lançamentos com nota a emitir são alterados. Você pode preencher o número depois, editando cada um." },
+  cancel: { label: "Cancelar", title: "Cancelar lançamentos?", description: "Só pendentes podem ser cancelados. Cancelados saem do faturamento, mas continuam no histórico." },
+  delete: { label: "Excluir", title: "Excluir lançamentos?", description: "Esta ação não pode ser desfeita. Arquivos de nota anexados também são apagados." },
+};
+
+function FinancesPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { userProfile, loading } = useAuth();
+  const { toast } = useToast();
+  const plan = usePlan();
+  const canExport = plan.can("financeExport");
+
+  const initialParams = useRef(new URLSearchParams(searchParams.toString()));
+  const now = useMemo(() => new Date(), []);
+  const [month, setMonth] = useState(() => {
+    const m = parseInt(initialParams.current.get("mes") ?? "", 10);
+    return m >= 1 && m <= 12 ? m : now.getMonth() + 1;
+  });
+  const [year, setYear] = useState(() => {
+    const y = parseInt(initialParams.current.get("ano") ?? "", 10);
+    return y >= 2000 && y <= 2100 ? y : now.getFullYear();
+  });
+  const [filter, setFilter] = useState<FilterKey>(() => {
+    const f = initialParams.current.get("filtro");
+    return isFilterKey(f) ? f : "todos";
+  });
+
+  const [dashboard, setDashboard] = useState<FinanceDashboard | null>(null);
+  const [records, setRecords] = useState<FinancialRecord[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortKey>("date");
+  const [order, setOrder] = useState<"asc" | "desc">("desc");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [clients, setClients] = useState<string[]>([]);
+  const [modal, setModal] = useState<{ open: boolean; initial?: FinancialRecord | null; duplicateOf?: FinancialRecord | null; prefill?: Partial<FinancialRecordInput> | null }>({ open: false });
+  const [receiveTarget, setReceiveTarget] = useState<FinancialRecord | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FinancialRecord | null>(null);
+  const [bulkConfirm, setBulkConfirm] = useState<BulkAction | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [savingRegime, setSavingRegime] = useState(false);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const reqRef = useRef(0);
+  const deepLinkHandled = useRef(false);
+
+  // ── Carga (com guarda contra resposta atrasada — A10) ─────────────
+  const load = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!userProfile) return;
+      const id = ++reqRef.current;
+      if (!opts?.silent) setLoadingData(true);
+      try {
+        const [d, r] = await Promise.all([fetchFinanceDashboard(year, month), fetchFinancialRecords({ year, month })]);
+        if (id !== reqRef.current) return;
+        setDashboard(d);
+        setRecords(r);
+        setSelected(new Set());
+      } catch (error) {
+        if (id !== reqRef.current) return;
+        toast({ variant: "destructive", title: "Não foi possível carregar o financeiro", description: errorMessage(error, "Tente novamente em instantes.") });
+      } finally {
+        if (id === reqRef.current) setLoadingData(false);
+      }
+    },
+    [userProfile, year, month, toast]
+  );
+
+  useEffect(() => {
+    if (!loading && !userProfile) router.push("/login");
+  }, [loading, userProfile, router]);
+
+  useEffect(() => {
+    if (userProfile) void load();
+  }, [userProfile, load]);
+
+  const refreshClients = useCallback(() => {
+    fetchFinanceClients().then(setClients).catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    if (userProfile) refreshClients();
+  }, [userProfile, refreshClients]);
+
+  // ── Deep links: ?lancamento=id · ?novo=1&titulo&valor&cliente · ?painel=anual ──
+  useEffect(() => {
+    if (!userProfile || deepLinkHandled.current) return;
+    deepLinkHandled.current = true;
+    const p = initialParams.current;
+    const lanc = p.get("lancamento");
+    if (lanc) {
+      fetchFinancialRecord(lanc)
+        .then((r) => {
+          const [y, m] = r.date.split("-").map(Number);
+          setYear(y);
+          setMonth(m);
+          setFilter(r.status === "cancelled" ? "cancelados" : "todos");
+          setHighlightId(r.id);
+        })
+        .catch(() => toast({ variant: "destructive", title: "Lançamento não encontrado", description: "Ele pode ter sido excluído." }));
+    }
+    if (p.get("novo") === "1") {
+      const valor = parseFloat(p.get("valor") ?? "");
+      setModal({
+        open: true,
+        prefill: {
+          title: p.get("titulo") ?? "",
+          amount: Number.isFinite(valor) && valor > 0 ? valor : undefined,
+          clientName: p.get("cliente") ?? undefined,
+          status: "pending",
+          source: "external",
+        },
+      });
+    }
+    if (p.get("painel") === "anual") {
+      setTimeout(() => document.getElementById("painel-anual")?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
+    }
+  }, [userProfile, toast]);
+
+  // URL espelha mês/ano/filtro (para voltar/compartilhar) — só depois da primeira carga
+  useEffect(() => {
+    if (!dashboard) return;
+    const params = new URLSearchParams();
+    params.set("mes", String(month));
+    params.set("ano", String(year));
+    if (filter !== "todos") params.set("filtro", filter);
+    router.replace(`/dashboard/financeiro?${params.toString()}`, { scroll: false });
+  }, [dashboard, month, year, filter, router]);
+
+  // Rola até a linha destacada e apaga o destaque depois
+  useEffect(() => {
+    if (!highlightId || loadingData) return;
+    const el = document.getElementById(`lancamento-${highlightId}`) ?? document.getElementById(`lancamento-m-${highlightId}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const t = setTimeout(() => setHighlightId(null), 6000);
+    return () => clearTimeout(t);
+  }, [highlightId, loadingData, records]);
+
+  // ── Derivados ──────────────────────────────────────────────────────
+  const visible = useMemo(() => {
+    const list = applyFilter(records, filter, search);
+    const dir = order === "asc" ? 1 : -1;
+    return [...list].sort((a, b) => {
+      if (sort === "amount") return (a.amount - b.amount) * dir || b.date.localeCompare(a.date);
+      return a.date.localeCompare(b.date) * dir || a.createdAt.localeCompare(b.createdAt) * dir;
+    });
+  }, [records, filter, search, sort, order]);
+
+  const years = useMemo(() => {
+    const first = Math.min(dashboard?.firstYear ?? year, year);
+    const last = Math.max(now.getFullYear() + 1, year);
+    const list: number[] = [];
+    for (let y = last; y >= first; y--) list.push(y);
+    return list;
+  }, [dashboard?.firstYear, year, now]);
+
+  const isCurrentMonth = month === now.getMonth() + 1 && year === now.getFullYear();
+
+  // ── Ações ──────────────────────────────────────────────────────────
+  const shiftMonth = (delta: number) => {
+    const d = new Date(Date.UTC(year, month - 1 + delta, 1));
+    setYear(d.getUTCFullYear());
+    setMonth(d.getUTCMonth() + 1);
+  };
+
+  const handleSaved = (record: FinancialRecord, mode: "created" | "updated") => {
+    const [y, m] = record.date.split("-").map(Number);
+    const moved = y !== year || m !== month;
+    toast({
+      title: mode === "created" ? "Lançamento salvo" : "Alterações salvas",
+      description: moved ? `Ele fica em ${MONTHS_PT[m - 1]}/${y}. Mostrando esse mês.` : `${record.title} · ${formatBRL(record.amount)}`,
+    });
+    if (moved) {
+      setYear(y);
+      setMonth(m);
+      if (record.status === "cancelled") setFilter("cancelados");
+    } else {
+      void load({ silent: true });
+    }
+    setHighlightId(record.id);
+    if (record.clientName && !clients.includes(record.clientName)) refreshClients();
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    const target = deleteTarget;
+    setDeleteTarget(null);
+    try {
+      await deleteFinancialRecord(target.id);
+      toast({ title: "Lançamento excluído", description: `${target.title} · ${formatBRL(target.amount)}` });
+      void load({ silent: true });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Não foi possível excluir", description: errorMessage(error, "Tente novamente.") });
+    }
+  };
+
+  const runBulk = async () => {
+    if (!bulkConfirm || selected.size === 0) return;
+    const action = bulkConfirm;
+    setBulkBusy(true);
+    try {
+      const result = await bulkUpdateFinancialRecords([...selected], action);
+      toast({
+        title: `${result.updated} lançamento${result.updated === 1 ? "" : "s"} ${action === "delete" ? "excluído" : "atualizado"}${result.updated === 1 ? "" : "s"}`,
+        description: result.skipped > 0 ? `${result.skipped} não se aplicava${result.skipped === 1 ? "" : "m"} e foi ignorado.` : undefined,
+      });
+      setSelected(new Set());
+      void load({ silent: true });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Ação em lote falhou", description: errorMessage(error, "Tente novamente.") });
+    } finally {
+      setBulkBusy(false);
+      setBulkConfirm(null);
+    }
+  };
+
+  const changeRegime = async (regime: TaxRegime) => {
+    if (!dashboard) return;
+    setSavingRegime(true);
+    try {
+      const settings = await updateFinanceSettings({ taxRegime: regime });
+      setDashboard({ ...dashboard, settings });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Não foi possível trocar o regime", description: errorMessage(error, "Tente novamente.") });
+    } finally {
+      setSavingRegime(false);
+    }
+  };
+
+  const exportCsv = async (scope: "month" | "year") => {
+    if (!canExport) {
+      notifyPlanLimit(buildPlanFeatureBody("financeExport", plan.tier));
+      return;
+    }
+    try {
+      let rows = records;
+      if (scope === "year") {
+        rows = [];
+        for (let offset = 0; ; offset += 500) {
+          const page = await fetchFinancialRecords({ year, limit: 500, offset });
+          rows.push(...page);
+          if (page.length < 500) break;
+        }
+      }
+      if (rows.length === 0) {
+        toast({ title: "Nada para exportar", description: scope === "year" ? `Sem lançamentos em ${year}.` : "Sem lançamentos neste mês." });
+        return;
+      }
+      const name = scope === "year" ? `financeiro-${year}.csv` : `financeiro-${year}-${String(month).padStart(2, "0")}.csv`;
+      downloadTextFile(name, buildFinanceCsv(rows));
+    } catch (error) {
+      toast({ variant: "destructive", title: "Exportação falhou", description: errorMessage(error, "Tente novamente.") });
+    }
+  };
+
+  const openNfFile = async (r: FinancialRecord) => {
+    try {
+      const url = await fetchNfFileUrl(r.id);
+      if (!url) {
+        toast({ title: "Sem arquivo", description: "Este lançamento não tem nota anexada." });
+        return;
+      }
+      window.open(url, "_blank", "noopener");
+    } catch (error) {
+      toast({ variant: "destructive", title: "Não foi possível abrir a nota", description: errorMessage(error, "Tente novamente.") });
+    }
+  };
+
+  const toggleSelect = (id: string) =>
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const toggleAll = (ids: string[]) =>
+    setSelected((s) => (ids.every((id) => s.has(id)) ? new Set() : new Set(ids)));
+
+  if (loading || !userProfile) return <PageSkeleton />;
+
+  const monthLabel = `${MONTHS_PT[month - 1]} de ${year}`;
+
+  return (
+    <div className="min-h-screen flex flex-col bg-background/50">
+      <Header />
+
+      <main className="flex-1 py-12 px-4">
+        <div className="container mx-auto max-w-6xl space-y-8">
+          {/* Cabeçalho */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-emerald-500 to-teal-500">Gestão Financeira</h1>
+              <p className="text-muted-foreground mt-1">Receitas, despesas, notas fiscais e o teto do seu regime, num lugar só.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-500">
+                    <Download className="mr-2 h-4 w-4" /> Exportar
+                    {!canExport && <PlanBadge className="ml-2" />}
+                    <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>CSV para Excel</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => exportCsv("month")}>{monthLabel}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportCsv("year")}>Ano de {year} inteiro</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Relatório para imprimir / PDF</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => window.open(`/dashboard/financeiro/imprimir?mes=${month}&ano=${year}`, "_blank", "noopener")}>
+                    <FileText className="mr-2 h-4 w-4" /> Extrato de {monthLabel}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => window.open(`/dashboard/financeiro/imprimir?ano=${year}`, "_blank", "noopener")}>
+                    <BarChart3 className="mr-2 h-4 w-4" /> Resumo anual de {year}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button variant="outline" onClick={() => setSettingsOpen(true)} aria-label="Ajustes fiscais" title="Regime e lembretes fiscais" className="border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-500">
+                <Settings2 className="h-4 w-4" />
+              </Button>
+              <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => setModal({ open: true })}>
+                <Plus className="mr-2 h-4 w-4" /> Novo lançamento
+              </Button>
+            </div>
+          </div>
+
+          {/* Painel anual */}
+          <section id="painel-anual" className="scroll-mt-24">
+            {dashboard ? (
+              <AnnualPanel dashboard={dashboard} onRegimeChange={changeRegime} onOpenSettings={() => setSettingsOpen(true)} busy={savingRegime} />
+            ) : (
+              <Skeleton className="h-52 w-full rounded-2xl" />
+            )}
+          </section>
+
+          {/* Período */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="icon" onClick={() => shiftMonth(-1)} aria-label="Mês anterior"><ChevronLeft className="h-4 w-4" /></Button>
+            <Select value={month.toString()} onValueChange={(val) => setMonth(parseInt(val, 10))}>
+              <SelectTrigger className="w-[150px] bg-background" aria-label="Mês"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {MONTHS_PT.map((name, i) => (
+                  <SelectItem key={name} value={String(i + 1)}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={year.toString()} onValueChange={(val) => setYear(parseInt(val, 10))}>
+              <SelectTrigger className="w-[100px] bg-background" aria-label="Ano"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {years.map((y) => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="icon" onClick={() => shiftMonth(1)} aria-label="Próximo mês"><ChevronRight className="h-4 w-4" /></Button>
+            {!isCurrentMonth && (
+              <Button variant="ghost" size="sm" onClick={() => { setMonth(now.getMonth() + 1); setYear(now.getFullYear()); }}>Hoje</Button>
+            )}
+          </div>
+
+          {/* KPIs do mês */}
+          <KpiCards monthly={dashboard?.monthly ?? null} active={filter} loading={loadingData} onFilter={(key) => setFilter((f) => (f === key ? "todos" : key))} />
+
+          {/* Gráfico do ano */}
+          <Card className="bg-card/80">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Mês a mês em {year}</CardTitle>
+              <CardDescription>Clique num mês para ver os lançamentos dele.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {dashboard ? (
+                <FinanceChart months={dashboard.months} year={year} activeMonth={month} onSelectMonth={setMonth} />
+              ) : (
+                <Skeleton className="h-56 w-full" />
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Lançamentos */}
+          <Card>
+            <CardHeader className="border-b pb-4 mb-4 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Lançamentos de {monthLabel}</CardTitle>
+                  <CardDescription>
+                    {records.length === 0 ? "Nenhum registro neste mês." : `${visible.length} de ${records.length} lançamento${records.length === 1 ? "" : "s"}${filter !== "todos" || search ? " com o filtro atual" : ""}.`}
+                  </CardDescription>
+                </div>
+                <div className="relative sm:w-72">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar título, cliente, nº da NF…" className="pl-9 pr-8" aria-label="Buscar lançamentos" />
+                  {search && (
+                    <button type="button" onClick={() => setSearch("")} aria-label="Limpar busca" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Filtros">
+                {FILTER_CHIPS.map((chip) => {
+                  const active = filter === chip.key;
+                  return (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      onClick={() => setFilter(chip.key)}
+                      aria-pressed={active}
+                      className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${active ? "bg-emerald-600 border-emerald-600 text-white" : "bg-background hover:bg-muted text-muted-foreground hover:text-foreground"}`}
+                    >
+                      {chip.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {selected.size > 0 && (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm">
+                  <span className="font-medium">{selected.size} selecionado{selected.size === 1 ? "" : "s"}</span>
+                  <span className="text-muted-foreground">·</span>
+                  {(["mark_received", "mark_nf_issued", "cancel", "delete"] as BulkAction[]).map((action) => (
+                    <Button key={action} size="sm" variant={action === "delete" ? "destructive" : "outline"} onClick={() => setBulkConfirm(action)} disabled={bulkBusy}>
+                      {BULK_LABELS[action].label}
+                    </Button>
+                  ))}
+                  <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())} className="ml-auto">Limpar seleção</Button>
+                </div>
+              )}
+            </CardHeader>
+            <CardContent>
+              <RecordsTable
+                records={visible}
+                loading={loadingData}
+                hasAnyInMonth={records.length > 0}
+                selected={selected}
+                highlightId={highlightId}
+                sort={sort}
+                order={order}
+                onSortChange={(s, o) => { setSort(s); setOrder(o); }}
+                onToggleSelect={toggleSelect}
+                onToggleAll={toggleAll}
+                onEdit={(r) => setModal({ open: true, initial: r })}
+                onDuplicate={(r) => setModal({ open: true, duplicateOf: r })}
+                onDelete={setDeleteTarget}
+                onReceive={setReceiveTarget}
+                onOpenNfFile={openNfFile}
+                onNew={() => setModal({ open: true })}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+
+      <Footer />
+
+      <FinanceModal
+        isOpen={modal.open}
+        onClose={() => setModal({ open: false })}
+        onSaved={handleSaved}
+        initialData={modal.initial ?? null}
+        duplicateOf={modal.duplicateOf ?? null}
+        prefill={modal.prefill ?? null}
+        clients={clients}
+      />
+
+      <ReceiveDialog
+        record={receiveTarget}
+        onClose={() => setReceiveTarget(null)}
+        onConfirmed={(r) => {
+          toast({ title: r.type === "expense" ? "Pagamento registrado" : "Recebimento confirmado", description: `${r.title} · ${formatBRL(r.amount)}` });
+          void load({ silent: true });
+        }}
+      />
+
+      {dashboard && (
+        <SettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          settings={dashboard.settings}
+          limits={dashboard.limits}
+          onSaved={(settings) => setDashboard({ ...dashboard, settings })}
+        />
+      )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir lançamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget ? `"${deleteTarget.title}" (${formatBRL(deleteTarget.amount)}) some do histórico e dos totais. ` : ""}
+              Esta ação não pode ser desfeita. Se você só quer tirar do faturamento, prefira cancelar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Manter</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-rose-600 hover:bg-rose-700">Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!bulkConfirm} onOpenChange={(open) => !open && !bulkBusy && setBulkConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{bulkConfirm ? BULK_LABELS[bulkConfirm].title : ""}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {selected.size} lançamento{selected.size === 1 ? "" : "s"} selecionado{selected.size === 1 ? "" : "s"}. {bulkConfirm ? BULK_LABELS[bulkConfirm].description : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkBusy}>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); void runBulk(); }} disabled={bulkBusy} className={bulkConfirm === "delete" ? "bg-rose-600 hover:bg-rose-700" : "bg-emerald-600 hover:bg-emerald-700"}>
+              {bulkBusy ? "Aplicando…" : "Confirmar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
 }

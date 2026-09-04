@@ -778,6 +778,14 @@ function ContratoDetailInner() {
                           <p className="text-sm font-medium">
                             {contract.contractValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                           </p>
+                          {contract.paymentStatus === "paid" && (
+                            <p className="text-xs text-green-600">Recebido (registrado no financeiro)</p>
+                          )}
+                          {contract.paymentStatus === "pending" && (
+                            <Link href="/dashboard/financeiro?filtro=pendentes" className="text-xs text-amber-600 hover:underline">
+                              A receber no financeiro
+                            </Link>
+                          )}
                         </div>
                       </div>
                     )}

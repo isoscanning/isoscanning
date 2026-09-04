@@ -63,6 +63,13 @@ export const NOTIFICATION_TYPES = [
   "briefing_member_removed",
   "briefing_execution_started",
   "briefing_incident",
+  "finance_record_created",
+  "finance_recurring_created",
+  "finance_overdue",
+  "finance_nf_pending",
+  "finance_das_due",
+  "finance_dasn_due",
+  "finance_mei_threshold",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -79,6 +86,7 @@ const briefingUrl: Resolver = (id) => (id ? `/dashboard/briefing-pro/${id}` : "/
 const briefingExecUrl: Resolver = (id) => (id ? `/dashboard/briefing-pro/${id}/execucao` : "/dashboard/briefing-pro");
 const candidaturaUrl: Resolver = (id) => (id ? `/dashboard/candidaturas?candidatura=${id}` : "/dashboard/candidaturas");
 const communityUrl: Resolver = (ref) => (ref ? `/c/${ref}` : "/comunidade");
+const financeRecordUrl: Resolver = (id) => (id ? `/dashboard/financeiro?lancamento=${id}` : "/dashboard/financeiro");
 
 const CLICK_URLS: Record<NotificationType, Resolver> = {
   job_match: (id) => (id ? `/vagas/${id}` : "/vagas"),
@@ -155,6 +163,14 @@ const CLICK_URLS: Record<NotificationType, Resolver> = {
   briefing_member_removed: () => "/dashboard/briefing-pro",
   briefing_execution_started: briefingExecUrl,
   briefing_incident: briefingExecUrl,
+
+  finance_record_created: financeRecordUrl,
+  finance_recurring_created: financeRecordUrl,
+  finance_overdue: () => "/dashboard/financeiro?filtro=vencidos",
+  finance_nf_pending: () => "/dashboard/financeiro?filtro=nf",
+  finance_das_due: () => "/dashboard/financeiro?painel=anual",
+  finance_dasn_due: () => "/dashboard/financeiro?painel=anual",
+  finance_mei_threshold: () => "/dashboard/financeiro?painel=anual",
 };
 
 export function notificationClickUrl(type: string, referenceId?: string | null): string {
@@ -170,7 +186,7 @@ export interface NotificationMeta {
   toast: string;
   tone: NotificationTone;
   /** Agrupador exibido como filtro na página de histórico. */
-  group: "trabalho" | "contratos" | "financeiro" | "social" | "briefing" | "comunidade" | "sistema";
+  group: "trabalho" | "contratos" | "financeiro" | "caixa" | "social" | "briefing" | "comunidade" | "sistema";
 }
 
 export const NOTIFICATION_META: Record<NotificationType, NotificationMeta> = {
@@ -237,6 +253,14 @@ export const NOTIFICATION_META: Record<NotificationType, NotificationMeta> = {
   briefing_member_removed: { toast: "Você saiu de um briefing", tone: "warning", group: "briefing" },
   briefing_execution_started: { toast: "Execução iniciada!", tone: "info", group: "briefing" },
   briefing_incident: { toast: "Intercorrência registrada", tone: "error", group: "briefing" },
+
+  finance_record_created: { toast: "Contrato entrou no seu financeiro", tone: "success", group: "caixa" },
+  finance_recurring_created: { toast: "Lançamento do mês criado", tone: "info", group: "caixa" },
+  finance_overdue: { toast: "Recebimento vencido", tone: "error", group: "caixa" },
+  finance_nf_pending: { toast: "Nota fiscal a emitir", tone: "warning", group: "caixa" },
+  finance_das_due: { toast: "DAS do MEI vence em breve", tone: "warning", group: "caixa" },
+  finance_dasn_due: { toast: "Declaração anual do MEI", tone: "warning", group: "caixa" },
+  finance_mei_threshold: { toast: "Atenção ao teto do MEI", tone: "warning", group: "caixa" },
 };
 
 export function notificationMeta(type: string): NotificationMeta {
@@ -247,6 +271,7 @@ export const NOTIFICATION_GROUP_LABELS: Record<NotificationMeta["group"], string
   trabalho: "Trabalho",
   contratos: "Contratos",
   financeiro: "Plano e pagamentos",
+  caixa: "Financeiro",
   social: "Social media",
   briefing: "Briefing",
   comunidade: "Comunidade",

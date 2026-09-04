@@ -141,6 +141,7 @@ export const AI_COSTS = {
   "city-holidays": 1,
   "briefing-generate": 3,
   "briefing-refine": 1,
+  "briefing-file-ocr": 1,
 } as const;
 
 export type AiKind = keyof typeof AI_COSTS;

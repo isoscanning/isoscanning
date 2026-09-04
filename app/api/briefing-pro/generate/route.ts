@@ -1,9 +1,15 @@
 // Briefing Pro — geração de estrutura de briefing com IA.
 //
 // Recebe um texto livre (o "briefing bruto" que o cliente/contratante mandou,
-// ou uma descrição do trabalho) e devolve a estrutura completa pronta para o
-// usuário revisar e salvar: dados gerais, seções com itens (checklist/shot
+// ou uma descrição do trabalho) e/ou o texto extraído de um arquivo base
+// (/api/briefing-pro/extract-file) e devolve a estrutura completa pronta para
+// o usuário revisar e salvar: dados gerais, seções com itens (checklist/shot
 // list), entregáveis com specs e prazos, contatos e locações.
+//
+// Com arquivo base, a IA usa a organização do documento como espinha dorsal e
+// devolve uma estrutura semelhante e melhorada (lacunas preenchidas, itens
+// destrinchados, cronograma, obrigatórios). Documentos longos passam antes por
+// uma condensação com o modelo leve — ver fitToBudget.
 // A resposta segue exatamente o shape do CreateBriefingDto do backend.
 
 import { NextRequest, NextResponse } from "next/server";
@@ -11,14 +17,30 @@ import { requireUser, consumeAiCredits } from "@/lib/server/api-auth";
 import { callGroqJson, GroqError } from "@/lib/server/groq";
 import {
   BRIEFING_TYPES,
+  CONDENSE_INPUT_MAX_CHARS,
+  DOCUMENT_RULES,
   ITEM_JSON_FORMAT,
   RawGeneratedSection,
+  buildSourceBlock,
   cleanDate,
   cleanEnum,
   cleanString,
   cleanTime,
+  composeSourceText,
+  condenseDocument,
   normalizeSections,
 } from "@/lib/server/briefing-ai";
+import { MAX_EXTRACTED_CHARS, MIN_USEFUL_CHARS } from "@/lib/briefing-pro-file";
+
+export const maxDuration = 60;
+
+// Orçamento do bloco-fonte no prompt: no tier gratuito da Groq (8k tokens/min)
+// um prompt muito grande espreme o espaço da resposta — 10k chars ≈ 3,3k tokens.
+const MAX_PROMPT_SOURCE_CHARS = 10000;
+/** Observações do usuário quando há arquivo (o documento precisa do resto do orçamento). */
+const MAX_NOTES_WITH_FILE_CHARS = 3000;
+/** Folga para os rótulos do bloco-fonte. */
+const SOURCE_BLOCK_OVERHEAD = 400;
 
 interface GeneratedDeliverable {
   title?: string;
@@ -47,25 +69,31 @@ interface GeneratedBriefing {
   deliverables?: GeneratedDeliverable[];
 }
 
+interface GenerateRequestBody {
+  text?: string;
+  briefing_type?: string;
+  /** Texto extraído do arquivo base (vem de /extract-file). */
+  file_text?: string;
+  file_name?: string;
+}
+
 const SYSTEM_PROMPT = `Você é um produtor executivo sênior especializado em transformar briefings bagunçados em planos de trabalho impecáveis. Você já produziu casamentos, campanhas de marketing, produções audiovisuais, ensaios fotográficos e gestão de social media, e conhece as dores de quem executa no dia: informação faltando, horário indefinido, material perdido e checklist inexistente.
 
-Sua tarefa: ler o texto do usuário e estruturar um briefing profissional completo em JSON.
+Sua tarefa: ler o material do usuário (texto livre e/ou documento base enviado pelo cliente) e estruturar um briefing profissional completo em JSON.
 
 Regras:
 - Responda SOMENTE com um objeto JSON válido, sem texto fora dele.
 - Escreva todo o conteúdo em português do Brasil.
-- Extraia TUDO que o texto contém (datas, horários, nomes, telefones, endereços, exigências) e distribua nos campos certos. Não invente dados pessoais que não estão no texto.
-- Onde o texto for omisso em algo importante para a execução, CRIE itens e seções sugeridos com base na melhor prática do tipo de trabalho (ex.: shot list para fotografia, cronograma do dia, conferência de equipamento, backup de cartões, aprovação de roteiro). Sugestões devem ser acionáveis e específicas.
+- Extraia TUDO que o material contém (datas, horários, nomes, telefones, endereços, exigências) e distribua nos campos certos. Não invente dados pessoais que não estão no material.
+- Onde o material for omisso em algo importante para a execução, CRIE itens e seções sugeridos com base na melhor prática do tipo de trabalho (ex.: shot list para fotografia, cronograma do dia, conferência de equipamento, backup de cartões, aprovação de roteiro). Sugestões devem ser acionáveis e específicas.
 - Para trabalhos com dia de execução (evento, ensaio, filmagem), inclua uma seção de cronograma do dia com scheduled_time (formato HH:MM) nos itens sempre que possível, e uma seção de preparação/checklist prévio.
-- Entregáveis devem ter specs técnicas concretas (formato, resolução, quantidade, prazo) quando o tipo de trabalho permitir inferir.`;
+- Entregáveis devem ter specs técnicas concretas (formato, resolução, quantidade, prazo) quando o tipo de trabalho permitir inferir.
+- Quando houver um DOCUMENTO BASE, siga à risca as instruções "COMO USAR O DOCUMENTO BASE".`;
 
-function buildUserPrompt(sourceText: string, hintType?: string): string {
-  return `TEXTO DO BRIEFING (fornecido pelo usuário):
-"""
-${sourceText}
-"""
+function buildUserPrompt(sourceBlock: string, hasDocument: boolean, hintType?: string): string {
+  return `${sourceBlock}
 ${hintType ? `\nTipo de trabalho indicado pelo usuário: ${hintType}` : ""}
-
+${hasDocument ? `\n${DOCUMENT_RULES}\n` : ""}
 Devolva o JSON EXATAMENTE neste formato:
 {
   "title": "título curto do trabalho",
@@ -103,6 +131,50 @@ Devolva o JSON EXATAMENTE neste formato:
 }
 
 Gere entre 3 e 7 seções, com itens suficientes para cobrir preparação, execução e finalização do trabalho. Campos sem informação e sem sugestão útil podem ficar como string vazia ou serem omitidos.`;
+}
+
+function formatChars(n: number): string {
+  return `${Math.round(n / 1000)} mil caracteres`;
+}
+
+/**
+ * Faz o texto caber no orçamento do prompt: passa direto se couber; se não,
+ * condensa com o modelo leve e, como último recurso, corta. Os avisos vão
+ * para o front, que mostra ao usuário o que aconteceu com o material.
+ */
+async function fitToBudget(
+  text: string,
+  budget: number,
+  warnings: string[],
+  fileName?: string
+): Promise<string> {
+  if (text.length <= budget) return text;
+
+  if (text.length > CONDENSE_INPUT_MAX_CHARS) {
+    warnings.push(
+      `O material é longo: só os primeiros ${formatChars(CONDENSE_INPUT_MAX_CHARS)} foram considerados.`
+    );
+  }
+
+  try {
+    const condensed = await condenseDocument(text, {
+      fileName,
+      targetChars: Math.min(budget, 6000),
+    });
+    if (condensed.length >= MIN_USEFUL_CHARS) {
+      warnings.push(
+        "O material era longo demais para a IA ler inteiro e foi condensado antes da estruturação. Confira se nada importante ficou de fora."
+      );
+      return condensed.slice(0, budget);
+    }
+  } catch (err) {
+    console.warn("[briefing-pro/generate] condensação falhou, cortando o texto:", err);
+  }
+
+  warnings.push(
+    `O material é longo e não pôde ser condensado: só os primeiros ${formatChars(budget)} foram usados.`
+  );
+  return text.slice(0, budget);
 }
 
 /** Normaliza a resposta da IA para o shape aceito pelo backend. */
@@ -172,17 +244,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
-  let body: { text?: string; briefing_type?: string };
+  let body: GenerateRequestBody;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Corpo da requisição inválido" }, { status: 400 });
   }
 
-  const sourceText = (body.text ?? "").trim();
-  if (sourceText.length < 40) {
+  const notesRaw = (typeof body.text === "string" ? body.text : "").trim();
+  const fileTextRaw = (typeof body.file_text === "string" ? body.file_text : "")
+    .trim()
+    .slice(0, MAX_EXTRACTED_CHARS);
+  const fileName = cleanString(body.file_name, 200);
+  const hasFile = fileTextRaw.length > 0;
+
+  if (hasFile && fileTextRaw.length < MIN_USEFUL_CHARS) {
     return NextResponse.json(
-      { error: "Descreva o trabalho com mais detalhes (mínimo ~40 caracteres) para a IA estruturar o briefing." },
+      { error: "O texto lido do arquivo está vazio. Envie o arquivo de novo ou cole o conteúdo." },
+      { status: 400 }
+    );
+  }
+  if (!hasFile && notesRaw.length < 40) {
+    return NextResponse.json(
+      { error: "Descreva o trabalho com mais detalhes (mínimo ~40 caracteres) ou anexe o briefing do cliente para a IA estruturar." },
       { status: 400 }
     );
   }
@@ -191,18 +275,47 @@ export async function POST(request: NextRequest) {
   const denied = await consumeAiCredits(auth, "briefing-generate");
   if (denied) return denied;
 
+  const warnings: string[] = [];
+  let notes = notesRaw;
+  let fileText = fileTextRaw;
+
+  if (hasFile) {
+    if (notes.length > MAX_NOTES_WITH_FILE_CHARS) {
+      notes = notes.slice(0, MAX_NOTES_WITH_FILE_CHARS);
+      warnings.push("As observações foram encurtadas para caber no limite da IA.");
+    }
+    fileText = await fitToBudget(
+      fileText,
+      MAX_PROMPT_SOURCE_CHARS - notes.length - SOURCE_BLOCK_OVERHEAD,
+      warnings,
+      fileName
+    );
+  } else {
+    // Texto colado muito longo: antes era cortado em silêncio, agora é condensado.
+    notes = await fitToBudget(notes, MAX_PROMPT_SOURCE_CHARS, warnings);
+  }
+
+  const sourceBlock = buildSourceBlock({
+    notes,
+    fileText: hasFile ? fileText : undefined,
+    fileName,
+  });
+
   try {
     const parsed = await callGroqJson<GeneratedBriefing>({
       systemPrompt: SYSTEM_PROMPT,
-      // Cap do texto: no tier gratuito da Groq (8k tokens/min) um prompt muito
-      // grande esprene o espaço da resposta — 10k chars ≈ 3k tokens de entrada.
-      userPrompt: buildUserPrompt(sourceText.slice(0, 10000), body.briefing_type),
+      userPrompt: buildUserPrompt(sourceBlock, hasFile, body.briefing_type),
       temperature: 0.6,
       maxTokens: 8192,
       retries: 1,
     });
 
-    const briefing = normalize(parsed, sourceText);
+    // source_text guarda o material ORIGINAL (não o condensado): é o rastro
+    // de onde a IA tirou cada informação.
+    const briefing = normalize(
+      parsed,
+      composeSourceText({ notes: notesRaw, fileText: hasFile ? fileTextRaw : undefined, fileName })
+    );
 
     if (briefing.sections.length === 0) {
       return NextResponse.json(
@@ -211,7 +324,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ briefing });
+    return NextResponse.json({ briefing, warnings });
   } catch (err) {
     console.error("[briefing-pro/generate]", err);
     const status = err instanceof GroqError ? err.status : 500;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/header";
@@ -20,8 +20,22 @@ import {
 import {
   ArrowLeft, Sparkles, PenLine, Loader2, CheckCircle2,
   Package, Users, MapPin, RefreshCw, Save, Lock, CornerDownRight,
+  FileUp, FileText, FileImage, Paperclip, X, ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
+import imageCompression from "browser-image-compression";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
+import {
+  ACCEPT_ATTRIBUTE,
+  BriefingFileKind,
+  FILE_KIND_LABELS,
+  MAX_FILE_BYTES,
+  MAX_FILE_LABEL,
+  detectFileKind,
+  formatFileSize,
+  unsupportedFileMessage,
+} from "@/lib/briefing-pro-file";
 import { briefingProService, CreateBriefingPayload } from "@/lib/briefing-pro-service";
 import { tokenManager } from "@/lib/token-manager";
 import { notifyPlanLimit } from "@/lib/plans/plan-events";
@@ -48,6 +62,42 @@ function isPlanApiError(err: unknown): boolean {
   const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
   return code === "PLAN_LIMIT" || code === "PLAN_FEATURE";
 }
+
+/** Arquivo base já lido pelo servidor (/api/briefing-pro/extract-file). */
+interface AttachedFile {
+  name: string;
+  size: number;
+  kind: BriefingFileKind;
+  text: string;
+  chars: number;
+  pages: number | null;
+  method: string;
+  /** Aviso do servidor: texto cortado por tamanho ou OCR incompleto. */
+  note: string | null;
+}
+
+/**
+ * Fotos de celular passam de 4 MB fácil; reduzimos no navegador (1600 px,
+ * JPEG) — suficiente para o OCR ler e bem abaixo do limite do upload.
+ */
+async function prepareImageForOcr(file: File): Promise<Blob> {
+  try {
+    return await imageCompression(file, {
+      maxWidthOrHeight: 1600,
+      maxSizeMB: 1.2,
+      useWebWorker: true,
+      initialQuality: 0.85,
+      fileType: "image/jpeg",
+    });
+  } catch (err) {
+    console.warn("[briefing-pro] compressão da imagem falhou, enviando original", err);
+    return file;
+  }
+}
+
+const DESCRIPTION_PLACEHOLDER = `Ex: Casamento da Ana e do Pedro dia 15/11 no Espaço Jardim, cerimônia às 17h e festa até 1h. A noiva quer fotos do making of a partir das 14h no hotel Villa. Entregar 40 fotos editadas em até 20 dias e um vídeo de 3 minutos para o Instagram. Contato da cerimonialista: Paula (11) 99999-9999. Não fotografar a avó do noivo, que não autorizou imagem...`;
+
+const NOTES_PLACEHOLDER = `Ex: Priorizar as fotos da família logo após a cerimônia. O cliente ainda não confirmou o horário do making of. Incluir checklist de equipamento e cronograma detalhado do dia...`;
 
 /** Estrutura sugerida por tipo de trabalho na criação manual. */
 const DEFAULT_SECTIONS: Record<BriefingType, Array<{ title: string; description: string }>> = {
@@ -109,6 +159,13 @@ export default function NewBriefingPage() {
   const [generating, setGenerating] = useState(false);
   const [preview, setPreview] = useState<GeneratedBriefingStructure | null>(null);
 
+  // Arquivo base (briefing que o cliente mandou)
+  const [attached, setAttached] = useState<AttachedFile | null>(null);
+  const [extracting, setExtracting] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [showExtracted, setShowExtracted] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (!loading && !userProfile) router.push("/login");
   }, [userProfile, loading, router]);
@@ -141,8 +198,9 @@ export default function NewBriefingPage() {
   }
 
   async function generateWithAi() {
-    if (aiText.trim().length < 40) {
-      toast.error("Descreva o trabalho com mais detalhes para a IA estruturar o briefing");
+    const notes = aiText.trim();
+    if (!attached && notes.length < 40) {
+      toast.error("Descreva o trabalho com mais detalhes (ou anexe o briefing do cliente) para a IA estruturar");
       return;
     }
     setGenerating(true);
@@ -151,18 +209,85 @@ export default function NewBriefingPage() {
       const res = await fetch("/api/briefing-pro/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...tokenManager.authHeader() },
-        body: JSON.stringify({ text: aiText, briefing_type: aiType === "auto" ? undefined : aiType }),
+        body: JSON.stringify({
+          text: notes,
+          briefing_type: aiType === "auto" ? undefined : aiType,
+          file_text: attached?.text,
+          file_name: attached?.name,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 403 && notifyPlanLimit(data)) return;
       if (!res.ok) throw new Error(data?.error || "Erro ao gerar o briefing com IA");
       setPreview(data.briefing as GeneratedBriefingStructure);
       toast.success("Briefing estruturado! Revise antes de salvar.");
+      // Material longo condensado/cortado: o usuário precisa saber para conferir
+      for (const warning of (data.warnings as string[] | undefined) ?? []) {
+        toast.warning(warning, { duration: 8000 });
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao gerar com IA");
     } finally {
       setGenerating(false);
     }
+  }
+
+  /** Lê o arquivo base no servidor e guarda o texto extraído para a geração. */
+  async function handleFile(file: File) {
+    const kind = detectFileKind(file.name, file.type);
+    if (!kind) {
+      toast.error(unsupportedFileMessage(file.name));
+      return;
+    }
+    if (kind !== "image" && file.size > MAX_FILE_BYTES) {
+      toast.error(`Arquivo muito grande (máximo ${MAX_FILE_LABEL}). Reduza o arquivo ou cole o texto.`);
+      return;
+    }
+    setExtracting(true);
+    try {
+      const payload: Blob = kind === "image" ? await prepareImageForOcr(file) : file;
+      if (payload.size > MAX_FILE_BYTES) {
+        toast.error(`Imagem muito grande mesmo depois de reduzida (máximo ${MAX_FILE_LABEL}).`);
+        return;
+      }
+      const form = new FormData();
+      form.append("file", payload, file.name);
+      // fetch direto (em vez do service) para ler o corpo do 403 de plano (créditos de IA do OCR)
+      const res = await fetch("/api/briefing-pro/extract-file", {
+        method: "POST",
+        headers: tokenManager.authHeader(),
+        body: form,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 403 && notifyPlanLimit(data)) return;
+      if (!res.ok) throw new Error(data?.error || "Não foi possível ler o arquivo");
+      const pages = typeof data.pages === "number" ? data.pages : null;
+      setAttached({
+        name: file.name,
+        size: file.size,
+        kind,
+        text: String(data.text ?? ""),
+        chars: Number(data.chars ?? 0),
+        pages,
+        method: String(data.method ?? ""),
+        note: typeof data.note === "string" ? data.note : null,
+      });
+      setShowExtracted(false);
+      toast.success(
+        `Arquivo lido: ${Number(data.chars ?? 0).toLocaleString("pt-BR")} caracteres` +
+          (pages ? ` em ${pages} página${pages > 1 ? "s" : ""}` : "")
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível ler o arquivo");
+    } finally {
+      setExtracting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  function removeAttached() {
+    setAttached(null);
+    setShowExtracted(false);
   }
 
   async function saveGenerated() {
@@ -215,8 +340,9 @@ export default function NewBriefingPage() {
                   </div>
                   <CardTitle>Criar com IA</CardTitle>
                   <CardDescription>
-                    Cole o texto que o cliente mandou (ou descreva o trabalho) e a IA monta toda a
-                    estrutura: seções, checklist, shot list, entregáveis e cronograma.
+                    Anexe o briefing que o cliente mandou (PDF, Word ou print), cole o texto ou
+                    descreva o trabalho — a IA monta toda a estrutura: seções, checklist, shot
+                    list, entregáveis e cronograma.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -349,9 +475,10 @@ export default function NewBriefingPage() {
                 Criar com IA
               </CardTitle>
               <CardDescription>
-                Cole o briefing que o cliente mandou (e-mail, WhatsApp, PDF transcrito) ou descreva o
-                trabalho com suas palavras. Quanto mais detalhes — datas, horários, locais, contatos,
-                exigências — melhor a estrutura gerada.
+                Anexe o briefing que o cliente mandou (PDF, Word, print do WhatsApp ou foto) e/ou
+                descreva o trabalho com suas palavras. A IA lê o material, mantém a organização
+                original e devolve uma estrutura completa e melhorada. Quanto mais detalhes — datas,
+                horários, locais, contatos, exigências — melhor o resultado.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -372,20 +499,130 @@ export default function NewBriefingPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="ai-text">Descrição do trabalho *</Label>
+                <Label>Arquivo base (opcional)</Label>
+                {!attached ? (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Anexar arquivo base"
+                    onClick={() => !extracting && fileInputRef.current?.click()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        if (!extracting) fileInputRef.current?.click();
+                      }
+                    }}
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOver(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file && !extracting) void handleFile(file);
+                    }}
+                    className={cn(
+                      "rounded-lg border-2 border-dashed p-5 text-center transition-colors",
+                      extracting ? "cursor-wait opacity-70" : "cursor-pointer",
+                      dragOver
+                        ? "border-rose-500 bg-rose-50 dark:bg-rose-950/20"
+                        : "border-muted-foreground/25 hover:border-rose-500/50 hover:bg-muted/40"
+                    )}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept={ACCEPT_ATTRIBUTE}
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) void handleFile(file);
+                      }}
+                    />
+                    {extracting ? (
+                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Lendo o arquivo...
+                      </div>
+                    ) : (
+                      <>
+                        <FileUp className="h-6 w-6 mx-auto mb-2 text-rose-500" />
+                        <p className="text-sm font-medium">Anexar o briefing que o cliente mandou</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          PDF, Word (.docx), texto ou foto/print (PNG, JPG) · até {MAX_FILE_LABEL}.
+                          Arraste aqui ou clique para escolher.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border p-3 space-y-2">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 flex items-center justify-center shrink-0">
+                        {attached.kind === "image" ? (
+                          <FileImage className="h-4 w-4" />
+                        ) : (
+                          <FileText className="h-4 w-4" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{attached.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {FILE_KIND_LABELS[attached.kind]}
+                          {attached.pages ? ` · ${attached.pages} página${attached.pages > 1 ? "s" : ""}` : ""}
+                          {` · ${formatFileSize(attached.size)}`}
+                          {` · ${attached.chars.toLocaleString("pt-BR")} caracteres lidos`}
+                          {attached.method === "ocr" ? " (OCR)" : ""}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        onClick={removeAttached}
+                        aria-label="Remover arquivo"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {attached.note && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">{attached.note}</p>
+                    )}
+                    <Collapsible open={showExtracted} onOpenChange={setShowExtracted}>
+                      <CollapsibleTrigger asChild>
+                        <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs">
+                          <ChevronDown
+                            className={cn("h-3.5 w-3.5 transition-transform", showExtracted && "rotate-180")}
+                          />
+                          {showExtracted ? "Ocultar texto lido" : "Ver texto lido"}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <pre className="mt-2 max-h-56 overflow-auto rounded-md bg-muted/50 p-3 text-xs whitespace-pre-wrap font-sans">
+                          {attached.text}
+                        </pre>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ai-text">
+                  {attached ? "Observações e ajustes (opcional)" : "Descrição do trabalho *"}
+                </Label>
                 <Textarea
                   id="ai-text"
                   value={aiText}
                   onChange={(e) => setAiText(e.target.value)}
-                  placeholder={`Ex: Casamento da Ana e do Pedro dia 15/11 no Espaço Jardim, cerimônia às 17h e festa até 1h. A noiva quer fotos do making of a partir das 14h no hotel Villa. Entregar 40 fotos editadas em até 20 dias e um vídeo de 3 minutos para o Instagram. Contato da cerimonialista: Paula (11) 99999-9999. Não fotografar a avó do noivo, que não autorizou imagem...`}
-                  rows={12}
+                  placeholder={attached ? NOTES_PLACEHOLDER : DESCRIPTION_PLACEHOLDER}
+                  rows={attached ? 5 : 12}
                   className="resize-y"
                 />
                 <p className="text-xs text-muted-foreground text-right">
                   {aiText.trim().length} caracteres
                 </p>
               </div>
-              <Button onClick={generateWithAi} disabled={generating} className="w-full gap-2">
+              <Button onClick={generateWithAi} disabled={generating || extracting} className="w-full gap-2">
                 {generating ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -394,7 +631,7 @@ export default function NewBriefingPage() {
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4" />
-                    Gerar estrutura do briefing
+                    {attached ? "Gerar estrutura a partir do arquivo" : "Gerar estrutura do briefing"}
                   </>
                 )}
               </Button>
@@ -408,6 +645,12 @@ export default function NewBriefingPage() {
               <CardHeader>
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   <Badge variant="outline">{BRIEFING_TYPE_LABELS[preview.briefing_type]}</Badge>
+                  {attached && (
+                    <Badge variant="outline" className="gap-1 max-w-[240px]">
+                      <Paperclip className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{attached.name}</span>
+                    </Badge>
+                  )}
                   {preview.event_date && (
                     <Badge variant="secondary">
                       {preview.event_date.split("-").reverse().join("/")}
@@ -551,7 +794,7 @@ export default function NewBriefingPage() {
                 disabled={saving}
               >
                 <RefreshCw className="h-4 w-4" />
-                Ajustar texto e gerar de novo
+                Ajustar e gerar de novo
               </Button>
               <Button className="flex-1 gap-2" onClick={saveGenerated} disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

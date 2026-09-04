@@ -103,6 +103,7 @@ interface Contract {
   signedPdfUrl?: string | null;
   professionalId?: string | null;
   jobApplicationId?: string | null;
+  budgetQuoteId?: string | null;
   agendaBlockedAt?: string | null;
   paymentStatus?: string;
   serviceCompletedAt?: string | null;
@@ -683,12 +684,19 @@ function ContratoDetailInner() {
                       </div>
                     ))}
                   </div>
-                  {(contract.jobApplicationId || contract.agendaBlockedAt) && (
+                  {(contract.jobApplicationId || contract.budgetQuoteId || contract.agendaBlockedAt) && (
                     <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t">
                       {contract.agendaBlockedAt && (
                         <Link href="/dashboard/agenda">
                           <Button variant="outline" size="sm" className="gap-2 h-8 text-xs">
                             <CalendarCheck className="h-3.5 w-3.5 text-green-600" /> Ver na agenda
+                          </Button>
+                        </Link>
+                      )}
+                      {contract.budgetQuoteId && isOwner && (
+                        <Link href={`/dashboard/calculadora-orcamento/orcamentos/${contract.budgetQuoteId}`}>
+                          <Button variant="outline" size="sm" className="gap-2 h-8 text-xs">
+                            <FileText className="h-3.5 w-3.5 text-amber-500" /> Ver proposta de origem
                           </Button>
                         </Link>
                       )}
@@ -748,7 +756,7 @@ function ContratoDetailInner() {
                     <h2 className="text-xl font-bold">{contract.title}</h2>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <Badge variant="outline" className="text-xs">
-                        {contract.source === "standalone" ? "Independente" : contract.source === "proposal" ? "Proposta" : contract.source === "job_application" ? "Acordo de Vaga" : "Orçamento"}
+                        {contract.source === "standalone" ? "Independente" : contract.source === "proposal" ? "Proposta" : contract.source === "job_application" ? "Acordo de Vaga" : contract.source === "budget_quote" ? "Proposta da Calculadora" : "Orçamento"}
                       </Badge>
                       {contract.creationType === "upload" && (
                         <Badge variant="outline" className="text-xs">PDF enviado (legado)</Badge>

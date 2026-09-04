@@ -574,7 +574,7 @@ export default function DashboardPage() {
                       </div>
                       <CardTitle className="group-hover:text-amber-500 transition-colors">Minhas Propostas</CardTitle>
                       <CardDescription>
-                        Responda às propostas recebidas nos seus anúncios e acompanhe as que você enviou.
+                        Propostas de equipamentos recebidas e enviadas, e as propostas de orçamento que você mandou aos clientes.
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="flex justify-end">
@@ -716,7 +716,7 @@ export default function DashboardPage() {
                       </div>
                       <CardTitle className="group-hover:text-amber-500 transition-colors">Calculadora de Orçamento</CardTitle>
                       <CardDescription>
-                        Calcule o custo real por trabalho com base na depreciação dos seus equipamentos.
+                        Calcule o custo real de cada trabalho, defina sua margem e envie propostas que viram contrato com um clique.
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="flex justify-end">

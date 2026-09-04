@@ -8,7 +8,6 @@ import { Footer } from "@/components/footer";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -48,7 +47,6 @@ import {
   CalendarDays,
   Building2,
   Zap,
-  ChevronDown,
   FileText,
   ClipboardList,
 } from "lucide-react";
@@ -61,8 +59,41 @@ import {
 import Link from "next/link";
 import apiClient from "@/lib/api-service";
 import { ScrollReveal } from "@/components/scroll-reveal";
+import { UsageMeter } from "@/components/plan/usage-meter";
+import { QuoteStatusBadge } from "@/components/budget/quote-status-badge";
+import {
+  formatDateOnly,
+  quoteDisplayStatus,
+  type BudgetQuoteData,
+  type QuoteDisplayStatus,
+} from "@/lib/budget/budget-calc";
 
 // ── Types ──────────────────────────────────────────────────────
+
+type QuoteSummary = Pick<
+  BudgetQuoteData,
+  "id" | "eventName" | "eventDate" | "eventEndDate" | "clientName" | "finalPrice" | "totalCost" | "status" | "isExpired" | "viewCount" | "contract" | "createdAt" | "sentAt" | "isEditable"
+>;
+
+type QuoteFilter = "all" | "draft" | "open" | "approved" | "rejected";
+
+const QUOTE_FILTERS: { value: QuoteFilter; label: string }[] = [
+  { value: "all", label: "Todos" },
+  { value: "draft", label: "Rascunhos" },
+  { value: "open", label: "Com o cliente" },
+  { value: "approved", label: "Aprovados" },
+  { value: "rejected", label: "Recusados" },
+];
+
+function matchesFilter(status: QuoteDisplayStatus, filter: QuoteFilter): boolean {
+  switch (filter) {
+    case "draft": return status === "draft";
+    case "open": return status === "sent" || status === "viewed" || status === "expired";
+    case "approved": return status === "approved" || status === "contracted";
+    case "rejected": return status === "rejected";
+    default: return true;
+  }
+}
 
 interface EquipmentItem {
   id: string;
@@ -106,7 +137,8 @@ export default function BudgetCalculatorPage() {
   const [equipments, setEquipments] = useState<EquipmentItem[]>([]);
   const [softwares, setSoftwares] = useState<SoftwareItem[]>([]);
   const [infrastructures, setInfrastructures] = useState<InfrastructureItem[]>([]);
-  const [quotes, setQuotes] = useState<{ id: string; eventName: string; eventDate?: string; grandTotal: number; createdAt: string }[]>([]);
+  const [quotes, setQuotes] = useState<QuoteSummary[]>([]);
+  const [quoteFilter, setQuoteFilter] = useState<QuoteFilter>("all");
   const [fetching, setFetching] = useState(true);
 
   // Equipment dialog
@@ -137,6 +169,7 @@ export default function BudgetCalculatorPage() {
   // Delete quote
   const [deleteQuoteTarget, setDeleteQuoteTarget] = useState<{ id: string; name: string } | null>(null);
   const [deletingQuote, setDeletingQuote] = useState(false);
+  const [deleteQuoteError, setDeleteQuoteError] = useState("");
 
   useEffect(() => {
     if (!loading && !userProfile) router.push("/login");
@@ -170,6 +203,12 @@ export default function BudgetCalculatorPage() {
   const totalMonthlySoftware = softwares.reduce((s, i) => s + i.monthlyCost, 0);
   const totalMonthlyInfra = infrastructures.reduce((s, i) => s + i.monthlyCost, 0);
   const totalInvestment = equipments.reduce((s, i) => s + i.value, 0);
+
+  const quotesWithStatus = quotes.map((q) => ({ q, status: quoteDisplayStatus(q) }));
+  const visibleQuotes = quotesWithStatus.filter(({ status }) => matchesFilter(status, quoteFilter));
+  const countBy = (filter: QuoteFilter) => quotesWithStatus.filter(({ status }) => matchesFilter(status, filter)).length;
+  const awaitingClient = countBy("open");
+  const approvedCount = countBy("approved");
 
   // ── Equipment CRUD ──────────────────────────────────────────
 
@@ -336,7 +375,8 @@ export default function BudgetCalculatorPage() {
       setDeleteQuoteTarget(null);
       await fetchAll();
     } catch (e) {
-      console.error("Error deleting quote", e);
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setDeleteQuoteError(typeof msg === "string" ? msg : "Não foi possível excluir o orçamento.");
     } finally {
       setDeletingQuote(false);
     }
@@ -397,7 +437,7 @@ export default function BudgetCalculatorPage() {
                       Calculadora de Orçamento
                     </h1>
                     <p className="text-muted-foreground text-sm mt-1">
-                      Descubra o custo real de cada trabalho com base na depreciação de equipamentos e assinaturas de software.
+                      Descubra o custo real de cada trabalho, defina sua margem e envie propostas que o cliente aprova pelo link e viram contrato.
                     </p>
                   </div>
                 </div>
@@ -792,13 +832,13 @@ export default function BudgetCalculatorPage() {
             </Accordion>
           </ScrollReveal>
 
-          {/* ── Orçamentos Salvos ── */}
+          {/* ── Orçamentos / Propostas ── */}
           <ScrollReveal delay={0.3}>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
                   <ClipboardList className="h-5 w-5 text-amber-500" />
-                  <h2 className="text-lg font-bold">Orçamentos Gerados</h2>
+                  <h2 className="text-lg font-bold">Orçamentos e Propostas</h2>
                   {quotes.length > 0 && (
                     <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-semibold px-2 py-0.5 rounded-full">
                       {quotes.length}
@@ -813,15 +853,43 @@ export default function BudgetCalculatorPage() {
                 </Link>
               </div>
 
+              {quotes.length > 0 && (
+                <div className="grid sm:grid-cols-[1fr_auto] gap-4 items-start">
+                  <div className="flex flex-wrap gap-2">
+                    {QUOTE_FILTERS.map((f) => {
+                      const count = countBy(f.value);
+                      const active = quoteFilter === f.value;
+                      return (
+                        <button
+                          key={f.value}
+                          type="button"
+                          onClick={() => setQuoteFilter(f.value)}
+                          className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${active ? "bg-amber-500 border-amber-500 text-white" : "border-border hover:border-amber-400"}`}
+                        >
+                          {f.label} <span className={active ? "opacity-80" : "text-muted-foreground"}>({count})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {(awaitingClient > 0 || approvedCount > 0) && (
+                    <p className="text-xs text-muted-foreground sm:text-right">
+                      {awaitingClient > 0 && <>{awaitingClient} aguardando o cliente</>}
+                      {awaitingClient > 0 && approvedCount > 0 && " · "}
+                      {approvedCount > 0 && <>{approvedCount} aprovado{approvedCount > 1 ? "s" : ""}</>}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {quotes.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center gap-3 border-2 border-dashed border-amber-200 dark:border-amber-900/40 rounded-2xl">
                   <div className="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
                     <FileText className="h-6 w-6 text-amber-500" />
                   </div>
                   <div>
-                    <p className="font-semibold text-sm">Nenhum orçamento gerado ainda</p>
+                    <p className="font-semibold text-sm">Nenhum orçamento ainda</p>
                     <p className="text-muted-foreground text-xs mt-1 max-w-xs">
-                      Crie seu primeiro orçamento para calcular o custo total de um evento com transporte, hospedagem e mais.
+                      Crie o primeiro: calcule custos, defina sua margem e envie a proposta para o cliente aprovar pelo link.
                     </p>
                   </div>
                   <Link href="/dashboard/calculadora-orcamento/novo-orcamento">
@@ -830,9 +898,13 @@ export default function BudgetCalculatorPage() {
                     </Button>
                   </Link>
                 </div>
+              ) : visibleQuotes.length === 0 ? (
+                <div className="py-10 text-center text-sm text-muted-foreground border-2 border-dashed rounded-2xl">
+                  Nenhum orçamento em &quot;{QUOTE_FILTERS.find((f) => f.value === quoteFilter)?.label}&quot;.
+                </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {quotes.map((q) => (
+                  {visibleQuotes.map(({ q, status }) => (
                     <Card key={q.id} className="group border hover:border-amber-500/50 hover:shadow-md transition-all duration-300 h-full flex flex-col">
                       <CardHeader className="pb-2">
                         <div className="flex items-start gap-3">
@@ -842,28 +914,32 @@ export default function BudgetCalculatorPage() {
                             </div>
                             <div className="min-w-0">
                               <CardTitle className="text-sm leading-tight truncate group-hover:text-amber-500 transition-colors">{q.eventName}</CardTitle>
-                              {q.eventDate && (
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                  {new Date(q.eventDate).toLocaleDateString("pt-BR")}
-                                </p>
-                              )}
+                              <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                                {q.clientName ? q.clientName : "Sem cliente"}
+                                {q.eventDate ? ` · ${formatDateOnly(q.eventDate)}` : ""}
+                              </p>
                             </div>
                           </Link>
                           <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Link href={`/dashboard/calculadora-orcamento/novo-orcamento?editId=${q.id}`}>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-amber-500"><Pencil className="h-3.5 w-3.5" /></Button>
-                            </Link>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive" onClick={() => setDeleteQuoteTarget({ id: q.id, name: q.eventName })}>
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                            {q.isEditable && (
+                              <Link href={`/dashboard/calculadora-orcamento/novo-orcamento?editId=${q.id}`}>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-amber-500" title="Editar"><Pencil className="h-3.5 w-3.5" /></Button>
+                              </Link>
+                            )}
+                            {status !== "contracted" && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive" title="Excluir" onClick={() => setDeleteQuoteTarget({ id: q.id, name: q.eventName })}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </CardHeader>
-                      <CardContent className="mt-auto">
+                      <CardContent className="mt-auto space-y-2">
+                        <QuoteStatusBadge status={status} className="text-[11px]" />
                         <Link href={`/dashboard/calculadora-orcamento/orcamentos/${q.id}`}>
                           <div className="flex items-center justify-between pt-2 border-t border-border">
-                            <span className="text-xs text-muted-foreground">Total estimado</span>
-                            <span className="font-bold text-amber-500 text-sm">{fmt(q.grandTotal)}</span>
+                            <span className="text-xs text-muted-foreground">Preço da proposta</span>
+                            <span className="font-bold text-amber-500 text-sm">{fmt(q.finalPrice)}</span>
                           </div>
                         </Link>
                       </CardContent>
@@ -872,6 +948,17 @@ export default function BudgetCalculatorPage() {
                 </div>
               )}
             </div>
+          </ScrollReveal>
+
+          {/* ── Cotas do plano usadas pela calculadora ── */}
+          <ScrollReveal delay={0.35}>
+            <UsageMeter
+              compact
+              meters={[
+                { feature: "budgetProposalsPerMonth", label: "Propostas enviadas no mês" },
+                { feature: "routeCalculationsPerMonth", label: "Cálculos de rota no mês" },
+              ]}
+            />
           </ScrollReveal>
 
         </div>
@@ -1057,14 +1144,15 @@ export default function BudgetCalculatorPage() {
       </AlertDialog>
 
       {/* ── Delete quote confirmation ── */}
-      <AlertDialog open={!!deleteQuoteTarget} onOpenChange={(open) => !open && setDeleteQuoteTarget(null)}>
+      <AlertDialog open={!!deleteQuoteTarget} onOpenChange={(open) => { if (!open) { setDeleteQuoteTarget(null); setDeleteQuoteError(""); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir orçamento?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir o orçamento <strong>{deleteQuoteTarget?.name}</strong>? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir o orçamento <strong>{deleteQuoteTarget?.name}</strong>? Se a proposta estiver com o cliente, o link deixa de funcionar. Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteQuoteError && <p className="text-sm text-destructive">{deleteQuoteError}</p>}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deletingQuote}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteQuote} disabled={deletingQuote}

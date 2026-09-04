@@ -35,6 +35,8 @@ export const NOTIFICATION_TYPES = [
   "booking_status",
   "quote_received",
   "quote_status",
+  "budget_proposal_approved",
+  "budget_proposal_rejected",
   "negotiation_candidate",
   "negotiation_employer",
   "contract_received",
@@ -87,6 +89,8 @@ const briefingExecUrl: Resolver = (id) => (id ? `/dashboard/briefing-pro/${id}/e
 const candidaturaUrl: Resolver = (id) => (id ? `/dashboard/candidaturas?candidatura=${id}` : "/dashboard/candidaturas");
 const communityUrl: Resolver = (ref) => (ref ? `/c/${ref}` : "/comunidade");
 const financeRecordUrl: Resolver = (id) => (id ? `/dashboard/financeiro?lancamento=${id}` : "/dashboard/financeiro");
+const budgetQuoteUrl: Resolver = (id) =>
+  id ? `/dashboard/calculadora-orcamento/orcamentos/${id}` : "/dashboard/calculadora-orcamento";
 
 const CLICK_URLS: Record<NotificationType, Resolver> = {
   job_match: (id) => (id ? `/vagas/${id}` : "/vagas"),
@@ -123,6 +127,9 @@ const CLICK_URLS: Record<NotificationType, Resolver> = {
   booking_status: () => "/dashboard/solicitacoes?tab=agendamentos",
   quote_received: () => "/dashboard/solicitacoes?tab=recebidos",
   quote_status: () => "/dashboard/solicitacoes?tab=orcamentos",
+
+  budget_proposal_approved: budgetQuoteUrl,
+  budget_proposal_rejected: budgetQuoteUrl,
 
   negotiation_candidate: candidaturaUrl,
   negotiation_employer: (ref) => {
@@ -222,6 +229,8 @@ export const NOTIFICATION_META: Record<NotificationType, NotificationMeta> = {
   booking_status: { toast: "Atualização de agendamento", tone: "info", group: "trabalho" },
   quote_received: { toast: "Novo pedido de orçamento!", tone: "info", group: "trabalho" },
   quote_status: { toast: "Atualização do seu orçamento", tone: "info", group: "trabalho" },
+  budget_proposal_approved: { toast: "Proposta aprovada pelo cliente! 🎉", tone: "success", group: "trabalho" },
+  budget_proposal_rejected: { toast: "Proposta recusada pelo cliente", tone: "warning", group: "trabalho" },
   negotiation_candidate: { toast: "Novidade na sua negociação", tone: "info", group: "trabalho" },
   negotiation_employer: { toast: "Novidade na negociação da vaga", tone: "info", group: "trabalho" },
 

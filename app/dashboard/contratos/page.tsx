@@ -60,6 +60,7 @@ const SOURCE_LABELS: Record<string, string> = {
   proposal: "Proposta",
   quote: "Orçamento",
   job_application: "Vaga",
+  budget_quote: "Proposta da Calculadora",
 };
 
 type ContractsTab = "owner" | "professional";

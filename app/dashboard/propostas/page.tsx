@@ -35,6 +35,7 @@ import {
   ArrowRight,
   CalendarRange,
   Check,
+  FileText,
   Handshake,
   Inbox,
   Loader2,
@@ -47,6 +48,14 @@ import {
 } from "lucide-react";
 import apiClient from "@/lib/api-service";
 import { isPlanErrorBody } from "@/lib/plans/plan-limits";
+import { QuoteStatusBadge } from "@/components/budget/quote-status-badge";
+import { fmtBRL, formatDateOnly as formatQuoteDate, quoteDisplayStatus, type BudgetQuoteData } from "@/lib/budget/budget-calc";
+
+/** Proposta da Calculadora de Orçamento enviada a um cliente (GET /budget-quotes). */
+type BudgetProposal = Pick<
+  BudgetQuoteData,
+  "id" | "eventName" | "eventDate" | "clientName" | "finalPrice" | "status" | "isExpired" | "viewCount" | "contract" | "sentAt" | "respondedAt" | "responseName"
+>;
 
 /** Espelha o payload de GET /proposals (escopo forcado ao usuario logado). */
 interface Proposal {
@@ -148,12 +157,15 @@ export default function PropostasPage() {
 
 function PropostasInner() {
   const router = useRouter();
-  // Deep link das notificações: proposal_received → ?tab=received, proposal_status → ?tab=sent
+  // Deep link das notificações: proposal_received → ?tab=received, proposal_status → ?tab=sent,
+  // propostas da Calculadora de Orçamento → ?tab=budget
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") === "sent" ? "sent" : "received";
+  const tabParam = searchParams.get("tab");
+  const initialTab = tabParam === "sent" ? "sent" : tabParam === "budget" ? "budget" : "received";
   const { userProfile, loading: authLoading } = useAuth();
 
   const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [budgetProposals, setBudgetProposals] = useState<BudgetProposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -164,9 +176,17 @@ function PropostasInner() {
     if (mode === "refresh") setRefreshing(true);
     else setLoading(true);
     try {
-      const response = await apiClient.get("/proposals");
+      const [response, budgetResponse] = await Promise.all([
+        apiClient.get("/proposals"),
+        // Propostas da calculadora são complemento: falha nelas não derruba a página
+        apiClient.get("/budget-quotes").catch(() => ({ data: [] })),
+      ]);
       const payload = response.data?.data ?? response.data ?? [];
       setProposals(Array.isArray(payload) ? payload : []);
+      const budgetPayload = budgetResponse.data;
+      setBudgetProposals(
+        (Array.isArray(budgetPayload) ? (budgetPayload as BudgetProposal[]) : []).filter((q) => q.status !== "draft")
+      );
       setError("");
     } catch (err) {
       console.error("[propostas] Erro ao carregar propostas:", err);
@@ -198,6 +218,18 @@ function PropostasInner() {
   }, [proposals, userProfile?.id]);
 
   const pendingReceived = received.filter((p) => p.status === "pending").length;
+
+  const budgetSorted = useMemo(
+    () =>
+      [...budgetProposals].sort(
+        (a, b) => new Date(b.sentAt ?? 0).getTime() - new Date(a.sentAt ?? 0).getTime()
+      ),
+    [budgetProposals]
+  );
+  const budgetAwaiting = budgetSorted.filter((q) => {
+    const s = quoteDisplayStatus(q);
+    return s === "sent" || s === "viewed";
+  }).length;
 
   const handleConfirmAction = async () => {
     if (!pendingAction) return;
@@ -435,11 +467,11 @@ function PropostasInner() {
             <div>
               <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
                 <Handshake className="h-7 w-7 text-primary" />
-                Propostas de Equipamentos
+                Minhas Propostas
               </h1>
               <p className="text-muted-foreground">
-                Responda a quem quer alugar ou comprar seus equipamentos e acompanhe as propostas
-                que você enviou.
+                Propostas de equipamentos que você recebeu ou enviou e as propostas de orçamento que
+                mandou para os seus clientes.
               </p>
             </div>
             <Button
@@ -484,7 +516,7 @@ function PropostasInner() {
             </div>
           ) : (
             <Tabs defaultValue={initialTab} className="w-full">
-              <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsList className="grid w-full max-w-xl grid-cols-3">
                 <TabsTrigger value="received" className="flex items-center gap-2">
                   <Inbox className="h-4 w-4" />
                   Recebidas ({received.length})
@@ -497,6 +529,15 @@ function PropostasInner() {
                 <TabsTrigger value="sent" className="flex items-center gap-2">
                   <Send className="h-4 w-4" />
                   Enviadas ({sent.length})
+                </TabsTrigger>
+                <TabsTrigger value="budget" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Orçamentos ({budgetSorted.length})
+                  {budgetAwaiting > 0 && (
+                    <span className="ml-1 rounded-full bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5">
+                      {budgetAwaiting}
+                    </span>
+                  )}
                 </TabsTrigger>
               </TabsList>
 
@@ -516,6 +557,99 @@ function PropostasInner() {
                 ) : (
                   <div className="space-y-4">
                     {sent.map((proposal) => renderProposalCard(proposal, "sent"))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="budget" className="mt-6">
+                {budgetSorted.length === 0 ? (
+                  <Card className="border-dashed">
+                    <CardContent className="py-14 flex flex-col items-center text-center">
+                      <div className="w-16 h-16 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-5">
+                        <FileText className="h-7 w-7 text-amber-500" />
+                      </div>
+                      <h3 className="text-lg font-semibold mb-1">Nenhuma proposta de orçamento enviada</h3>
+                      <p className="text-muted-foreground max-w-md mb-6 text-sm">
+                        Monte o orçamento na calculadora, defina sua margem e envie a proposta: o cliente
+                        aprova pelo link, a agenda é reservada e você gera o contrato com um clique.
+                      </p>
+                      <Button asChild className="bg-amber-500 hover:bg-amber-600 text-white">
+                        <Link href="/dashboard/calculadora-orcamento/novo-orcamento">Criar proposta</Link>
+                      </Button>
+                      <Button variant="ghost" size="sm" className="mt-2" asChild>
+                        <Link href="/dashboard/calculadora-orcamento">Abrir a calculadora</Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-4">
+                    {budgetSorted.map((q) => {
+                      const status = quoteDisplayStatus(q);
+                      return (
+                        <Card key={q.id} className="border-border overflow-hidden">
+                          <CardHeader className="pb-4">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="min-w-0 space-y-1">
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-amber-500 shrink-0" />
+                                  <span className="truncate">{q.eventName}</span>
+                                </CardTitle>
+                                <CardDescription>
+                                  Para <span className="font-medium text-foreground">{q.clientName || "cliente"}</span>
+                                  {q.sentAt ? <> · enviada em {formatDateTime(q.sentAt)}</> : null}
+                                </CardDescription>
+                              </div>
+                              <QuoteStatusBadge status={status} />
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            <div className="grid gap-4 sm:grid-cols-3">
+                              <div>
+                                <p className="text-xs text-muted-foreground">Valor da proposta</p>
+                                <p className="font-semibold">{fmtBRL(q.finalPrice)}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                  <CalendarRange className="h-3.5 w-3.5" /> Data do evento
+                                </p>
+                                <p className="font-semibold">{q.eventDate ? formatQuoteDate(q.eventDate) : "A combinar"}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground">Cliente</p>
+                                <p className="font-semibold">
+                                  {q.respondedAt
+                                    ? `${status === "rejected" ? "Recusou" : "Aprovou"} em ${formatDateTime(q.respondedAt)}`
+                                    : q.viewCount > 0
+                                      ? `Abriu o link ${q.viewCount}×`
+                                      : "Ainda não abriu o link"}
+                                </p>
+                              </div>
+                            </div>
+                            {status === "approved" && (
+                              <Alert className="border-green-200 bg-green-50 dark:border-green-900/50 dark:bg-green-900/20">
+                                <Check className="h-4 w-4 text-green-600" />
+                                <AlertDescription className="text-green-800 dark:text-green-300">
+                                  Aprovada pelo cliente — gere o contrato para fechar e bloquear a agenda de vez.
+                                </AlertDescription>
+                              </Alert>
+                            )}
+                          </CardContent>
+                          <CardFooter className="flex flex-wrap gap-2 border-t bg-muted/20 py-4">
+                            {q.contract && (
+                              <Button size="sm" variant="outline" className="gap-2" asChild>
+                                <Link href={`/dashboard/contratos/${q.contract.id}`}>Ver contrato</Link>
+                              </Button>
+                            )}
+                            <Button size="sm" variant="ghost" className="gap-2 ml-auto" asChild>
+                              <Link href={`/dashboard/calculadora-orcamento/orcamentos/${q.id}`}>
+                                Abrir proposta
+                                <ArrowRight className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      );
+                    })}
                   </div>
                 )}
               </TabsContent>

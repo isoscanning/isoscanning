@@ -101,9 +101,16 @@ const COMPARE_SECTIONS: { title: string; rows: CompareRow[] }[] = [
         ],
     },
     {
+        title: "Calculadora de Orçamento",
+        rows: [
+            { key: "budgetProposalsPerMonth", label: "Propostas enviadas ao cliente por mês (link de aprovação + contrato)" },
+            { key: "budgetTeamCosts", label: "Orçamento com equipe adicional (mão de obra, hospedagem, alimentação e transporte da equipe)" },
+            { key: "routeCalculationsPerMonth" },
+        ],
+    },
+    {
         title: "Ferramentas e suporte",
         rows: [
-            { key: "routeCalculationsPerMonth" },
             { key: "financeExport", label: "Financeiro completo + exportação" },
             { key: "supportChannel" },
         ],
@@ -250,11 +257,13 @@ export default function PricingPage() {
                 "10 créditos de IA por mês",
                 "1 briefing por mês (até 2 membros)",
                 "2 contratos por mês com assinatura eletrônica (editor e modelos do sistema)",
+                "Calculadora de Orçamento com 2 propostas enviadas por mês",
                 "3 cálculos de rota por mês",
                 "Chat ilimitado",
                 "Suporte pela comunidade"
             ],
             notIncluded: [
+                "Orçamento com equipe adicional",
                 "Contrapropostas em vagas",
                 "Selo Perfil Verificado",
                 "WhatsApp e Instagram no perfil",
@@ -293,6 +302,7 @@ export default function PricingPage() {
                 "Análise de concorrentes",
                 "10 briefings por mês, refinar com IA, até 10 membros",
                 "15 contratos por mês, modelos próprios e versões ilimitadas",
+                "30 propostas de orçamento por mês, com equipe adicional",
                 "50 cálculos de rota por mês",
                 "Financeiro completo + exportação",
                 "Suporte por e-mail"
@@ -324,6 +334,7 @@ export default function PricingPage() {
                 "Relatórios, contratos e páginas de assinatura sem marca IsoScanning (white-label)",
                 "Briefings ilimitados",
                 "Contratos ilimitados com white-label",
+                "Propostas de orçamento ilimitadas, com página do cliente sem marca",
                 "200 cálculos de rota por mês",
                 "Financeiro completo + exportação",
                 "Suporte prioritário por WhatsApp"

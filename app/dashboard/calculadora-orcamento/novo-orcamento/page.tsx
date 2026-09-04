@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, Suspense } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -9,17 +10,36 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft, ArrowRight, Check, ChevronRight,
   FileText, Clock, Utensils, Hotel, Users, Truck,
   PlusCircle, Trash2, Info, Car, Plane, Bus,
-  MapPin, Fuel, Calculator, Loader2, AlertCircle,
+  MapPin, Fuel, Calculator, Loader2, AlertCircle, Tag, User, Eye, EyeOff, TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
 import Script from "next/script";
 import apiClient from "@/lib/api-service";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { usePlan } from "@/lib/plans/use-plan";
+import { PlanPaywall } from "@/components/plan/plan-gate";
+import {
+  applyBRLMask,
+  parseBRL as n,
+  fmtBRL as fmt,
+  toBRLMask,
+  computeCostBreakdown,
+  computeFinalPrice,
+  computeProfit,
+  computeClientLineItems,
+  todayIso,
+  addDaysIso,
+  isValidEmail,
+  formatDateLong,
+  formatDateOnly,
+  type BudgetQuoteData,
+  type CostBreakdown,
+} from "@/lib/budget/budget-calc";
 
 /** 403 de plano (cálculos de rota/mês) — o interceptor do apiClient já abriu o modal de upgrade. */
 function isPlanApiError(err: unknown): boolean {
@@ -31,6 +51,13 @@ function routeLimitHint(limit: number | null): string {
   return limit === null
     ? "Cálculos de rota ilimitados no seu plano"
     : `${limit} cálculos de rota/mês no seu plano`;
+}
+
+function apiErrorMessage(err: unknown, fallback: string): string {
+  const msg = (err as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
+  if (Array.isArray(msg)) return msg.join(", ");
+  if (typeof msg === "string") return msg;
+  return fallback;
 }
 
 declare global {
@@ -47,12 +74,7 @@ interface StaffMember {
 }
 
 function newStaffMember(): StaffMember {
-  return {
-    id: Math.random().toString(36).slice(2),
-    name: "",
-    hourlyRate: "",
-    coverageHours: "8",
-  };
+  return { id: Math.random().toString(36).slice(2), name: "", hourlyRate: "", coverageHours: "8" };
 }
 
 interface AccomGroup {
@@ -87,22 +109,9 @@ interface TeamTransport {
 function newTeamTransport(): TeamTransport {
   return {
     id: Math.random().toString(36).slice(2),
-    name: "",
-    type: "air",
-    cost: "",
-    origin: "",
-    destination: "",
-    gasPrice: "",
-    kmPerLiter: "",
-    axles: "2",
-    routeType: "fastest",
-    distanceKm: "",
-    durationMinutes: "",
-    fuelCost: "",
-    tollCost: "",
-    routeCalculated: false,
-    roundTrip: false,
-    memberIds: [],
+    name: "", type: "air", cost: "", origin: "", destination: "", gasPrice: "", kmPerLiter: "",
+    axles: "2", routeType: "fastest", distanceKm: "", durationMinutes: "", fuelCost: "", tollCost: "",
+    routeCalculated: false, roundTrip: false, memberIds: [],
   };
 }
 
@@ -113,41 +122,36 @@ interface BudgetSnapshot {
 }
 
 interface FormState {
-  // Step 1 – Evento
+  // Evento
   eventName: string;
   eventLocation: string;
   eventDate: string;
+  eventEndDate: string;
   coverageHours: string;
-
-  // Step 2 – Mão de obra
+  // Mão de obra
   hourlyRate: string;
   jobsPerMonth: string;
-
-  // Step 4 – Equipe
+  // Equipe
   staffMembers: StaffMember[];
-
-  // Step 3 – Hospedagem & Alimentação (pessoal)
+  // Hospedagem & alimentação (pessoal)
   hasAccommodation: boolean;
   accommodationDailyRate: string;
   accommodationDays: string;
   hasFood: boolean;
   foodCostPerMeal: string;
   foodMeals: string;
-
-  // Step 3 – Hospedagem da equipe
+  // Hospedagem da equipe
   hasTeamAccommodation: boolean;
   teamAccommMode: "individual" | "grouped";
   teamAccommEntries: { memberId: string; dailyRate: string; days: string }[];
   teamAccommGroups: AccomGroup[];
-
-  // Step 3 – Alimentação da equipe
+  // Alimentação da equipe
   hasTeamFood: boolean;
   teamFoodMode: "same" | "individual";
   teamFoodPerMeal: string;
   teamFoodMeals: string;
   teamFoodEntries: { memberId: string; costPerMeal: string; meals: string }[];
-
-  // Step 5 – Transporte (pessoal)
+  // Transporte (pessoal)
   transportType: "none" | "air" | "ground" | "own_vehicle";
   transportCost: string;
   transportOrigin: string;
@@ -163,83 +167,51 @@ interface FormState {
   transportRouteCalculated: boolean;
   transportRoundTrip: boolean;
   myTransportPassengers: string[];
-
-  // Step 5 – Transporte da equipe
+  // Transporte da equipe
   hasTeamTransport: boolean;
   teamTransports: TeamTransport[];
-
-  // Step 6 – Custos extras
+  // Extras
   extraCosts: { name: string; value: string }[];
+  // Preço & cliente
+  marginPercent: string;
+  discount: string;
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  clientDocument: string;
+  scopeNotes: string;
+  paymentTerms: string;
+  showBreakdown: boolean;
+  validUntil: string;
 }
 
 const INITIAL_FORM: FormState = {
-  eventName: "",
-  eventLocation: "",
-  eventDate: "",
-  coverageHours: "8",
-  hourlyRate: "",
-  jobsPerMonth: "4",
+  eventName: "", eventLocation: "", eventDate: "", eventEndDate: "", coverageHours: "8",
+  hourlyRate: "", jobsPerMonth: "4",
   staffMembers: [],
-  hasAccommodation: false,
-  accommodationDailyRate: "",
-  accommodationDays: "1",
-  hasFood: false,
-  foodCostPerMeal: "",
-  foodMeals: "2",
-  hasTeamAccommodation: false,
-  teamAccommMode: "individual",
-  teamAccommEntries: [],
-  teamAccommGroups: [],
-  hasTeamFood: false,
-  teamFoodMode: "same",
-  teamFoodPerMeal: "",
-  teamFoodMeals: "2",
-  teamFoodEntries: [],
-  transportType: "none",
-  transportCost: "",
-  transportOrigin: "",
-  transportDestination: "",
-  transportGasPrice: "",
-  transportKmPerLiter: "",
-  transportAxles: "2",
-  transportRouteType: "fastest",
-  transportDistanceKm: "",
-  transportDurationMinutes: "",
-  transportFuelCost: "",
-  transportTollCost: "",
-  transportRouteCalculated: false,
-  transportRoundTrip: false,
-  myTransportPassengers: [],
-  hasTeamTransport: false,
-  teamTransports: [],
+  hasAccommodation: false, accommodationDailyRate: "", accommodationDays: "1",
+  hasFood: false, foodCostPerMeal: "", foodMeals: "2",
+  hasTeamAccommodation: false, teamAccommMode: "individual", teamAccommEntries: [], teamAccommGroups: [],
+  hasTeamFood: false, teamFoodMode: "same", teamFoodPerMeal: "", teamFoodMeals: "2", teamFoodEntries: [],
+  transportType: "none", transportCost: "", transportOrigin: "", transportDestination: "",
+  transportGasPrice: "", transportKmPerLiter: "", transportAxles: "2", transportRouteType: "fastest",
+  transportDistanceKm: "", transportDurationMinutes: "", transportFuelCost: "", transportTollCost: "",
+  transportRouteCalculated: false, transportRoundTrip: false, myTransportPassengers: [],
+  hasTeamTransport: false, teamTransports: [],
   extraCosts: [],
+  marginPercent: "30", discount: "",
+  clientName: "", clientEmail: "", clientPhone: "", clientDocument: "",
+  scopeNotes: "", paymentTerms: "", showBreakdown: true, validUntil: "",
 };
 
-function fmt(v: number) {
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
+// ── API → FormState (modo edição) ──────────────────────────────
 
-// Parse BRL-formatted strings like "6,50" or "1.200,50" to number
-function n(v: string) {
-  return Number(v.replace(/\./g, "").replace(",", ".")) || 0;
-}
-
-// Format number input as BRL currency while typing
-function applyBRLMask(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
-  if (!digits) return "";
-  const num = parseInt(digits, 10) / 100;
-  return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-// ── Map API quote back to FormState (for edit mode) ───────────
-
-function mapQuoteToForm(q: any): FormState {
-  const staff = q.additionalStaff ?? {};
+function mapQuoteToForm(q: BudgetQuoteData): FormState {
+  const staff = q.additionalStaff ?? { enabled: false };
   const members: StaffMember[] = (staff.members ?? []).map((m: any) => ({
     id: m.id ?? Math.random().toString(36).slice(2),
     name: m.name ?? "",
-    hourlyRate: applyBRLMask(String(Math.round((m.hourlyRate ?? 0) * 100))),
+    hourlyRate: toBRLMask(m.hourlyRate),
     coverageHours: String(m.coverageHours ?? 8),
   }));
   const teamAccom = staff.teamAccommodation ?? {};
@@ -249,103 +221,234 @@ function mapQuoteToForm(q: any): FormState {
   return {
     eventName: q.eventName ?? "",
     eventLocation: q.eventLocation ?? "",
-    eventDate: q.eventDate ? q.eventDate.split("T")[0] : "",
+    eventDate: q.eventDate ? q.eventDate.slice(0, 10) : "",
+    eventEndDate: q.eventEndDate ? q.eventEndDate.slice(0, 10) : "",
     coverageHours: String(q.coverageHours ?? 8),
-    hourlyRate: applyBRLMask(String(Math.round((q.hourlyRate ?? 0) * 100))),
+    hourlyRate: toBRLMask(q.hourlyRate),
     jobsPerMonth: String(q.jobsPerMonth ?? 4),
     staffMembers: members,
     hasAccommodation: q.accommodation?.enabled ?? false,
-    accommodationDailyRate: applyBRLMask(String(Math.round((q.accommodation?.dailyRate ?? 0) * 100))),
+    accommodationDailyRate: toBRLMask(q.accommodation?.dailyRate),
     accommodationDays: String(q.accommodation?.days ?? 1),
     hasFood: q.food?.enabled ?? false,
-    foodCostPerMeal: applyBRLMask(String(Math.round((q.food?.costPerMeal ?? 0) * 100))),
+    foodCostPerMeal: toBRLMask(q.food?.costPerMeal),
     foodMeals: String(q.food?.meals ?? 2),
     hasTeamAccommodation: teamAccom.enabled ?? false,
     teamAccommMode: teamAccom.mode ?? "individual",
     teamAccommEntries: (teamAccom.individual ?? []).map((e: any) => ({
-      memberId: e.memberId,
-      dailyRate: applyBRLMask(String(Math.round((e.dailyRate ?? 0) * 100))),
-      days: String(e.days ?? 1),
+      memberId: e.memberId, dailyRate: toBRLMask(e.dailyRate), days: String(e.days ?? 1),
     })),
     teamAccommGroups: (teamAccom.groups ?? []).map((g: any) => ({
-      id: g.id ?? Math.random().toString(36).slice(2),
-      name: g.name ?? "",
-      type: g.type ?? "single",
-      dailyRate: applyBRLMask(String(Math.round((g.dailyRate ?? 0) * 100))),
-      days: String(g.days ?? 1),
-      memberIds: g.memberIds ?? [],
+      id: g.id ?? Math.random().toString(36).slice(2), name: g.name ?? "", type: g.type ?? "single",
+      dailyRate: toBRLMask(g.dailyRate), days: String(g.days ?? 1), memberIds: g.memberIds ?? [],
     })),
     hasTeamFood: teamFood.enabled ?? false,
     teamFoodMode: teamFood.mode ?? "same",
-    teamFoodPerMeal: applyBRLMask(String(Math.round((teamFood.same?.costPerMeal ?? 0) * 100))),
+    teamFoodPerMeal: toBRLMask(teamFood.same?.costPerMeal),
     teamFoodMeals: String(teamFood.same?.meals ?? 2),
     teamFoodEntries: (teamFood.individual ?? []).map((e: any) => ({
-      memberId: e.memberId,
-      costPerMeal: applyBRLMask(String(Math.round((e.costPerMeal ?? 0) * 100))),
-      meals: String(e.meals ?? 2),
+      memberId: e.memberId, costPerMeal: toBRLMask(e.costPerMeal), meals: String(e.meals ?? 2),
     })),
     transportType: transport.type ?? "none",
-    transportCost: applyBRLMask(String(Math.round((transport.cost ?? 0) * 100))),
+    transportCost: toBRLMask(transport.cost),
     transportOrigin: transport.originAddress ?? "",
     transportDestination: transport.destinationAddress ?? "",
-    transportGasPrice: applyBRLMask(String(Math.round((transport.gasPricePerLiter ?? 0) * 100))),
-    transportKmPerLiter: String(transport.kmPerLiter ?? ""),
+    transportGasPrice: toBRLMask(transport.gasPricePerLiter),
+    transportKmPerLiter: transport.kmPerLiter ? String(transport.kmPerLiter) : "",
     transportAxles: String(transport.axles ?? 2),
-    transportRouteType: transport.routeType ?? "fastest",
-    transportDistanceKm: String(transport.distanceKm ?? ""),
-    transportDurationMinutes: String(transport.durationMinutes ?? ""),
-    transportFuelCost: applyBRLMask(String(Math.round((transport.fuelCost ?? 0) * 100))),
-    transportTollCost: applyBRLMask(String(Math.round((transport.tollCost ?? 0) * 100))),
+    transportRouteType: (transport.routeType as "fastest" | "shortest") ?? "fastest",
+    transportDistanceKm: transport.distanceKm ? String(transport.distanceKm) : "",
+    transportDurationMinutes: transport.durationMinutes ? String(transport.durationMinutes) : "",
+    transportFuelCost: toBRLMask(transport.fuelCost),
+    transportTollCost: toBRLMask(transport.tollCost),
     transportRouteCalculated: !!(transport.fuelCost || transport.tollCost),
     transportRoundTrip: transport.roundTrip ?? false,
     myTransportPassengers: transport.passengers ?? [],
     hasTeamTransport: (transport.teamTransports ?? []).length > 0,
     teamTransports: (transport.teamTransports ?? []).map((tt: any) => ({
-      id: tt.id ?? Math.random().toString(36).slice(2),
-      name: tt.name ?? "",
-      type: tt.type ?? "air",
-      cost: applyBRLMask(String(Math.round((tt.cost ?? 0) * 100))),
-      origin: tt.originAddress ?? "",
-      destination: tt.destinationAddress ?? "",
-      gasPrice: applyBRLMask(String(Math.round((tt.gasPricePerLiter ?? 0) * 100))),
-      kmPerLiter: String(tt.kmPerLiter ?? ""),
-      axles: String(tt.axles ?? 2),
-      routeType: tt.routeType ?? "fastest",
-      distanceKm: String(tt.distanceKm ?? ""),
-      durationMinutes: String(tt.durationMinutes ?? ""),
-      fuelCost: applyBRLMask(String(Math.round((tt.fuelCost ?? 0) * 100))),
-      tollCost: applyBRLMask(String(Math.round((tt.tollCost ?? 0) * 100))),
-      routeCalculated: !!(tt.fuelCost || tt.tollCost),
-      roundTrip: tt.roundTrip ?? false,
-      memberIds: tt.memberIds ?? [],
+      id: tt.id ?? Math.random().toString(36).slice(2), name: tt.name ?? "", type: tt.type ?? "air",
+      cost: toBRLMask(tt.cost), origin: tt.originAddress ?? "", destination: tt.destinationAddress ?? "",
+      gasPrice: toBRLMask(tt.gasPricePerLiter), kmPerLiter: tt.kmPerLiter ? String(tt.kmPerLiter) : "",
+      axles: String(tt.axles ?? 2), routeType: tt.routeType ?? "fastest",
+      distanceKm: tt.distanceKm ? String(tt.distanceKm) : "", durationMinutes: tt.durationMinutes ? String(tt.durationMinutes) : "",
+      fuelCost: toBRLMask(tt.fuelCost), tollCost: toBRLMask(tt.tollCost),
+      routeCalculated: !!(tt.fuelCost || tt.tollCost), roundTrip: tt.roundTrip ?? false, memberIds: tt.memberIds ?? [],
     })),
-    extraCosts: (q.extraCosts ?? []).map((c: any) => ({
-      name: c.name ?? "",
-      value: applyBRLMask(String(Math.round((c.value ?? 0) * 100))),
-    })),
+    extraCosts: (q.extraCosts ?? []).map((c) => ({ name: c.name ?? "", value: toBRLMask(c.value) })),
+    marginPercent: String(q.marginPercent ?? 0),
+    discount: toBRLMask(q.discount),
+    clientName: q.clientName ?? "",
+    clientEmail: q.clientEmail ?? "",
+    clientPhone: q.clientPhone ?? "",
+    clientDocument: q.clientDocument ?? "",
+    scopeNotes: q.scopeNotes ?? "",
+    paymentTerms: q.paymentTerms ?? "",
+    showBreakdown: q.showBreakdown ?? true,
+    validUntil: q.validUntil ? q.validUntil.slice(0, 10) : "",
   };
+}
+
+// ── FormState → payload da API (o mesmo objeto alimenta a prévia) ──
+
+function buildPayload(form: FormState, snapshot: BudgetSnapshot, teamAllowed: boolean) {
+  const members = teamAllowed ? form.staffMembers : [];
+  const memberIds = new Set(members.map((m) => m.id));
+  const hasTeam = members.length > 0;
+  const ownVehicle = form.transportType === "own_vehicle";
+
+  return {
+    eventName: form.eventName.trim(),
+    eventLocation: form.eventLocation.trim() || undefined,
+    eventDate: form.eventDate || undefined,
+    eventEndDate: form.eventDate && form.eventEndDate ? form.eventEndDate : undefined,
+    coverageHours: n(form.coverageHours),
+    hourlyRate: n(form.hourlyRate),
+    jobsPerMonth: Math.max(1, Math.round(n(form.jobsPerMonth))),
+    accommodation: {
+      enabled: form.hasAccommodation,
+      dailyRate: form.hasAccommodation ? n(form.accommodationDailyRate) : undefined,
+      days: form.hasAccommodation ? n(form.accommodationDays) : undefined,
+    },
+    food: {
+      enabled: form.hasFood,
+      costPerMeal: form.hasFood ? n(form.foodCostPerMeal) : undefined,
+      meals: form.hasFood ? n(form.foodMeals) : undefined,
+    },
+    additionalStaff: {
+      enabled: hasTeam,
+      members: members.map((m) => ({ id: m.id, name: m.name, hourlyRate: n(m.hourlyRate), coverageHours: n(m.coverageHours) })),
+      teamAccommodation: {
+        enabled: hasTeam && form.hasTeamAccommodation,
+        mode: form.teamAccommMode,
+        individual: hasTeam && form.hasTeamAccommodation && form.teamAccommMode === "individual"
+          ? form.teamAccommEntries.filter((e) => memberIds.has(e.memberId)).map((e) => ({ memberId: e.memberId, dailyRate: n(e.dailyRate), days: n(e.days) }))
+          : undefined,
+        groups: hasTeam && form.hasTeamAccommodation && form.teamAccommMode === "grouped"
+          ? form.teamAccommGroups.map((g) => ({ id: g.id, name: g.name, type: g.type, dailyRate: n(g.dailyRate), days: n(g.days), memberIds: g.memberIds.filter((id) => memberIds.has(id)) }))
+          : undefined,
+      },
+      teamFood: {
+        enabled: hasTeam && form.hasTeamFood,
+        mode: form.teamFoodMode,
+        same: hasTeam && form.hasTeamFood && form.teamFoodMode === "same"
+          ? { costPerMeal: n(form.teamFoodPerMeal), meals: n(form.teamFoodMeals) }
+          : undefined,
+        individual: hasTeam && form.hasTeamFood && form.teamFoodMode === "individual"
+          ? form.teamFoodEntries.filter((e) => memberIds.has(e.memberId)).map((e) => ({ memberId: e.memberId, costPerMeal: n(e.costPerMeal), meals: n(e.meals) }))
+          : undefined,
+      },
+    },
+    transport: {
+      type: form.transportType,
+      cost: form.transportType === "air" || form.transportType === "ground" ? n(form.transportCost) : undefined,
+      originAddress: ownVehicle ? form.transportOrigin : undefined,
+      destinationAddress: ownVehicle ? form.transportDestination : undefined,
+      distanceKm: ownVehicle ? Number(form.transportDistanceKm) || 0 : undefined,
+      durationMinutes: ownVehicle ? Number(form.transportDurationMinutes) || 0 : undefined,
+      gasPricePerLiter: ownVehicle ? n(form.transportGasPrice) : undefined,
+      kmPerLiter: ownVehicle ? Number(form.transportKmPerLiter) || 0 : undefined,
+      axles: ownVehicle ? Math.max(2, n(form.transportAxles)) : undefined,
+      routeType: ownVehicle ? form.transportRouteType : undefined,
+      fuelCost: ownVehicle ? n(form.transportFuelCost) : undefined,
+      tollCost: ownVehicle ? n(form.transportTollCost) : undefined,
+      // Ida e volta só faz sentido para veículo próprio (passagem já é o valor cheio)
+      roundTrip: ownVehicle ? form.transportRoundTrip : false,
+      passengers: hasTeam ? form.myTransportPassengers.filter((id) => memberIds.has(id)) : [],
+      teamTransports: hasTeam && form.hasTeamTransport
+        ? form.teamTransports.map((tt) => ({
+            id: tt.id,
+            name: tt.name,
+            type: tt.type,
+            cost: tt.type === "air" || tt.type === "ground" ? n(tt.cost) : undefined,
+            originAddress: tt.type === "own_vehicle" ? tt.origin : undefined,
+            destinationAddress: tt.type === "own_vehicle" ? tt.destination : undefined,
+            distanceKm: tt.type === "own_vehicle" ? Number(tt.distanceKm) || 0 : undefined,
+            durationMinutes: tt.type === "own_vehicle" ? Number(tt.durationMinutes) || 0 : undefined,
+            gasPricePerLiter: tt.type === "own_vehicle" ? n(tt.gasPrice) : undefined,
+            kmPerLiter: tt.type === "own_vehicle" ? Number(tt.kmPerLiter) || 0 : undefined,
+            axles: tt.type === "own_vehicle" ? Math.max(2, n(tt.axles)) : undefined,
+            routeType: tt.type === "own_vehicle" ? tt.routeType : undefined,
+            fuelCost: tt.type === "own_vehicle" ? n(tt.fuelCost) : undefined,
+            tollCost: tt.type === "own_vehicle" ? n(tt.tollCost) : undefined,
+            roundTrip: tt.type === "own_vehicle" ? tt.roundTrip : false,
+            memberIds: tt.memberIds.filter((id) => memberIds.has(id)),
+          }))
+        : [],
+    },
+    extraCosts: form.extraCosts.filter((c) => c.name.trim() && n(c.value) > 0).map((c) => ({ name: c.name.trim(), value: n(c.value) })),
+    equipmentCostPerJob: snapshot.equipmentCostPerJob,
+    softwareMonthlyCost: snapshot.softwareMonthlyCost,
+    infrastructureMonthlyCost: snapshot.infrastructureMonthlyCost,
+    marginPercent: Math.min(1000, Math.max(0, n(form.marginPercent))),
+    discount: n(form.discount),
+    clientName: form.clientName.trim() || undefined,
+    clientEmail: form.clientEmail.trim().toLowerCase() || undefined,
+    clientPhone: form.clientPhone.trim() || undefined,
+    clientDocument: form.clientDocument.trim() || undefined,
+    scopeNotes: form.scopeNotes.trim() || undefined,
+    paymentTerms: form.paymentTerms.trim() || undefined,
+    showBreakdown: form.showBreakdown,
+    validUntil: form.validUntil || undefined,
+  };
+}
+
+// ── Validação por passo (mensagens em PT-BR, antes de bater no servidor) ──
+
+const STEPS = [
+  { label: "Evento", icon: FileText },
+  { label: "Mão de Obra", icon: Clock },
+  { label: "Equipe", icon: Users },
+  { label: "Hospedagem & Alimentação", icon: Hotel },
+  { label: "Transporte", icon: Truck },
+  { label: "Extras", icon: PlusCircle },
+  { label: "Preço & Cliente", icon: Tag },
+  { label: "Resumo", icon: Calculator },
+];
+const STEP_PRICE = 6;
+const STEP_SUMMARY = 7;
+
+function validateStep(step: number, form: FormState, teamAllowed: boolean): string | null {
+  switch (step) {
+    case 0:
+      if (!form.eventName.trim()) return "Informe o nome do evento.";
+      if (form.eventEndDate && !form.eventDate) return "Informe a data de início para usar uma data final.";
+      if (form.eventDate && form.eventEndDate && form.eventEndDate < form.eventDate) return "A data final não pode ser anterior à data inicial.";
+      return null;
+    case 1:
+      if (n(form.coverageHours) <= 0) return "Informe quantas horas de cobertura você fará.";
+      if (n(form.hourlyRate) <= 0) return "Informe o valor da sua hora de trabalho.";
+      if (n(form.jobsPerMonth) < 1) return "Informe quantos trabalhos você faz por mês (mínimo 1).";
+      return null;
+    case 2:
+      if (!teamAllowed && form.staffMembers.length > 0) return "Equipe adicional está disponível a partir do plano Pro. Remova os membros ou faça upgrade.";
+      return null;
+    case STEP_PRICE: {
+      const margin = n(form.marginPercent);
+      if (margin < 0 || margin > 1000) return "A margem precisa estar entre 0% e 1000%.";
+      if (form.clientEmail.trim() && !isValidEmail(form.clientEmail)) return "O e-mail do cliente não parece válido.";
+      if (form.validUntil && form.validUntil < todayIso()) return "A validade da proposta precisa ser uma data futura.";
+      return null;
+    }
+    default:
+      return null;
+  }
 }
 
 // ── Address Autocomplete Input ─────────────────────────────────
 
-function AddressInput({
-  id, placeholder, value, onChange, googleReady,
-}: {
-  id: string; placeholder: string; value: string;
-  onChange: (v: string) => void; googleReady: boolean;
+function AddressInput({ id, placeholder, value, onChange, googleReady }: {
+  id: string; placeholder: string; value: string; onChange: (v: string) => void; googleReady: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<any>(null);
 
   useEffect(() => {
     if (!googleReady || !inputRef.current || !window.google?.maps?.places) return;
-    if (autocompleteRef.current) return; // already initialized
-
+    if (autocompleteRef.current) return;
     autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
       componentRestrictions: { country: "br" },
       fields: ["formatted_address"],
     });
-
     autocompleteRef.current.addListener("place_changed", () => {
       const place = autocompleteRef.current.getPlace();
       if (place?.formatted_address) onChange(place.formatted_address);
@@ -355,30 +458,12 @@ function AddressInput({
   return (
     <div className="relative">
       <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-      <Input
-        ref={inputRef}
-        id={id}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="pl-9"
-        autoComplete="off"
-      />
+      <Input ref={inputRef} id={id} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className="pl-9" autoComplete="off" />
     </div>
   );
 }
 
 // ── Step indicator ─────────────────────────────────────────────
-
-const STEPS = [
-  { label: "Evento", icon: FileText },
-  { label: "Mão de Obra", icon: Clock },
-  { label: "Equipe", icon: Users },
-  { label: "Hospedagem & Alimentação", icon: Hotel },
-  { label: "Transporte", icon: Truck },
-  { label: "Extras", icon: PlusCircle },
-  { label: "Resumo", icon: Calculator },
-];
 
 function StepIndicator({ current, onNavigate }: { current: number; onNavigate: (i: number) => void }) {
   return (
@@ -400,9 +485,7 @@ function StepIndicator({ current, onNavigate }: { current: number; onNavigate: (
                   : "bg-transparent border-border text-foreground/50 hover:border-foreground/30 hover:text-foreground/70 cursor-pointer"
               }`}
             >
-              {done
-                ? <Check className="h-3 w-3 shrink-0" />
-                : <Icon className="h-3 w-3 shrink-0" />}
+              {done ? <Check className="h-3 w-3 shrink-0" /> : <Icon className="h-3 w-3 shrink-0" />}
               <span className="hidden md:inline">{s.label}</span>
             </button>
             {i < STEPS.length - 1 && (
@@ -417,25 +500,15 @@ function StepIndicator({ current, onNavigate }: { current: number; onNavigate: (
 
 // ── Toggle component ───────────────────────────────────────────
 
-function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: boolean) => void; label?: string }) {
+function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   return (
     <div className="flex gap-2">
-      <button
-        type="button"
-        onClick={() => onChange(true)}
-        className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-all ${
-          value ? "border-amber-500 bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400" : "border-border text-muted-foreground hover:border-amber-300"
-        }`}
-      >
+      <button type="button" onClick={() => onChange(true)}
+        className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-all ${value ? "border-amber-500 bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400" : "border-border text-muted-foreground hover:border-amber-300"}`}>
         Sim
       </button>
-      <button
-        type="button"
-        onClick={() => onChange(false)}
-        className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-all ${
-          !value ? "border-slate-400 bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" : "border-border text-muted-foreground hover:border-slate-300"
-        }`}
-      >
+      <button type="button" onClick={() => onChange(false)}
+        className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-all ${!value ? "border-slate-400 bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" : "border-border text-muted-foreground hover:border-slate-300"}`}>
         Não
       </button>
     </div>
@@ -456,7 +529,11 @@ function NovoOrcamentoInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("editId");
+  const requestedStep = Number(searchParams.get("step"));
   const { userProfile, loading } = useAuth();
+  const plan = usePlan();
+  const teamAllowed = plan.can("budgetTeamCosts");
+
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [snapshot, setSnapshot] = useState<BudgetSnapshot>({ equipmentCostPerJob: 0, softwareMonthlyCost: 0, infrastructureMonthlyCost: 0 });
@@ -464,23 +541,36 @@ function NovoOrcamentoInner() {
   const [calcError, setCalcError] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [stepError, setStepError] = useState("");
   const [googleReady, setGoogleReady] = useState(false);
   const [editLoading, setEditLoading] = useState(!!editId);
+  const dirtyRef = useRef(false);
 
   useEffect(() => {
     if (!loading && !userProfile) router.push("/login");
   }, [userProfile, loading, router]);
 
+  // Modo edição: só rascunhos e propostas recusadas podem ser editados
   useEffect(() => {
     if (!editId || !userProfile) return;
     setEditLoading(true);
     apiClient.get(`/budget-quotes/${editId}`)
-      .then((res) => setForm(mapQuoteToForm(res.data)))
+      .then((res) => {
+        const q = res.data as BudgetQuoteData;
+        if (!q.isEditable) {
+          toast.error(q.status === "approved" ? "Proposta aprovada pelo cliente não pode ser editada." : "Retire a proposta enviada antes de editar.");
+          router.replace(`/dashboard/calculadora-orcamento/orcamentos/${editId}`);
+          return;
+        }
+        setForm(mapQuoteToForm(q));
+        if (Number.isInteger(requestedStep) && requestedStep >= 0 && requestedStep < STEPS.length) setStep(requestedStep);
+      })
       .catch(() => router.push("/dashboard/calculadora-orcamento"))
       .finally(() => setEditLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, userProfile, router]);
 
-  // Load budget calculator snapshot
+  // Custos operacionais atuais da calculadora (equipamentos, softwares, infra)
   useEffect(() => {
     if (!userProfile) return;
     Promise.all([
@@ -495,21 +585,47 @@ function NovoOrcamentoInner() {
     }).catch(() => {});
   }, [userProfile]);
 
+  // Aviso ao sair com alterações não salvas
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!dirtyRef.current || saving) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [saving]);
+
   const set = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => {
+    dirtyRef.current = true;
+    setStepError("");
     setForm((f) => ({ ...f, [key]: value }));
   }, []);
+
+  // ── Prévia ao vivo (mesmo payload que vai para o servidor) ──
+
+  const payload = useMemo(() => buildPayload(form, snapshot, teamAllowed), [form, snapshot, teamAllowed]);
+  const breakdown = useMemo(() => computeCostBreakdown(payload), [payload]);
+  const finalPrice = useMemo(() => computeFinalPrice(breakdown.total, payload.marginPercent, payload.discount), [breakdown.total, payload.marginPercent, payload.discount]);
+  const profit = computeProfit(breakdown.total, finalPrice);
+
+  // ── Navegação com validação ────────────────────────────────
+
+  function goTo(target: number) {
+    if (target <= step) { setStepError(""); setStep(target); return; }
+    for (let i = step; i < target; i++) {
+      const err = validateStep(i, form, teamAllowed);
+      if (err) { setStep(i); setStepError(err); return; }
+    }
+    setStepError("");
+    setStep(target);
+  }
 
   // ── Route calculation ──────────────────────────────────────
 
   async function handleCalculateRoute() {
-    if (!form.transportOrigin || !form.transportDestination) {
-      setCalcError("Informe os endereços de origem e destino.");
-      return;
-    }
-    if (!form.transportGasPrice || !form.transportKmPerLiter) {
-      setCalcError("Informe o valor da gasolina e o consumo do veículo.");
-      return;
-    }
+    if (!form.transportOrigin || !form.transportDestination) { setCalcError("Informe os endereços de origem e destino."); return; }
+    if (!form.transportGasPrice || !form.transportKmPerLiter) { setCalcError("Informe o valor da gasolina e o consumo do veículo."); return; }
     setCalcLoading(true);
     setCalcError("");
     try {
@@ -522,192 +638,50 @@ function NovoOrcamentoInner() {
         axles: n(form.transportAxles),
       });
       const data = res.data;
-      if (!data.apiUsed) {
-        setCalcError("API do Google Maps não configurada. Insira a distância e pedágios manualmente.");
-        return;
-      }
+      if (!data.apiUsed) { setCalcError("API do Google Maps não configurada. Insira a distância e pedágios manualmente."); return; }
       if (!data.routeFound) {
         const detail = data.errorDetail ? ` (${data.errorDetail})` : "";
         setCalcError(`Rota não encontrada. Verifique os endereços e tente novamente.${detail}`);
         return;
       }
+      dirtyRef.current = true;
       setForm((f) => ({
         ...f,
         transportDistanceKm: String(data.distanceKm),
         transportDurationMinutes: String(data.durationMinutes),
-        transportFuelCost: applyBRLMask(String(Math.round(data.fuelCost * 100))),
-        transportTollCost: applyBRLMask(String(Math.round(data.tollCost * 100))),
+        transportFuelCost: toBRLMask(data.fuelCost),
+        transportTollCost: toBRLMask(data.tollCost),
         transportRouteCalculated: true,
       }));
     } catch (err) {
-      if (isPlanApiError(err)) return; // limite do plano: modal de upgrade já aberto
+      if (isPlanApiError(err)) return;
       setCalcError("Erro ao calcular rota. Verifique os endereços ou insira os valores manualmente.");
     } finally {
       setCalcLoading(false);
     }
   }
 
-  // ── Grand total calculation ────────────────────────────────
-
-  function calcTotal() {
-    const labor = n(form.coverageHours) * n(form.hourlyRate);
-    const accom = form.hasAccommodation ? n(form.accommodationDailyRate) * n(form.accommodationDays) : 0;
-    const food = form.hasFood ? n(form.foodCostPerMeal) * n(form.foodMeals) : 0;
-
-    let staffLabor = 0;
-    for (const m of form.staffMembers) {
-      staffLabor += n(m.coverageHours) * n(m.hourlyRate);
-    }
-
-    let staffAccom = 0;
-    if (form.hasTeamAccommodation) {
-      if (form.teamAccommMode === "individual") {
-        for (const e of form.teamAccommEntries) staffAccom += n(e.dailyRate) * n(e.days);
-      } else {
-        for (const g of form.teamAccommGroups) {
-          staffAccom += g.type === "property" ? n(g.dailyRate) : n(g.dailyRate) * n(g.days);
-        }
-      }
-    }
-
-    let staffFood = 0;
-    if (form.hasTeamFood) {
-      if (form.teamFoodMode === "same") {
-        staffFood = n(form.teamFoodPerMeal) * n(form.teamFoodMeals) * form.staffMembers.length;
-      } else {
-        for (const e of form.teamFoodEntries) staffFood += n(e.costPerMeal) * n(e.meals);
-      }
-    }
-
-    let transport = 0;
-    if (form.transportType === "air" || form.transportType === "ground") {
-      transport = n(form.transportCost);
-    } else if (form.transportType === "own_vehicle") {
-      transport = n(form.transportFuelCost) + n(form.transportTollCost);
-    }
-    if (form.transportRoundTrip) transport *= 2;
-
-    let teamTransport = 0;
-    for (const tt of form.teamTransports) {
-      let cost = 0;
-      if (tt.type === "air" || tt.type === "ground") cost = n(tt.cost);
-      else if (tt.type === "own_vehicle") cost = n(tt.fuelCost) + n(tt.tollCost);
-      if (tt.roundTrip) cost *= 2;
-      teamTransport += cost;
-    }
-
-    const extras = form.extraCosts.reduce((s, c) => s + n(c.value), 0);
-    const jobs = Math.max(1, n(form.jobsPerMonth));
-    const swPerJob = snapshot.softwareMonthlyCost / jobs;
-    const infraPerJob = snapshot.infrastructureMonthlyCost / jobs;
-
-    return {
-      labor, accom, food,
-      staffLabor, staffAccom, staffFood,
-      transport, teamTransport, extras,
-      equipmentCostPerJob: snapshot.equipmentCostPerJob,
-      swPerJob, infraPerJob,
-      grand: labor + accom + food + staffLabor + staffAccom + staffFood + transport + teamTransport + extras + snapshot.equipmentCostPerJob + swPerJob + infraPerJob,
-    };
-  }
-
-  const totals = calcTotal();
-
   // ── Save ───────────────────────────────────────────────────
 
   async function handleSave() {
+    for (let i = 0; i < STEP_SUMMARY; i++) {
+      const err = validateStep(i, form, teamAllowed);
+      if (err) { setStep(i); setStepError(err); return; }
+    }
     setSaving(true);
     setError("");
     try {
-      const payload = {
-        eventName: form.eventName,
-        eventLocation: form.eventLocation || undefined,
-        eventDate: form.eventDate || undefined,
-        coverageHours: n(form.coverageHours),
-        hourlyRate: n(form.hourlyRate),
-        jobsPerMonth: n(form.jobsPerMonth),
-        accommodation: {
-          enabled: form.hasAccommodation,
-          dailyRate: form.hasAccommodation ? n(form.accommodationDailyRate) : undefined,
-          days: form.hasAccommodation ? n(form.accommodationDays) : undefined,
-        },
-        food: {
-          enabled: form.hasFood,
-          costPerMeal: form.hasFood ? n(form.foodCostPerMeal) : undefined,
-          meals: form.hasFood ? n(form.foodMeals) : undefined,
-        },
-        additionalStaff: {
-          enabled: form.staffMembers.length > 0,
-          members: form.staffMembers.map((m) => ({
-            id: m.id,
-            name: m.name,
-            hourlyRate: n(m.hourlyRate),
-            coverageHours: n(m.coverageHours),
-          })),
-          teamAccommodation: {
-            enabled: form.hasTeamAccommodation,
-            mode: form.teamAccommMode,
-            individual: form.hasTeamAccommodation && form.teamAccommMode === "individual"
-              ? form.teamAccommEntries.map((e) => ({ memberId: e.memberId, dailyRate: n(e.dailyRate), days: n(e.days) }))
-              : undefined,
-            groups: form.hasTeamAccommodation && form.teamAccommMode === "grouped"
-              ? form.teamAccommGroups.map((g) => ({ id: g.id, name: g.name, type: g.type, dailyRate: n(g.dailyRate), days: n(g.days), memberIds: g.memberIds }))
-              : undefined,
-          },
-          teamFood: {
-            enabled: form.hasTeamFood,
-            mode: form.teamFoodMode,
-            same: form.hasTeamFood && form.teamFoodMode === "same"
-              ? { costPerMeal: n(form.teamFoodPerMeal), meals: n(form.teamFoodMeals) }
-              : undefined,
-            individual: form.hasTeamFood && form.teamFoodMode === "individual"
-              ? form.teamFoodEntries.map((e) => ({ memberId: e.memberId, costPerMeal: n(e.costPerMeal), meals: n(e.meals) }))
-              : undefined,
-          },
-        },
-        transport: {
-          type: form.transportType,
-          cost: (form.transportType === "air" || form.transportType === "ground") ? n(form.transportCost) : undefined,
-          originAddress: form.transportType === "own_vehicle" ? form.transportOrigin : undefined,
-          destinationAddress: form.transportType === "own_vehicle" ? form.transportDestination : undefined,
-          distanceKm: form.transportType === "own_vehicle" ? (Number(form.transportDistanceKm) || 0) : undefined,
-          durationMinutes: form.transportType === "own_vehicle" ? (Number(form.transportDurationMinutes) || 0) : undefined,
-          gasPricePerLiter: form.transportType === "own_vehicle" ? n(form.transportGasPrice) : undefined,
-          kmPerLiter: form.transportType === "own_vehicle" ? (Number(form.transportKmPerLiter) || 0) : undefined,
-          axles: form.transportType === "own_vehicle" ? n(form.transportAxles) : undefined,
-          routeType: form.transportType === "own_vehicle" ? form.transportRouteType : undefined,
-          fuelCost: form.transportType === "own_vehicle" ? n(form.transportFuelCost) : undefined,
-          tollCost: form.transportType === "own_vehicle" ? n(form.transportTollCost) : undefined,
-          roundTrip: form.transportRoundTrip,
-          passengers: form.myTransportPassengers,
-          teamTransports: form.hasTeamTransport ? form.teamTransports.map((tt) => ({
-            id: tt.id,
-            name: tt.name,
-            type: tt.type,
-            cost: (tt.type === "air" || tt.type === "ground") ? n(tt.cost) : undefined,
-            originAddress: tt.type === "own_vehicle" ? tt.origin : undefined,
-            destinationAddress: tt.type === "own_vehicle" ? tt.destination : undefined,
-            distanceKm: tt.type === "own_vehicle" ? (Number(tt.distanceKm) || 0) : undefined,
-            fuelCost: tt.type === "own_vehicle" ? n(tt.fuelCost) : undefined,
-            tollCost: tt.type === "own_vehicle" ? n(tt.tollCost) : undefined,
-            roundTrip: tt.roundTrip,
-            memberIds: tt.memberIds,
-          })) : [],
-        },
-        extraCosts: form.extraCosts.filter((c) => c.name && n(c.value) > 0).map((c) => ({ name: c.name, value: n(c.value) })),
-        equipmentCostPerJob: snapshot.equipmentCostPerJob,
-        softwareMonthlyCost: snapshot.softwareMonthlyCost,
-        infrastructureMonthlyCost: snapshot.infrastructureMonthlyCost,
-        grandTotal: totals.grand,
-      };
       const res = editId
         ? await apiClient.put(`/budget-quotes/${editId}`, payload)
         : await apiClient.post("/budget-quotes", payload);
+      dirtyRef.current = false;
+      toast.success(editId ? "Orçamento atualizado." : "Orçamento salvo.", {
+        description: "Agora você pode enviar a proposta para o cliente ou gerar o contrato.",
+      });
       router.push(`/dashboard/calculadora-orcamento/orcamentos/${res.data.id}`);
-    } catch (e: any) {
-      const msg = e?.response?.data?.message ?? "Erro ao salvar orçamento.";
-      setError(Array.isArray(msg) ? msg.join(", ") : msg);
-    } finally {
+    } catch (e) {
+      if (isPlanApiError(e)) { setSaving(false); return; }
+      setError(apiErrorMessage(e, "Erro ao salvar orçamento."));
       setSaving(false);
     }
   }
@@ -720,20 +694,31 @@ function NovoOrcamentoInner() {
     );
   }
 
-  // ── Step rendering ─────────────────────────────────────────
+  function clearTeam() {
+    dirtyRef.current = true;
+    setForm((f) => ({
+      ...f,
+      staffMembers: [], teamAccommEntries: [], teamAccommGroups: [], hasTeamAccommodation: false,
+      hasTeamFood: false, teamFoodEntries: [], hasTeamTransport: false, teamTransports: [], myTransportPassengers: [],
+    }));
+    setStepError("");
+  }
 
   function renderStep() {
     switch (step) {
       case 0: return <StepEvento form={form} set={set} />;
       case 1: return <StepMaoDeObra form={form} set={set} />;
-      case 2: return <StepEquipe form={form} set={set} />;
-      case 3: return <StepHospedagemAlimentacao form={form} set={set} />;
-      case 4: return <StepTransporte form={form} set={set} calcLoading={calcLoading} calcError={calcError} onCalculate={handleCalculateRoute} googleReady={googleReady} roundTrip={form.transportRoundTrip} onRoundTripChange={(v) => set("transportRoundTrip", v)} />;
+      case 2: return <StepEquipe form={form} set={set} teamAllowed={teamAllowed} onClearTeam={clearTeam} />;
+      case 3: return <StepHospedagemAlimentacao form={form} set={set} teamAllowed={teamAllowed} />;
+      case 4: return <StepTransporte form={form} set={set} calcLoading={calcLoading} calcError={calcError} onCalculate={handleCalculateRoute} googleReady={googleReady} roundTrip={form.transportRoundTrip} onRoundTripChange={(v) => set("transportRoundTrip", v)} teamAllowed={teamAllowed} />;
       case 5: return <StepExtras form={form} set={set} />;
-      case 6: return <StepResumo form={form} snapshot={snapshot} totals={totals} error={error} saving={saving} onSave={handleSave} isEditing={!!editId} />;
+      case 6: return <StepPreco form={form} set={set} breakdown={breakdown} finalPrice={finalPrice} profit={profit} />;
+      case 7: return <StepResumo form={form} snapshot={snapshot} breakdown={breakdown} finalPrice={finalPrice} profit={profit} error={error} saving={saving} onSave={handleSave} isEditing={!!editId} teamAllowed={teamAllowed} onGoTo={goTo} />;
       default: return null;
     }
   }
+
+  const StepIcon = STEPS[step].icon;
 
   return (
     <div className="min-h-screen flex flex-col bg-background/50">
@@ -741,7 +726,6 @@ function NovoOrcamentoInner() {
       <main className="flex-1 py-10 px-4">
         <div className="container mx-auto max-w-3xl space-y-8">
           <ScrollReveal>
-            {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
               <Link href="/dashboard" className="hover:text-foreground transition-colors">Dashboard</Link>
               <ChevronRight className="h-3.5 w-3.5" />
@@ -750,48 +734,55 @@ function NovoOrcamentoInner() {
               <span className="text-foreground font-medium">{editId ? "Editar Orçamento" : "Novo Orçamento"}</span>
             </div>
 
-            {/* Hero */}
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow shrink-0">
-                <FileText className="h-6 w-6" />
+            <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow shrink-0">
+                  <FileText className="h-6 w-6" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold">{editId ? "Editar Orçamento" : "Novo Orçamento"}</h1>
+                  <p className="text-muted-foreground text-sm">{editId ? "Atualize os dados do orçamento." : "Calcule o custo, defina o preço e monte a proposta para o cliente."}</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold">{editId ? "Editar Orçamento" : "Novo Orçamento"}</h1>
-                <p className="text-muted-foreground text-sm">{editId ? "Atualize os dados do orçamento." : "Preencha os dados para calcular o custo total do evento."}</p>
+              {/* Totais sempre à vista */}
+              <div className="rounded-xl border bg-card px-4 py-2.5 text-right shrink-0">
+                <p className="text-[11px] text-muted-foreground">Custo {fmt(breakdown.total)}</p>
+                <p className="text-lg font-bold text-amber-500 leading-tight">{fmt(finalPrice)}</p>
+                <p className="text-[11px] text-muted-foreground">preço da proposta</p>
               </div>
             </div>
 
-            {/* Step indicator */}
-            <StepIndicator current={step} onNavigate={setStep} />
+            <StepIndicator current={step} onNavigate={goTo} />
 
-            {/* Step content */}
             <Card className="mt-6 border shadow-sm">
               <CardHeader className="pb-3 border-b">
                 <CardTitle className="text-base flex items-center gap-2">
-                  {(() => { const Icon = STEPS[step].icon; return <Icon className="h-4 w-4 text-amber-500" />; })()}
+                  <StepIcon className="h-4 w-4 text-amber-500" />
                   {STEPS[step].label}
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
                 {renderStep()}
+                {stepError && (
+                  <div className="mt-5 flex items-start gap-2 text-sm text-destructive bg-destructive/10 rounded-lg p-3">
+                    <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><p>{stepError}</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* Navigation */}
             <div className="flex items-center justify-between pt-2">
               {step > 0 ? (
-                <Button variant="outline" onClick={() => setStep((s) => s - 1)} className="gap-2">
+                <Button variant="outline" onClick={() => goTo(step - 1)} className="gap-2">
                   <ArrowLeft className="h-4 w-4" /> Anterior
                 </Button>
               ) : (
-                <Link href="/dashboard/calculadora-orcamento">
-                  <Button variant="outline" className="gap-2">
-                    <ArrowLeft className="h-4 w-4" /> Cancelar
-                  </Button>
+                <Link href={editId ? `/dashboard/calculadora-orcamento/orcamentos/${editId}` : "/dashboard/calculadora-orcamento"}>
+                  <Button variant="outline" className="gap-2"><ArrowLeft className="h-4 w-4" /> Cancelar</Button>
                 </Link>
               )}
               {step < STEPS.length - 1 ? (
-                <Button onClick={() => setStep((s) => s + 1)} className="gap-2 bg-amber-500 hover:bg-amber-600 text-white">
+                <Button onClick={() => goTo(step + 1)} className="gap-2 bg-amber-500 hover:bg-amber-600 text-white">
                   Próximo <ArrowRight className="h-4 w-4" />
                 </Button>
               ) : null}
@@ -818,19 +809,26 @@ function StepEvento({ form, set }: { form: FormState; set: any }) {
     <div className="space-y-5">
       <div className="space-y-1.5">
         <Label htmlFor="eventName">Nome do evento *</Label>
-        <Input id="eventName" placeholder="ex: Casamento Silva e Oliveira" value={form.eventName}
-          onChange={(e) => set("eventName", e.target.value)} />
+        <Input id="eventName" placeholder="ex: Casamento Silva e Oliveira" value={form.eventName} onChange={(e) => set("eventName", e.target.value)} />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="eventLocation">Local do evento</Label>
-        <Input id="eventLocation" placeholder="ex: São Paulo, SP" value={form.eventLocation}
-          onChange={(e) => set("eventLocation", e.target.value)} />
+        <Input id="eventLocation" placeholder="ex: São Paulo, SP" value={form.eventLocation} onChange={(e) => set("eventLocation", e.target.value)} />
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="eventDate">Data do evento</Label>
-        <Input id="eventDate" type="date" value={form.eventDate}
-          onChange={(e) => set("eventDate", e.target.value)} />
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="eventDate">Data do evento</Label>
+          <Input id="eventDate" type="date" value={form.eventDate} onChange={(e) => set("eventDate", e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="eventEndDate">Data final (eventos de vários dias)</Label>
+          <Input id="eventEndDate" type="date" value={form.eventEndDate} min={form.eventDate || undefined} disabled={!form.eventDate} onChange={(e) => set("eventEndDate", e.target.value)} />
+        </div>
       </div>
+      <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+        <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+        Com a data preenchida, a aprovação do cliente reserva o dia na sua agenda e o contrato assinado bloqueia de vez.
+      </p>
     </div>
   );
 }
@@ -842,8 +840,7 @@ function StepMaoDeObra({ form, set }: { form: FormState; set: any }) {
     <div className="space-y-5">
       <div className="space-y-1.5">
         <Label htmlFor="coverageHours">Minhas horas de cobertura *</Label>
-        <Input id="coverageHours" type="number" min="0.5" step="0.5" placeholder="8" value={form.coverageHours}
-          onChange={(e) => set("coverageHours", e.target.value)} />
+        <Input id="coverageHours" type="number" min="0.5" step="0.5" placeholder="8" value={form.coverageHours} onChange={(e) => set("coverageHours", e.target.value)} />
         <p className="text-xs text-muted-foreground">Quantas horas você ficará no evento.</p>
       </div>
 
@@ -857,23 +854,21 @@ function StepMaoDeObra({ form, set }: { form: FormState; set: any }) {
             </div>
           </div>
         </div>
-        <Input id="hourlyRate" inputMode="numeric" placeholder="0,00" value={form.hourlyRate}
-          onChange={(e) => set("hourlyRate", applyBRLMask(e.target.value))} />
+        <Input id="hourlyRate" inputMode="numeric" placeholder="0,00" value={form.hourlyRate} onChange={(e) => set("hourlyRate", applyBRLMask(e.target.value))} />
         <p className="text-xs text-muted-foreground">Apenas o custo da sua hora — equipamentos são calculados separadamente.</p>
       </div>
 
       {n(form.hourlyRate) > 0 && n(form.coverageHours) > 0 && (
         <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">{form.coverageHours}h × {n(form.hourlyRate).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
+          <span className="text-sm text-muted-foreground">{form.coverageHours}h × {fmt(n(form.hourlyRate))}</span>
           <span className="font-bold text-amber-500">{fmt(n(form.coverageHours) * n(form.hourlyRate))}</span>
         </div>
       )}
 
       <div className="space-y-1.5">
         <Label htmlFor="jobsPerMonth">Quantos trabalhos você realiza por mês (em média)?</Label>
-        <Input id="jobsPerMonth" type="number" min="1" step="1" placeholder="4" value={form.jobsPerMonth}
-          onChange={(e) => set("jobsPerMonth", e.target.value)} />
-        <p className="text-xs text-muted-foreground">Usado para dividir os custos mensais de software e infraestrutura por job.</p>
+        <Input id="jobsPerMonth" type="number" min="1" step="1" placeholder="4" value={form.jobsPerMonth} onChange={(e) => set("jobsPerMonth", e.target.value)} />
+        <p className="text-xs text-muted-foreground">Usado para dividir os custos mensais de software e infraestrutura por trabalho.</p>
       </div>
     </div>
   );
@@ -889,65 +884,41 @@ const ACCOM_TYPE_LABELS: Record<AccomGroup["type"], string> = {
 };
 
 function AccomGroupCard({ group, staffMembers, allGroups, onChange, onRemove, onToggleMember }: {
-  group: AccomGroup;
-  staffMembers: StaffMember[];
-  allGroups: AccomGroup[];
-  onChange: (patch: Partial<AccomGroup>) => void;
-  onRemove: () => void;
-  onToggleMember: (memberId: string) => void;
+  group: AccomGroup; staffMembers: StaffMember[]; allGroups: AccomGroup[];
+  onChange: (patch: Partial<AccomGroup>) => void; onRemove: () => void; onToggleMember: (memberId: string) => void;
 }) {
-  const assignedElsewhere = new Set(
-    allGroups.filter((g) => g.id !== group.id).flatMap((g) => g.memberIds)
-  );
+  const assignedElsewhere = new Set(allGroups.filter((g) => g.id !== group.id).flatMap((g) => g.memberIds));
   const isProperty = group.type === "property";
   const total = isProperty ? n(group.dailyRate) : n(group.dailyRate) * n(group.days);
 
   return (
     <div className="rounded-xl border border-violet-200 dark:border-violet-800 overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3 bg-violet-50 dark:bg-violet-900/20">
-        <Input
-          placeholder="Nome da acomodação (ex: Quarto 1, Casa Airbnb)"
-          value={group.name}
-          onChange={(e) => onChange({ name: e.target.value })}
-          className="h-8 text-sm border-violet-200 dark:border-violet-700 bg-white dark:bg-background flex-1"
-        />
-        <button type="button" onClick={onRemove} className="shrink-0 text-muted-foreground hover:text-destructive transition-colors">
-          <Trash2 className="h-4 w-4" />
-        </button>
+        <Input placeholder="Nome da acomodação (ex: Quarto 1, Casa Airbnb)" value={group.name} onChange={(e) => onChange({ name: e.target.value })}
+          className="h-8 text-sm border-violet-200 dark:border-violet-700 bg-white dark:bg-background flex-1" />
+        <button type="button" onClick={onRemove} className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"><Trash2 className="h-4 w-4" /></button>
       </div>
-
       <div className="p-4 space-y-4">
-        {/* Type */}
         <div className="grid grid-cols-2 gap-2">
           {(["single", "double", "triple", "property"] as const).map((t) => (
             <button key={t} type="button" onClick={() => onChange({ type: t })}
-              className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition-all ${
-                group.type === t
-                  ? "border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400"
-                  : "border-border text-muted-foreground hover:border-violet-300"
-              }`}>
+              className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition-all ${group.type === t ? "border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400" : "border-border text-muted-foreground hover:border-violet-300"}`}>
               {ACCOM_TYPE_LABELS[t]}
             </button>
           ))}
         </div>
-
-        {/* Rate + days */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label className="text-xs">{isProperty ? "Valor total (R$)" : "Valor da diária (R$)"}</Label>
-            <Input inputMode="numeric" placeholder="0,00"
-              value={group.dailyRate} onChange={(e) => onChange({ dailyRate: applyBRLMask(e.target.value) })} />
+            <Input inputMode="numeric" placeholder="0,00" value={group.dailyRate} onChange={(e) => onChange({ dailyRate: applyBRLMask(e.target.value) })} />
           </div>
           {!isProperty && (
             <div className="space-y-1">
               <Label className="text-xs">Qtd. de diárias</Label>
-              <Input type="number" min="1" step="1" placeholder="1"
-                value={group.days} onChange={(e) => onChange({ days: e.target.value })} />
+              <Input type="number" min="1" step="1" placeholder="1" value={group.days} onChange={(e) => onChange({ days: e.target.value })} />
             </div>
           )}
         </div>
-
-        {/* Member assignment */}
         {staffMembers.length > 0 && (
           <div className="space-y-2">
             <Label className="text-xs font-medium">Membros nesta acomodação</Label>
@@ -957,16 +928,8 @@ function AccomGroupCard({ group, staffMembers, allGroups, onChange, onRemove, on
                 const blocked = !isHere && assignedElsewhere.has(m.id);
                 return (
                   <button key={m.id} type="button" disabled={blocked} onClick={() => onToggleMember(m.id)}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all text-left ${
-                      isHere
-                        ? "border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300"
-                        : blocked
-                          ? "border-border bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
-                          : "border-border hover:border-violet-300"
-                    }`}>
-                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                      isHere ? "bg-violet-500 border-violet-500" : "border-muted-foreground"
-                    }`}>
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all text-left ${isHere ? "border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300" : blocked ? "border-border bg-muted text-muted-foreground opacity-50 cursor-not-allowed" : "border-border hover:border-violet-300"}`}>
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isHere ? "bg-violet-500 border-violet-500" : "border-muted-foreground"}`}>
                       {isHere && <Check className="h-2.5 w-2.5 text-white" />}
                     </div>
                     <span>{m.name || "Profissional sem nome"}</span>
@@ -977,14 +940,9 @@ function AccomGroupCard({ group, staffMembers, allGroups, onChange, onRemove, on
             </div>
           </div>
         )}
-
         {n(group.dailyRate) > 0 && (
           <div className="rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 px-3 py-2 flex justify-between text-sm">
-            <span className="text-muted-foreground">
-              {isProperty
-                ? `Imóvel (${group.memberIds.length} membro(s))`
-                : `${fmt(n(group.dailyRate))} × ${group.days} diária(s)`}
-            </span>
+            <span className="text-muted-foreground">{isProperty ? `Imóvel (${group.memberIds.length} membro(s))` : `${fmt(n(group.dailyRate))} × ${group.days} diária(s)`}</span>
             <span className="font-bold text-violet-600">{fmt(total)}</span>
           </div>
         )}
@@ -995,42 +953,27 @@ function AccomGroupCard({ group, staffMembers, allGroups, onChange, onRemove, on
 
 // ── Step 3: Hospedagem & Alimentação ───────────────────────────
 
-function StepHospedagemAlimentacao({ form, set }: { form: FormState; set: any }) {
-  const hasTeam = form.staffMembers.length > 0;
+function StepHospedagemAlimentacao({ form, set, teamAllowed }: { form: FormState; set: any; teamAllowed: boolean }) {
+  const hasTeam = teamAllowed && form.staffMembers.length > 0;
 
   function getAccommEntry(memberId: string) {
     return form.teamAccommEntries.find((e) => e.memberId === memberId) ?? { memberId, dailyRate: "", days: "1" };
   }
   function setAccommEntry(memberId: string, patch: Partial<{ dailyRate: string; days: string }>) {
     const exists = form.teamAccommEntries.find((e) => e.memberId === memberId);
-    if (exists) {
-      set("teamAccommEntries", form.teamAccommEntries.map((e) => e.memberId === memberId ? { ...e, ...patch } : e));
-    } else {
-      set("teamAccommEntries", [...form.teamAccommEntries, { memberId, dailyRate: "", days: "1", ...patch }]);
-    }
+    if (exists) set("teamAccommEntries", form.teamAccommEntries.map((e) => e.memberId === memberId ? { ...e, ...patch } : e));
+    else set("teamAccommEntries", [...form.teamAccommEntries, { memberId, dailyRate: "", days: "1", ...patch }]);
   }
-
   function getFoodEntry(memberId: string) {
     return form.teamFoodEntries.find((e) => e.memberId === memberId) ?? { memberId, costPerMeal: "", meals: "2" };
   }
   function setFoodEntry(memberId: string, patch: Partial<{ costPerMeal: string; meals: string }>) {
     const exists = form.teamFoodEntries.find((e) => e.memberId === memberId);
-    if (exists) {
-      set("teamFoodEntries", form.teamFoodEntries.map((e) => e.memberId === memberId ? { ...e, ...patch } : e));
-    } else {
-      set("teamFoodEntries", [...form.teamFoodEntries, { memberId, costPerMeal: "", meals: "2", ...patch }]);
-    }
+    if (exists) set("teamFoodEntries", form.teamFoodEntries.map((e) => e.memberId === memberId ? { ...e, ...patch } : e));
+    else set("teamFoodEntries", [...form.teamFoodEntries, { memberId, costPerMeal: "", meals: "2", ...patch }]);
   }
-
   function addAccomGroup() {
-    set("teamAccommGroups", [...form.teamAccommGroups, {
-      id: Math.random().toString(36).slice(2),
-      name: "",
-      type: "double" as const,
-      dailyRate: "",
-      days: "1",
-      memberIds: [],
-    }]);
+    set("teamAccommGroups", [...form.teamAccommGroups, { id: Math.random().toString(36).slice(2), name: "", type: "double" as const, dailyRate: "", days: "1", memberIds: [] }]);
   }
   function updateAccomGroup(id: string, patch: Partial<AccomGroup>) {
     set("teamAccommGroups", form.teamAccommGroups.map((g) => g.id === id ? { ...g, ...patch } : g));
@@ -1041,38 +984,28 @@ function StepHospedagemAlimentacao({ form, set }: { form: FormState; set: any })
   function toggleMemberInGroup(groupId: string, memberId: string) {
     const group = form.teamAccommGroups.find((g) => g.id === groupId);
     if (!group) return;
-    const memberIds = group.memberIds.includes(memberId)
-      ? group.memberIds.filter((id) => id !== memberId)
-      : [...group.memberIds, memberId];
+    const memberIds = group.memberIds.includes(memberId) ? group.memberIds.filter((id) => id !== memberId) : [...group.memberIds, memberId];
     updateAccomGroup(groupId, { memberIds });
   }
 
   return (
     <div className="space-y-8">
-
-      {/* ── Minha hospedagem ── */}
+      {/* Minha hospedagem */}
       <section className="space-y-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-            <Hotel className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-base font-semibold">Minha hospedagem</p>
-            <p className="text-xs text-muted-foreground">Acomodação pessoal</p>
-          </div>
+          <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center"><Hotel className="h-4 w-4" /></div>
+          <div><p className="text-base font-semibold">Minha hospedagem</p><p className="text-xs text-muted-foreground">Acomodação pessoal</p></div>
         </div>
         <Toggle value={form.hasAccommodation} onChange={(v) => set("hasAccommodation", v)} />
         {form.hasAccommodation && (
           <div className="grid grid-cols-2 gap-4 pl-4 border-l-2 border-blue-200 dark:border-blue-800">
             <div className="space-y-1.5">
               <Label htmlFor="accDailyRate">Valor da diária (R$)</Label>
-              <Input id="accDailyRate" inputMode="numeric" placeholder="0,00"
-                value={form.accommodationDailyRate} onChange={(e) => set("accommodationDailyRate", applyBRLMask(e.target.value))} />
+              <Input id="accDailyRate" inputMode="numeric" placeholder="0,00" value={form.accommodationDailyRate} onChange={(e) => set("accommodationDailyRate", applyBRLMask(e.target.value))} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="accDays">Quantidade de diárias</Label>
-              <Input id="accDays" type="number" min="1" step="1" placeholder="1"
-                value={form.accommodationDays} onChange={(e) => set("accommodationDays", e.target.value)} />
+              <Input id="accDays" type="number" min="1" step="1" placeholder="1" value={form.accommodationDays} onChange={(e) => set("accommodationDays", e.target.value)} />
             </div>
             {n(form.accommodationDailyRate) > 0 && (
               <div className="col-span-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 px-3 py-2 flex justify-between items-center text-sm">
@@ -1084,43 +1017,27 @@ function StepHospedagemAlimentacao({ form, set }: { form: FormState; set: any })
         )}
       </section>
 
-      {/* ── Hospedagem da equipe ── */}
+      {/* Hospedagem da equipe */}
       {hasTeam && (
         <>
           <div className="border-t border-border" />
           <section className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 flex items-center justify-center">
-                <Users className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="text-base font-semibold">Hospedagem da equipe</p>
-                <p className="text-xs text-muted-foreground">{form.staffMembers.length} profissional(is)</p>
-              </div>
+              <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 flex items-center justify-center"><Users className="h-4 w-4" /></div>
+              <div><p className="text-base font-semibold">Hospedagem da equipe</p><p className="text-xs text-muted-foreground">{form.staffMembers.length} profissional(is)</p></div>
             </div>
             <Toggle value={form.hasTeamAccommodation} onChange={(v) => set("hasTeamAccommodation", v)} />
-
             {form.hasTeamAccommodation && (
               <div className="space-y-4">
-                {/* Mode selector */}
                 <div className="grid grid-cols-2 gap-3">
-                  {([
-                    { value: "individual", label: "Individual", desc: "Cada um na sua acomodação" },
-                    { value: "grouped", label: "Agrupar", desc: "Quartos ou imóvel compartilhado" },
-                  ] as const).map((mode) => (
+                  {([{ value: "individual", label: "Individual", desc: "Cada um na sua acomodação" }, { value: "grouped", label: "Agrupar", desc: "Quartos ou imóvel compartilhado" }] as const).map((mode) => (
                     <button key={mode.value} type="button" onClick={() => set("teamAccommMode", mode.value)}
-                      className={`p-3 rounded-xl border text-left transition-all ${
-                        form.teamAccommMode === mode.value
-                          ? "border-violet-500 bg-violet-50 dark:bg-violet-900/20"
-                          : "border-border hover:border-violet-300"
-                      }`}>
+                      className={`p-3 rounded-xl border text-left transition-all ${form.teamAccommMode === mode.value ? "border-violet-500 bg-violet-50 dark:bg-violet-900/20" : "border-border hover:border-violet-300"}`}>
                       <p className="text-sm font-medium">{mode.label}</p>
                       <p className="text-xs text-muted-foreground">{mode.desc}</p>
                     </button>
                   ))}
                 </div>
-
-                {/* Individual */}
                 {form.teamAccommMode === "individual" && (
                   <div className="space-y-3">
                     {form.staffMembers.map((m) => {
@@ -1131,13 +1048,11 @@ function StepHospedagemAlimentacao({ form, set }: { form: FormState; set: any })
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1">
                               <Label className="text-xs">Valor da diária (R$)</Label>
-                              <Input inputMode="numeric" placeholder="0,00"
-                                value={entry.dailyRate} onChange={(e) => setAccommEntry(m.id, { dailyRate: applyBRLMask(e.target.value) })} />
+                              <Input inputMode="numeric" placeholder="0,00" value={entry.dailyRate} onChange={(e) => setAccommEntry(m.id, { dailyRate: applyBRLMask(e.target.value) })} />
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs">Qtd. de diárias</Label>
-                              <Input type="number" min="1" step="1" placeholder="1"
-                                value={entry.days} onChange={(e) => setAccommEntry(m.id, { days: e.target.value })} />
+                              <Input type="number" min="1" step="1" placeholder="1" value={entry.days} onChange={(e) => setAccommEntry(m.id, { days: e.target.value })} />
                             </div>
                           </div>
                           {n(entry.dailyRate) > 0 && (
@@ -1151,20 +1066,11 @@ function StepHospedagemAlimentacao({ form, set }: { form: FormState; set: any })
                     })}
                   </div>
                 )}
-
-                {/* Grouped */}
                 {form.teamAccommMode === "grouped" && (
                   <div className="space-y-3">
                     {form.teamAccommGroups.map((group) => (
-                      <AccomGroupCard
-                        key={group.id}
-                        group={group}
-                        staffMembers={form.staffMembers}
-                        allGroups={form.teamAccommGroups}
-                        onChange={(patch) => updateAccomGroup(group.id, patch)}
-                        onRemove={() => removeAccomGroup(group.id)}
-                        onToggleMember={(memberId) => toggleMemberInGroup(group.id, memberId)}
-                      />
+                      <AccomGroupCard key={group.id} group={group} staffMembers={form.staffMembers} allGroups={form.teamAccommGroups}
+                        onChange={(patch) => updateAccomGroup(group.id, patch)} onRemove={() => removeAccomGroup(group.id)} onToggleMember={(memberId) => toggleMemberInGroup(group.id, memberId)} />
                     ))}
                     <button type="button" onClick={addAccomGroup}
                       className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-violet-200 dark:border-violet-800 text-sm font-medium text-violet-600 hover:border-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all">
@@ -1180,29 +1086,22 @@ function StepHospedagemAlimentacao({ form, set }: { form: FormState; set: any })
 
       <div className="border-t border-border" />
 
-      {/* ── Minha alimentação ── */}
+      {/* Minha alimentação */}
       <section className="space-y-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center">
-            <Utensils className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-base font-semibold">Minha alimentação</p>
-            <p className="text-xs text-muted-foreground">Alimentação pessoal</p>
-          </div>
+          <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center"><Utensils className="h-4 w-4" /></div>
+          <div><p className="text-base font-semibold">Minha alimentação</p><p className="text-xs text-muted-foreground">Alimentação pessoal</p></div>
         </div>
         <Toggle value={form.hasFood} onChange={(v) => set("hasFood", v)} />
         {form.hasFood && (
           <div className="grid grid-cols-2 gap-4 pl-4 border-l-2 border-green-200 dark:border-green-800">
             <div className="space-y-1.5">
               <Label htmlFor="foodCost">Valor por refeição (R$)</Label>
-              <Input id="foodCost" inputMode="numeric" placeholder="0,00"
-                value={form.foodCostPerMeal} onChange={(e) => set("foodCostPerMeal", applyBRLMask(e.target.value))} />
+              <Input id="foodCost" inputMode="numeric" placeholder="0,00" value={form.foodCostPerMeal} onChange={(e) => set("foodCostPerMeal", applyBRLMask(e.target.value))} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="foodMeals">Quantidade de refeições</Label>
-              <Input id="foodMeals" type="number" min="1" step="1" placeholder="2"
-                value={form.foodMeals} onChange={(e) => set("foodMeals", e.target.value)} />
+              <Input id="foodMeals" type="number" min="1" step="1" placeholder="2" value={form.foodMeals} onChange={(e) => set("foodMeals", e.target.value)} />
             </div>
             {n(form.foodCostPerMeal) > 0 && (
               <div className="col-span-2 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 px-3 py-2 flex justify-between items-center text-sm">
@@ -1214,54 +1113,36 @@ function StepHospedagemAlimentacao({ form, set }: { form: FormState; set: any })
         )}
       </section>
 
-      {/* ── Alimentação da equipe ── */}
+      {/* Alimentação da equipe */}
       {hasTeam && (
         <>
           <div className="border-t border-border" />
           <section className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                <Utensils className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="text-base font-semibold">Alimentação da equipe</p>
-                <p className="text-xs text-muted-foreground">{form.staffMembers.length} profissional(is)</p>
-              </div>
+              <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center"><Utensils className="h-4 w-4" /></div>
+              <div><p className="text-base font-semibold">Alimentação da equipe</p><p className="text-xs text-muted-foreground">{form.staffMembers.length} profissional(is)</p></div>
             </div>
             <Toggle value={form.hasTeamFood} onChange={(v) => set("hasTeamFood", v)} />
-
             {form.hasTeamFood && (
               <div className="space-y-4">
-                {/* Mode selector */}
                 <div className="grid grid-cols-2 gap-3">
-                  {([
-                    { value: "same", label: "Igual para todos" },
-                    { value: "individual", label: "Individual" },
-                  ] as const).map((mode) => (
+                  {([{ value: "same", label: "Igual para todos" }, { value: "individual", label: "Individual" }] as const).map((mode) => (
                     <button key={mode.value} type="button" onClick={() => set("teamFoodMode", mode.value)}
-                      className={`py-2 rounded-xl border text-sm font-medium transition-all ${
-                        form.teamFoodMode === mode.value
-                          ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"
-                          : "border-border text-muted-foreground hover:border-amber-300"
-                      }`}>
+                      className={`py-2 rounded-xl border text-sm font-medium transition-all ${form.teamFoodMode === mode.value ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400" : "border-border text-muted-foreground hover:border-amber-300"}`}>
                       {mode.label}
                     </button>
                   ))}
                 </div>
-
-                {/* Same for all */}
                 {form.teamFoodMode === "same" && (
                   <div className="space-y-3 pl-4 border-l-2 border-amber-200 dark:border-amber-800">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label className="text-xs">Valor por refeição (R$)</Label>
-                        <Input inputMode="numeric" placeholder="0,00"
-                          value={form.teamFoodPerMeal} onChange={(e) => set("teamFoodPerMeal", applyBRLMask(e.target.value))} />
+                        <Input inputMode="numeric" placeholder="0,00" value={form.teamFoodPerMeal} onChange={(e) => set("teamFoodPerMeal", applyBRLMask(e.target.value))} />
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Qtd. de refeições</Label>
-                        <Input type="number" min="1" step="1" placeholder="2"
-                          value={form.teamFoodMeals} onChange={(e) => set("teamFoodMeals", e.target.value)} />
+                        <Input type="number" min="1" step="1" placeholder="2" value={form.teamFoodMeals} onChange={(e) => set("teamFoodMeals", e.target.value)} />
                       </div>
                     </div>
                     {n(form.teamFoodPerMeal) > 0 && (
@@ -1272,8 +1153,6 @@ function StepHospedagemAlimentacao({ form, set }: { form: FormState; set: any })
                     )}
                   </div>
                 )}
-
-                {/* Individual */}
                 {form.teamFoodMode === "individual" && (
                   <div className="space-y-3">
                     {form.staffMembers.map((m) => {
@@ -1284,13 +1163,11 @@ function StepHospedagemAlimentacao({ form, set }: { form: FormState; set: any })
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1">
                               <Label className="text-xs">Valor por refeição (R$)</Label>
-                              <Input inputMode="numeric" placeholder="0,00"
-                                value={entry.costPerMeal} onChange={(e) => setFoodEntry(m.id, { costPerMeal: applyBRLMask(e.target.value) })} />
+                              <Input inputMode="numeric" placeholder="0,00" value={entry.costPerMeal} onChange={(e) => setFoodEntry(m.id, { costPerMeal: applyBRLMask(e.target.value) })} />
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs">Qtd. de refeições</Label>
-                              <Input type="number" min="1" step="1" placeholder="2"
-                                value={entry.meals} onChange={(e) => setFoodEntry(m.id, { meals: e.target.value })} />
+                              <Input type="number" min="1" step="1" placeholder="2" value={entry.meals} onChange={(e) => setFoodEntry(m.id, { meals: e.target.value })} />
                             </div>
                           </div>
                           {n(entry.costPerMeal) > 0 && (
@@ -1313,9 +1190,9 @@ function StepHospedagemAlimentacao({ form, set }: { form: FormState; set: any })
   );
 }
 
-// ── Step 4: Equipe ─────────────────────────────────────────────
+// ── Step 4: Equipe (Pro+) ──────────────────────────────────────
 
-function StepEquipe({ form, set }: { form: FormState; set: any }) {
+function StepEquipe({ form, set, teamAllowed, onClearTeam }: { form: FormState; set: any; teamAllowed: boolean; onClearTeam: () => void }) {
   function updateMember(id: string, patch: Partial<StaffMember>) {
     set("staffMembers", form.staffMembers.map((m) => m.id === id ? { ...m, ...patch } : m));
   }
@@ -1326,24 +1203,46 @@ function StepEquipe({ form, set }: { form: FormState; set: any }) {
     set("staffMembers", [...form.staffMembers, newStaffMember()]);
   }
 
+  if (!teamAllowed) {
+    return (
+      <div className="space-y-4">
+        <PlanPaywall
+          feature="budgetTeamCosts"
+          title="Equipe adicional no orçamento"
+          description="Inclua assistentes, segundo fotógrafo, editor e outros profissionais no custo do trabalho — com hospedagem, alimentação e transporte de cada um."
+          bullets={[
+            "Mão de obra por membro (valor da hora × horas)",
+            "Hospedagem individual ou agrupada (quartos e imóveis)",
+            "Alimentação e transporte da equipe",
+            "Tudo entra no preço e nos itens da proposta",
+          ]}
+        />
+        {form.staffMembers.length > 0 && (
+          <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-900/10 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            <p className="text-sm flex-1">
+              Este orçamento tem <strong>{form.staffMembers.length} membro(s) de equipe</strong> de quando o recurso estava disponível. Para salvar no plano atual, remova a equipe.
+            </p>
+            <Button type="button" size="sm" variant="outline" onClick={onClearTeam} className="gap-2 shrink-0">
+              <Trash2 className="h-3.5 w-3.5" /> Remover equipe
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 flex items-center justify-center">
-          <Users className="h-4 w-4" />
-        </div>
-        <div>
-          <p className="text-base font-semibold">Equipe adicional</p>
-          <p className="text-xs text-muted-foreground">Adicione profissionais que participarão do evento.</p>
-        </div>
+        <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 flex items-center justify-center"><Users className="h-4 w-4" /></div>
+        <div><p className="text-base font-semibold">Equipe adicional</p><p className="text-xs text-muted-foreground">Adicione profissionais que participarão do evento.</p></div>
       </div>
 
       {form.staffMembers.length === 0 ? (
         <div className="rounded-xl border-2 border-dashed border-violet-200 dark:border-violet-800 p-6 text-center space-y-3">
           <Users className="h-8 w-8 text-violet-300 mx-auto" />
-          <p className="text-sm text-muted-foreground">Nenhum profissional adicional.</p>
-          <button type="button" onClick={addMember}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-violet-600 hover:text-violet-700 transition-colors">
+          <p className="text-sm text-muted-foreground">Nenhum profissional adicional. Você pode seguir sem equipe.</p>
+          <button type="button" onClick={addMember} className="inline-flex items-center gap-1.5 text-sm font-medium text-violet-600 hover:text-violet-700 transition-colors">
             <PlusCircle className="h-4 w-4" /> Adicionar profissional
           </button>
         </div>
@@ -1351,40 +1250,23 @@ function StepEquipe({ form, set }: { form: FormState; set: any }) {
         <div className="space-y-4">
           {form.staffMembers.map((m, idx) => (
             <div key={m.id} className="rounded-xl border border-violet-200 dark:border-violet-800 overflow-hidden">
-              {/* Card header */}
               <div className="flex items-center gap-3 px-4 py-3 bg-violet-50 dark:bg-violet-900/20">
-                <div className="w-6 h-6 rounded-full bg-violet-200 dark:bg-violet-800 text-violet-700 dark:text-violet-300 flex items-center justify-center text-xs font-bold shrink-0">
-                  {idx + 1}
-                </div>
-                <Input
-                  placeholder="Nome / função (ex: Assistente, Editor)"
-                  value={m.name}
-                  onChange={(e) => updateMember(m.id, { name: e.target.value })}
-                  className="h-8 text-sm border-violet-200 dark:border-violet-700 bg-white dark:bg-background"
-                />
-                <button type="button" onClick={() => removeMember(m.id)}
-                  className="shrink-0 text-muted-foreground hover:text-destructive transition-colors">
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <div className="w-6 h-6 rounded-full bg-violet-200 dark:bg-violet-800 text-violet-700 dark:text-violet-300 flex items-center justify-center text-xs font-bold shrink-0">{idx + 1}</div>
+                <Input placeholder="Nome / função (ex: Assistente, Editor)" value={m.name} onChange={(e) => updateMember(m.id, { name: e.target.value })}
+                  className="h-8 text-sm border-violet-200 dark:border-violet-700 bg-white dark:bg-background" />
+                <button type="button" onClick={() => removeMember(m.id)} className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"><Trash2 className="h-4 w-4" /></button>
               </div>
-
-              {/* Card body */}
               <div className="p-4 space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium">Valor da hora (R$)</Label>
-                    <Input inputMode="numeric" placeholder="0,00"
-                      value={m.hourlyRate}
-                      onChange={(e) => updateMember(m.id, { hourlyRate: applyBRLMask(e.target.value) })} />
+                    <Input inputMode="numeric" placeholder="0,00" value={m.hourlyRate} onChange={(e) => updateMember(m.id, { hourlyRate: applyBRLMask(e.target.value) })} />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium">Horas de cobertura</Label>
-                    <Input type="number" min="0.5" step="0.5" placeholder="8"
-                      value={m.coverageHours}
-                      onChange={(e) => updateMember(m.id, { coverageHours: e.target.value })} />
+                    <Input type="number" min="0.5" step="0.5" placeholder="8" value={m.coverageHours} onChange={(e) => updateMember(m.id, { coverageHours: e.target.value })} />
                   </div>
                 </div>
-
                 {n(m.hourlyRate) > 0 && n(m.coverageHours) > 0 && (
                   <div className="rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 px-3 py-2 flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">Mão de obra</span>
@@ -1394,7 +1276,6 @@ function StepEquipe({ form, set }: { form: FormState; set: any }) {
               </div>
             </div>
           ))}
-
           <button type="button" onClick={addMember}
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-violet-200 dark:border-violet-800 text-sm font-medium text-violet-600 hover:border-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all">
             <PlusCircle className="h-4 w-4" /> Adicionar profissional
@@ -1408,12 +1289,8 @@ function StepEquipe({ form, set }: { form: FormState; set: any }) {
 // ── TeamTransportCard ──────────────────────────────────────────
 
 function TeamTransportCard({ transport, staffMembers, allTransports, onChange, onRemove, googleReady }: {
-  transport: TeamTransport;
-  staffMembers: StaffMember[];
-  allTransports: TeamTransport[];
-  onChange: (patch: Partial<TeamTransport>) => void;
-  onRemove: () => void;
-  googleReady: boolean;
+  transport: TeamTransport; staffMembers: StaffMember[]; allTransports: TeamTransport[];
+  onChange: (patch: Partial<TeamTransport>) => void; onRemove: () => void; googleReady: boolean;
 }) {
   const [calcLoading, setCalcLoading] = useState(false);
   const [calcError, setCalcError] = useState("");
@@ -1428,33 +1305,19 @@ function TeamTransportCard({ transport, staffMembers, allTransports, onChange, o
     setCalcLoading(true); setCalcError("");
     try {
       const res = await apiClient.post("/budget-quotes/calculate-route", {
-        originAddress: transport.origin,
-        destinationAddress: transport.destination,
-        routeType: transport.routeType,
-        gasPricePerLiter: n(transport.gasPrice),
-        kmPerLiter: Number(transport.kmPerLiter) || 0,
-        axles: n(transport.axles),
+        originAddress: transport.origin, destinationAddress: transport.destination, routeType: transport.routeType,
+        gasPricePerLiter: n(transport.gasPrice), kmPerLiter: Number(transport.kmPerLiter) || 0, axles: n(transport.axles),
       });
       const data = res.data;
       if (!data.apiUsed) { setCalcError("API do Google Maps não configurada. Insira manualmente."); return; }
       if (!data.routeFound) { setCalcError("Rota não encontrada. Verifique os endereços."); return; }
-      onChange({
-        distanceKm: String(data.distanceKm),
-        durationMinutes: String(data.durationMinutes),
-        fuelCost: applyBRLMask(String(Math.round(data.fuelCost * 100))),
-        tollCost: applyBRLMask(String(Math.round(data.tollCost * 100))),
-        routeCalculated: true,
-      });
+      onChange({ distanceKm: String(data.distanceKm), durationMinutes: String(data.durationMinutes), fuelCost: toBRLMask(data.fuelCost), tollCost: toBRLMask(data.tollCost), routeCalculated: true });
     } catch (err) { if (!isPlanApiError(err)) setCalcError("Erro ao calcular rota. Insira os valores manualmente."); }
     finally { setCalcLoading(false); }
   }
 
-  const assignedElsewhere = new Set(
-    allTransports.filter((t) => t.id !== transport.id).flatMap((t) => t.memberIds)
-  );
-  const totalCost = transport.type === "own_vehicle"
-    ? (n(transport.fuelCost) + n(transport.tollCost)) * (transport.roundTrip ? 2 : 1)
-    : n(transport.cost);
+  const assignedElsewhere = new Set(allTransports.filter((t) => t.id !== transport.id).flatMap((t) => t.memberIds));
+  const totalCost = transport.type === "own_vehicle" ? (n(transport.fuelCost) + n(transport.tollCost)) * (transport.roundTrip ? 2 : 1) : n(transport.cost);
 
   const ttypes = [
     { value: "air", icon: <Plane className="h-4 w-4" />, label: "Aéreo" },
@@ -1465,78 +1328,58 @@ function TeamTransportCard({ transport, staffMembers, allTransports, onChange, o
   return (
     <div className="rounded-xl border border-amber-200 dark:border-amber-800 overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-900/20">
-        <Input
-          placeholder="Nome (ex: Van da equipe, Passagem Bea)"
-          value={transport.name}
-          onChange={(e) => onChange({ name: e.target.value })}
-          className="h-8 text-sm border-amber-200 dark:border-amber-700 bg-white dark:bg-background flex-1"
-        />
-        <button type="button" onClick={onRemove} className="shrink-0 text-muted-foreground hover:text-destructive transition-colors">
-          <Trash2 className="h-4 w-4" />
-        </button>
+        <Input placeholder="Nome (ex: Van da equipe, Passagem Bea)" value={transport.name} onChange={(e) => onChange({ name: e.target.value })}
+          className="h-8 text-sm border-amber-200 dark:border-amber-700 bg-white dark:bg-background flex-1" />
+        <button type="button" onClick={onRemove} className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"><Trash2 className="h-4 w-4" /></button>
       </div>
-
       <div className="p-4 space-y-4">
-        {/* Type selector */}
         <div className="grid grid-cols-3 gap-2">
           {ttypes.map((t) => (
             <button key={t.value} type="button" onClick={() => onChange({ type: t.value })}
-              className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-medium transition-all ${
-                transport.type === t.value
-                  ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"
-                  : "border-border text-muted-foreground hover:border-amber-300"
-              }`}>
+              className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-medium transition-all ${transport.type === t.value ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400" : "border-border text-muted-foreground hover:border-amber-300"}`}>
               {t.icon}{t.label}
             </button>
           ))}
         </div>
 
-        {/* Air / Ground: cost */}
         {(transport.type === "air" || transport.type === "ground") && (
           <div className="space-y-1.5 pl-3 border-l-2 border-amber-200 dark:border-amber-800">
             <Label className="text-xs">{transport.type === "air" ? "Valor da passagem (R$)" : "Valor do transporte (R$)"}</Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium pointer-events-none">R$</span>
-              <Input inputMode="numeric" placeholder="0,00" value={transport.cost}
-                onChange={(e) => onChange({ cost: applyBRLMask(e.target.value) })} className="pl-9" />
+              <Input inputMode="numeric" placeholder="0,00" value={transport.cost} onChange={(e) => onChange({ cost: applyBRLMask(e.target.value) })} className="pl-9" />
             </div>
             {n(transport.cost) > 0 && <p className="text-xs font-medium text-amber-600">{fmt(n(transport.cost))}</p>}
           </div>
         )}
 
-        {/* Own vehicle */}
         {transport.type === "own_vehicle" && (
           <div className="space-y-4 pl-3 border-l-2 border-amber-200 dark:border-amber-800">
             <div className="space-y-1">
               <Label className="text-xs">Endereço de partida</Label>
-              <AddressInput id={`tt-orig-${transport.id}`} placeholder="ex: Rua das Flores, 123, SP"
-                value={transport.origin} onChange={handleOriginChange} googleReady={googleReady} />
+              <AddressInput id={`tt-orig-${transport.id}`} placeholder="ex: Rua das Flores, 123, SP" value={transport.origin} onChange={handleOriginChange} googleReady={googleReady} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Endereço de chegada</Label>
-              <AddressInput id={`tt-dest-${transport.id}`} placeholder="ex: Rua da Saudade, 456, SP"
-                value={transport.destination} onChange={handleDestChange} googleReady={googleReady} />
+              <AddressInput id={`tt-dest-${transport.id}`} placeholder="ex: Rua da Saudade, 456, SP" value={transport.destination} onChange={handleDestChange} googleReady={googleReady} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs flex items-center gap-1"><Fuel className="h-3 w-3" /> Gasolina (R$/L)</Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium pointer-events-none">R$</span>
-                  <Input inputMode="numeric" placeholder="0,00" value={transport.gasPrice}
-                    onChange={(e) => onChange({ gasPrice: applyBRLMask(e.target.value) })} className="pl-9 h-9 text-sm" />
+                  <Input inputMode="numeric" placeholder="0,00" value={transport.gasPrice} onChange={(e) => onChange({ gasPrice: applyBRLMask(e.target.value) })} className="pl-9 h-9 text-sm" />
                 </div>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">KM por litro</Label>
-                <Input type="number" min="1" step="0.1" placeholder="ex: 12" value={transport.kmPerLiter}
-                  onChange={(e) => onChange({ kmPerLiter: e.target.value })} className="h-9 text-sm" />
+                <Input type="number" min="1" step="0.1" placeholder="ex: 12" value={transport.kmPerLiter} onChange={(e) => onChange({ kmPerLiter: e.target.value })} className="h-9 text-sm" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Eixos do veículo</Label>
-                <select value={transport.axles} onChange={(e) => onChange({ axles: e.target.value })}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm">
+                <select value={transport.axles} onChange={(e) => onChange({ axles: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm">
                   <option value="2">2 eixos (carro)</option>
                   <option value="3">3 eixos (van)</option>
                   <option value="4">4 eixos</option>
@@ -1548,9 +1391,7 @@ function TeamTransportCard({ transport, staffMembers, allTransports, onChange, o
                 <div className="grid grid-cols-2 gap-1.5">
                   {(["fastest", "shortest"] as const).map((rt) => (
                     <button key={rt} type="button" onClick={() => onChange({ routeType: rt })}
-                      className={`py-1.5 rounded-lg border text-xs font-medium transition-all ${
-                        transport.routeType === rt ? "border-amber-500 bg-amber-50 text-amber-600 dark:bg-amber-900/20" : "border-border text-muted-foreground hover:border-amber-300"
-                      }`}>
+                      className={`py-1.5 rounded-lg border text-xs font-medium transition-all ${transport.routeType === rt ? "border-amber-500 bg-amber-50 text-amber-600 dark:bg-amber-900/20" : "border-border text-muted-foreground hover:border-amber-300"}`}>
                       {rt === "fastest" ? "Rápida" : "Curta"}
                     </button>
                   ))}
@@ -1559,26 +1400,18 @@ function TeamTransportCard({ transport, staffMembers, allTransports, onChange, o
             </div>
             <label className="flex items-center gap-2 cursor-pointer select-none group">
               <div onClick={() => onChange({ roundTrip: !transport.roundTrip })}
-                className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
-                  transport.roundTrip ? "bg-amber-500 border-amber-500" : "border-border bg-background group-hover:border-amber-400"
-                }`}>
+                className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all ${transport.roundTrip ? "bg-amber-500 border-amber-500" : "border-border bg-background group-hover:border-amber-400"}`}>
                 {transport.roundTrip && <Check className="h-2.5 w-2.5 text-white" />}
               </div>
               <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">Calcular volta <span className="opacity-70">(×2)</span></span>
             </label>
             <Button type="button" onClick={handleCalculateRoute} disabled={calcLoading}
               className={`w-full gap-2 text-white h-9 text-sm ${transport.routeCalculated ? "bg-amber-600 hover:bg-amber-700" : "bg-amber-500 hover:bg-amber-600"}`}>
-              {calcLoading
-                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Calculando...</>
-                : transport.routeCalculated
-                ? <><MapPin className="h-3.5 w-3.5" /> Recalcular Rota</>
-                : <><MapPin className="h-3.5 w-3.5" /> Calcular Rota</>}
+              {calcLoading ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Calculando...</> : transport.routeCalculated ? <><MapPin className="h-3.5 w-3.5" /> Recalcular Rota</> : <><MapPin className="h-3.5 w-3.5" /> Calcular Rota</>}
             </Button>
             <p className="text-[11px] text-muted-foreground text-center">{routeLimitHint(routeLimit)}</p>
             {calcError && (
-              <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/10 rounded-lg p-2.5">
-                <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" /><p>{calcError}</p>
-              </div>
+              <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/10 rounded-lg p-2.5"><AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" /><p>{calcError}</p></div>
             )}
             <div className="space-y-2.5 pt-1">
               <p className="text-xs text-muted-foreground font-medium">Ou insira manualmente:</p>
@@ -1588,17 +1421,15 @@ function TeamTransportCard({ transport, staffMembers, allTransports, onChange, o
                   <Input type="number" min="0" step="0.1" placeholder="ex: 120" value={transport.distanceKm}
                     onChange={(e) => {
                       const km = e.target.value;
-                      const fuel = n(transport.gasPrice) > 0 && Number(transport.kmPerLiter) > 0
-                        ? (parseFloat(km) / Number(transport.kmPerLiter)) * n(transport.gasPrice) : 0;
-                      onChange({ distanceKm: km, ...(fuel > 0 ? { fuelCost: applyBRLMask(String(Math.round(fuel * 100))) } : {}) });
+                      const fuel = n(transport.gasPrice) > 0 && Number(transport.kmPerLiter) > 0 ? (parseFloat(km) / Number(transport.kmPerLiter)) * n(transport.gasPrice) : 0;
+                      onChange({ distanceKm: km, ...(fuel > 0 ? { fuelCost: toBRLMask(fuel) } : {}) });
                     }} className="h-9 text-sm" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Pedágios (R$)</Label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium pointer-events-none">R$</span>
-                    <Input inputMode="numeric" placeholder="0,00" value={transport.tollCost}
-                      onChange={(e) => onChange({ tollCost: applyBRLMask(e.target.value) })} className="pl-9 h-9 text-sm" />
+                    <Input inputMode="numeric" placeholder="0,00" value={transport.tollCost} onChange={(e) => onChange({ tollCost: applyBRLMask(e.target.value) })} className="pl-9 h-9 text-sm" />
                   </div>
                 </div>
               </div>
@@ -1606,51 +1437,32 @@ function TeamTransportCard({ transport, staffMembers, allTransports, onChange, o
                 <Label className="text-xs">Combustível (R$)</Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium pointer-events-none">R$</span>
-                  <Input inputMode="numeric" placeholder="0,00" value={transport.fuelCost}
-                    onChange={(e) => onChange({ fuelCost: applyBRLMask(e.target.value) })} className="pl-9 h-9 text-sm" />
+                  <Input inputMode="numeric" placeholder="0,00" value={transport.fuelCost} onChange={(e) => onChange({ fuelCost: applyBRLMask(e.target.value) })} className="pl-9 h-9 text-sm" />
                 </div>
               </div>
             </div>
             {(n(transport.fuelCost) + n(transport.tollCost)) > 0 && (
               <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 space-y-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Combustível{transport.roundTrip ? " (ida)" : ""}</span><span>{fmt(n(transport.fuelCost))}</span>
-                </div>
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Pedágios{transport.roundTrip ? " (ida)" : ""}</span><span>{fmt(n(transport.tollCost))}</span>
-                </div>
-                {transport.roundTrip && (
-                  <div className="flex justify-between text-xs text-amber-600 font-medium pt-0.5">
-                    <span>Subtotal ida e volta (×2)</span><span>{fmt((n(transport.fuelCost) + n(transport.tollCost)) * 2)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-sm font-bold pt-1 border-t border-amber-200 dark:border-amber-800">
-                  <span>Total</span><span className="text-amber-600">{fmt(totalCost)}</span>
-                </div>
+                <div className="flex justify-between text-xs text-muted-foreground"><span>Combustível{transport.roundTrip ? " (ida)" : ""}</span><span>{fmt(n(transport.fuelCost))}</span></div>
+                <div className="flex justify-between text-xs text-muted-foreground"><span>Pedágios{transport.roundTrip ? " (ida)" : ""}</span><span>{fmt(n(transport.tollCost))}</span></div>
+                {transport.roundTrip && <div className="flex justify-between text-xs text-amber-600 font-medium pt-0.5"><span>Subtotal ida e volta (×2)</span><span>{fmt((n(transport.fuelCost) + n(transport.tollCost)) * 2)}</span></div>}
+                <div className="flex justify-between text-sm font-bold pt-1 border-t border-amber-200 dark:border-amber-800"><span>Total</span><span className="text-amber-600">{fmt(totalCost)}</span></div>
               </div>
             )}
           </div>
         )}
 
-        {/* Member assignment */}
         {staffMembers.length > 0 && (
           <div className="space-y-2 pt-1">
-            <Label className="text-xs font-medium flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5" /> Membros neste transporte
-            </Label>
+            <Label className="text-xs font-medium flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> Membros neste transporte</Label>
             <div className="space-y-1.5">
               {staffMembers.map((m) => {
                 const isHere = transport.memberIds.includes(m.id);
                 const elsewhere = !isHere && assignedElsewhere.has(m.id);
                 return (
-                  <button key={m.id} type="button"
-                    onClick={() => onChange({ memberIds: isHere ? transport.memberIds.filter((id) => id !== m.id) : [...transport.memberIds, m.id] })}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-sm text-left transition-all ${
-                      isHere ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300" : "border-border hover:border-amber-300"
-                    }`}>
-                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isHere ? "bg-amber-500 border-amber-500" : "border-muted-foreground"}`}>
-                      {isHere && <Check className="h-2.5 w-2.5 text-white" />}
-                    </div>
+                  <button key={m.id} type="button" onClick={() => onChange({ memberIds: isHere ? transport.memberIds.filter((id) => id !== m.id) : [...transport.memberIds, m.id] })}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-sm text-left transition-all ${isHere ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300" : "border-border hover:border-amber-300"}`}>
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isHere ? "bg-amber-500 border-amber-500" : "border-muted-foreground"}`}>{isHere && <Check className="h-2.5 w-2.5 text-white" />}</div>
                     <span>{m.name || "Profissional sem nome"}</span>
                     {elsewhere && <span className="ml-auto text-xs text-muted-foreground">Já em outro transporte</span>}
                   </button>
@@ -1666,13 +1478,12 @@ function TeamTransportCard({ transport, staffMembers, allTransports, onChange, o
 
 // ── Step 5: Transporte ─────────────────────────────────────────
 
-function StepTransporte({ form, set, calcLoading, calcError, onCalculate, googleReady, roundTrip, onRoundTripChange }: {
-  form: FormState; set: any; calcLoading: boolean; calcError: string;
-  onCalculate: () => void; googleReady: boolean;
-  roundTrip: boolean; onRoundTripChange: (v: boolean) => void;
+function StepTransporte({ form, set, calcLoading, calcError, onCalculate, googleReady, roundTrip, onRoundTripChange, teamAllowed }: {
+  form: FormState; set: any; calcLoading: boolean; calcError: string; onCalculate: () => void; googleReady: boolean;
+  roundTrip: boolean; onRoundTripChange: (v: boolean) => void; teamAllowed: boolean;
 }) {
   const routeLimit = usePlan().limitOf("routeCalculationsPerMonth");
-  const hasTeam = form.staffMembers.length > 0;
+  const hasTeam = teamAllowed && form.staffMembers.length > 0;
 
   const types = [
     { value: "none", icon: <MapPin className="h-5 w-5" />, label: "Sem transporte" },
@@ -1685,109 +1496,82 @@ function StepTransporte({ form, set, calcLoading, calcError, onCalculate, google
   const handleDestChange = useCallback((v: string) => set("transportDestination", v), [set]);
 
   function addTeamTransport() { set("teamTransports", [...form.teamTransports, newTeamTransport()]); }
-  function updateTeamTransport(id: string, patch: Partial<TeamTransport>) {
-    set("teamTransports", form.teamTransports.map((t) => t.id === id ? { ...t, ...patch } : t));
-  }
-  function removeTeamTransport(id: string) {
-    set("teamTransports", form.teamTransports.filter((t) => t.id !== id));
-  }
-
+  function updateTeamTransport(id: string, patch: Partial<TeamTransport>) { set("teamTransports", form.teamTransports.map((t) => t.id === id ? { ...t, ...patch } : t)); }
+  function removeTeamTransport(id: string) { set("teamTransports", form.teamTransports.filter((t) => t.id !== id)); }
   function toggleMyPassenger(memberId: string) {
     const current = form.myTransportPassengers;
-    set("myTransportPassengers", current.includes(memberId)
-      ? current.filter((id) => id !== memberId)
-      : [...current, memberId]);
+    set("myTransportPassengers", current.includes(memberId) ? current.filter((id) => id !== memberId) : [...current, memberId]);
   }
 
   return (
     <div className="space-y-8">
-
-      {/* ── Meu transporte ── */}
       <section className="space-y-5">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-            <Truck className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-base font-semibold">Meu transporte</p>
-            <p className="text-xs text-muted-foreground">Deslocamento pessoal até o evento</p>
-          </div>
+          <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center"><Truck className="h-4 w-4" /></div>
+          <div><p className="text-base font-semibold">Meu transporte</p><p className="text-xs text-muted-foreground">Deslocamento pessoal até o evento</p></div>
         </div>
 
-        {/* Type selector */}
         <div className="grid grid-cols-2 gap-3">
           {types.map((t) => (
             <button key={t.value} type="button" onClick={() => set("transportType", t.value)}
-              className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-sm font-medium transition-all ${
-                form.transportType === t.value
-                  ? "border-amber-500 bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400"
-                  : "border-border text-muted-foreground hover:border-amber-300"
-              }`}>
+              className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-sm font-medium transition-all ${form.transportType === t.value ? "border-amber-500 bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400" : "border-border text-muted-foreground hover:border-amber-300"}`}>
               {t.icon}{t.label}
             </button>
           ))}
         </div>
 
-        {/* Air or ground */}
         {(form.transportType === "air" || form.transportType === "ground") && (
           <div className="space-y-1.5 pl-4 border-l-2 border-amber-200 dark:border-amber-800">
-            <Label htmlFor="transportCost">{form.transportType === "air" ? "Valor da passagem aérea (R$)" : "Valor do transporte (R$)"}</Label>
+            <Label htmlFor="transportCost">{form.transportType === "air" ? "Valor da passagem aérea (R$) — ida e volta" : "Valor do transporte (R$) — ida e volta"}</Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium pointer-events-none">R$</span>
-              <Input id="transportCost" inputMode="numeric" placeholder="0,00" value={form.transportCost}
-                onChange={(e) => set("transportCost", applyBRLMask(e.target.value))} className="pl-9" />
+              <Input id="transportCost" inputMode="numeric" placeholder="0,00" value={form.transportCost} onChange={(e) => set("transportCost", applyBRLMask(e.target.value))} className="pl-9" />
             </div>
+            <p className="text-xs text-muted-foreground">Informe o valor total do trajeto (se houver volta, some as duas passagens).</p>
             {n(form.transportCost) > 0 && <p className="text-xs font-medium text-amber-600">{fmt(n(form.transportCost))}</p>}
           </div>
         )}
 
-        {/* Own vehicle */}
         {form.transportType === "own_vehicle" && (
           <div className="space-y-5 pl-4 border-l-2 border-amber-200 dark:border-amber-800">
             <div className="space-y-1.5">
               <Label htmlFor="origin">Endereço de partida</Label>
-              <AddressInput id="origin" placeholder="ex: Rua das Flores, 123, São Paulo, SP"
-                value={form.transportOrigin} onChange={handleOriginChange} googleReady={googleReady} />
+              <AddressInput id="origin" placeholder="ex: Rua das Flores, 123, São Paulo, SP" value={form.transportOrigin} onChange={handleOriginChange} googleReady={googleReady} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="dest">Endereço de chegada</Label>
-              <AddressInput id="dest" placeholder="ex: Rua da Saudade, 456, Campinas, SP"
-                value={form.transportDestination} onChange={handleDestChange} googleReady={googleReady} />
+              <AddressInput id="dest" placeholder="ex: Rua da Saudade, 456, Campinas, SP" value={form.transportDestination} onChange={handleDestChange} googleReady={googleReady} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="gasPrice"><div className="flex items-center gap-1.5"><Fuel className="h-3.5 w-3.5" /> Gasolina (R$/litro)</div></Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium pointer-events-none">R$</span>
-                  <Input id="gasPrice" inputMode="numeric" placeholder="0,00" value={form.transportGasPrice}
-                    onChange={(e) => set("transportGasPrice", applyBRLMask(e.target.value))} className="pl-9" />
+                  <Input id="gasPrice" inputMode="numeric" placeholder="0,00" value={form.transportGasPrice} onChange={(e) => set("transportGasPrice", applyBRLMask(e.target.value))} className="pl-9" />
                 </div>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="kmPerL">KM por litro do veículo</Label>
-                <Input id="kmPerL" type="number" min="1" step="0.1" placeholder="ex: 12"
-                  value={form.transportKmPerLiter} onChange={(e) => set("transportKmPerLiter", e.target.value)} />
+                <Input id="kmPerL" type="number" min="1" step="0.1" placeholder="ex: 12" value={form.transportKmPerLiter} onChange={(e) => set("transportKmPerLiter", e.target.value)} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="axles">Número de eixos</Label>
-                <select id="axles" value={form.transportAxles} onChange={(e) => set("transportAxles", e.target.value)}
-                  className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                <select id="axles" value={form.transportAxles} onChange={(e) => set("transportAxles", e.target.value)} className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
                   <option value="2">2 eixos (carro passeio)</option>
                   <option value="3">3 eixos (van / pick-up)</option>
                   <option value="4">4 eixos</option>
                   <option value="5">5 eixos</option>
                 </select>
+                <p className="text-[11px] text-muted-foreground">Pedágio estimado por eixo (múltiplos da tarifa de carro).</p>
               </div>
               <div className="space-y-1.5">
                 <Label>Preferência de rota</Label>
                 <div className="grid grid-cols-2 gap-2">
                   {(["fastest", "shortest"] as const).map((rt) => (
                     <button key={rt} type="button" onClick={() => set("transportRouteType", rt)}
-                      className={`py-2 rounded-lg border text-xs font-medium transition-all ${
-                        form.transportRouteType === rt ? "border-amber-500 bg-amber-50 text-amber-600 dark:bg-amber-900/20" : "border-border text-muted-foreground hover:border-amber-300"
-                      }`}>
+                      className={`py-2 rounded-lg border text-xs font-medium transition-all ${form.transportRouteType === rt ? "border-amber-500 bg-amber-50 text-amber-600 dark:bg-amber-900/20" : "border-border text-muted-foreground hover:border-amber-300"}`}>
                       {rt === "fastest" ? "Mais rápida" : "Mais curta"}
                     </button>
                   ))}
@@ -1799,44 +1583,34 @@ function StepTransporte({ form, set, calcLoading, calcError, onCalculate, google
                 className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all ${roundTrip ? "bg-amber-500 border-amber-500" : "border-border bg-background group-hover:border-amber-400"}`}>
                 {roundTrip && <Check className="h-3 w-3 text-white" />}
               </div>
-              <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                Calcular volta <span className="text-xs">(dobra o custo de transporte)</span>
-              </span>
+              <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">Calcular volta <span className="text-xs">(dobra combustível e pedágio)</span></span>
             </label>
             <Button type="button" onClick={onCalculate} disabled={calcLoading}
               className={`w-full gap-2 text-white ${form.transportRouteCalculated ? "bg-amber-600 hover:bg-amber-700" : "bg-amber-500 hover:bg-amber-600"}`}>
-              {calcLoading
-                ? <><Loader2 className="h-4 w-4 animate-spin" /> Calculando...</>
-                : form.transportRouteCalculated
-                ? <><MapPin className="h-4 w-4" /> Recalcular Rota</>
-                : <><MapPin className="h-4 w-4" /> Calcular Rota</>}
+              {calcLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Calculando...</> : form.transportRouteCalculated ? <><MapPin className="h-4 w-4" /> Recalcular Rota</> : <><MapPin className="h-4 w-4" /> Calcular Rota</>}
             </Button>
             <p className="text-xs text-muted-foreground text-center">{routeLimitHint(routeLimit)}</p>
             {calcError && (
-              <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 rounded-lg p-3">
-                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><p>{calcError}</p>
-              </div>
+              <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 rounded-lg p-3"><AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><p>{calcError}</p></div>
             )}
             <div className="space-y-3 pt-1">
               <p className="text-xs text-muted-foreground font-medium">Ou insira manualmente:</p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="distKm" className="text-xs">Distância (km)</Label>
-                  <Input id="distKm" type="number" min="0" step="0.1" placeholder="ex: 120"
-                    value={form.transportDistanceKm} onChange={(e) => {
+                  <Input id="distKm" type="number" min="0" step="0.1" placeholder="ex: 120" value={form.transportDistanceKm}
+                    onChange={(e) => {
                       const km = e.target.value;
-                      const fuel = n(form.transportGasPrice) > 0 && Number(form.transportKmPerLiter) > 0
-                        ? (parseFloat(km) / Number(form.transportKmPerLiter)) * n(form.transportGasPrice) : 0;
+                      const fuel = n(form.transportGasPrice) > 0 && Number(form.transportKmPerLiter) > 0 ? (parseFloat(km) / Number(form.transportKmPerLiter)) * n(form.transportGasPrice) : 0;
                       set("transportDistanceKm", km);
-                      if (fuel > 0) set("transportFuelCost", applyBRLMask(String(Math.round(fuel * 100))));
+                      if (fuel > 0) set("transportFuelCost", toBRLMask(fuel));
                     }} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="tollCost" className="text-xs">Custo de pedágios (R$)</Label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium pointer-events-none">R$</span>
-                    <Input id="tollCost" inputMode="numeric" placeholder="0,00" value={form.transportTollCost}
-                      onChange={(e) => set("transportTollCost", applyBRLMask(e.target.value))} className="pl-9" />
+                    <Input id="tollCost" inputMode="numeric" placeholder="0,00" value={form.transportTollCost} onChange={(e) => set("transportTollCost", applyBRLMask(e.target.value))} className="pl-9" />
                   </div>
                 </div>
               </div>
@@ -1844,54 +1618,31 @@ function StepTransporte({ form, set, calcLoading, calcError, onCalculate, google
                 <Label htmlFor="fuelCost" className="text-xs">Custo de combustível (R$)</Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium pointer-events-none">R$</span>
-                  <Input id="fuelCost" inputMode="numeric" placeholder="0,00" value={form.transportFuelCost}
-                    onChange={(e) => set("transportFuelCost", applyBRLMask(e.target.value))} className="pl-9" />
+                  <Input id="fuelCost" inputMode="numeric" placeholder="0,00" value={form.transportFuelCost} onChange={(e) => set("transportFuelCost", applyBRLMask(e.target.value))} className="pl-9" />
                 </div>
               </div>
             </div>
             {(n(form.transportFuelCost) + n(form.transportTollCost)) > 0 && (
               <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 space-y-1">
-                {n(form.transportDistanceKm) > 0 && (
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Distância{roundTrip ? " (ida)" : ""}</span><span>{form.transportDistanceKm} km</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Combustível{roundTrip ? " (ida)" : ""}</span><span>{fmt(n(form.transportFuelCost))}</span>
-                </div>
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Pedágios{roundTrip ? " (ida)" : ""}</span><span>{fmt(n(form.transportTollCost))}</span>
-                </div>
-                {roundTrip && (
-                  <div className="flex justify-between text-xs text-amber-600 font-medium pt-0.5">
-                    <span>Subtotal ida e volta (×2)</span><span>{fmt((n(form.transportFuelCost) + n(form.transportTollCost)) * 2)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-sm font-bold pt-1 border-t border-amber-200 dark:border-amber-800">
-                  <span>Total transporte</span>
-                  <span className="text-amber-600">{fmt((n(form.transportFuelCost) + n(form.transportTollCost)) * (roundTrip ? 2 : 1))}</span>
-                </div>
+                {n(form.transportDistanceKm) > 0 && <div className="flex justify-between text-xs text-muted-foreground"><span>Distância{roundTrip ? " (ida)" : ""}</span><span>{form.transportDistanceKm} km</span></div>}
+                <div className="flex justify-between text-xs text-muted-foreground"><span>Combustível{roundTrip ? " (ida)" : ""}</span><span>{fmt(n(form.transportFuelCost))}</span></div>
+                <div className="flex justify-between text-xs text-muted-foreground"><span>Pedágios{roundTrip ? " (ida)" : ""}</span><span>{fmt(n(form.transportTollCost))}</span></div>
+                {roundTrip && <div className="flex justify-between text-xs text-amber-600 font-medium pt-0.5"><span>Subtotal ida e volta (×2)</span><span>{fmt((n(form.transportFuelCost) + n(form.transportTollCost)) * 2)}</span></div>}
+                <div className="flex justify-between text-sm font-bold pt-1 border-t border-amber-200 dark:border-amber-800"><span>Total transporte</span><span className="text-amber-600">{fmt((n(form.transportFuelCost) + n(form.transportTollCost)) * (roundTrip ? 2 : 1))}</span></div>
               </div>
             )}
 
-            {/* Passengers in my vehicle */}
             {hasTeam && (
               <div className="space-y-2 pt-2 border-t border-amber-200 dark:border-amber-800">
-                <Label className="text-xs font-medium flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5" /> Passageiros no meu veículo
-                </Label>
+                <Label className="text-xs font-medium flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> Passageiros no meu veículo</Label>
                 <p className="text-xs text-muted-foreground">Membros da equipe que vão no mesmo carro</p>
                 <div className="space-y-1.5">
                   {form.staffMembers.map((m) => {
                     const isPassenger = form.myTransportPassengers.includes(m.id);
                     return (
                       <button key={m.id} type="button" onClick={() => toggleMyPassenger(m.id)}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-sm text-left transition-all ${
-                          isPassenger ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300" : "border-border hover:border-amber-300"
-                        }`}>
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isPassenger ? "bg-amber-500 border-amber-500" : "border-muted-foreground"}`}>
-                          {isPassenger && <Check className="h-2.5 w-2.5 text-white" />}
-                        </div>
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-sm text-left transition-all ${isPassenger ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300" : "border-border hover:border-amber-300"}`}>
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isPassenger ? "bg-amber-500 border-amber-500" : "border-muted-foreground"}`}>{isPassenger && <Check className="h-2.5 w-2.5 text-white" />}</div>
                         <span>{m.name || "Profissional sem nome"}</span>
                       </button>
                     );
@@ -1903,34 +1654,20 @@ function StepTransporte({ form, set, calcLoading, calcError, onCalculate, google
         )}
       </section>
 
-      {/* ── Transporte da equipe ── */}
       {hasTeam && (
         <>
           <div className="border-t border-border" />
           <section className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                <Users className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="text-base font-semibold">Transporte da equipe</p>
-                <p className="text-xs text-muted-foreground">Adicione um ou mais transportes para a equipe</p>
-              </div>
+              <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center"><Users className="h-4 w-4" /></div>
+              <div><p className="text-base font-semibold">Transporte da equipe</p><p className="text-xs text-muted-foreground">Adicione um ou mais transportes para a equipe</p></div>
             </div>
             <Toggle value={form.hasTeamTransport} onChange={(v) => set("hasTeamTransport", v)} />
-
             {form.hasTeamTransport && (
               <div className="space-y-3">
                 {form.teamTransports.map((tt) => (
-                  <TeamTransportCard
-                    key={tt.id}
-                    transport={tt}
-                    staffMembers={form.staffMembers}
-                    allTransports={form.teamTransports}
-                    onChange={(patch) => updateTeamTransport(tt.id, patch)}
-                    onRemove={() => removeTeamTransport(tt.id)}
-                    googleReady={googleReady}
-                  />
+                  <TeamTransportCard key={tt.id} transport={tt} staffMembers={form.staffMembers} allTransports={form.teamTransports}
+                    onChange={(patch) => updateTeamTransport(tt.id, patch)} onRemove={() => removeTeamTransport(tt.id)} googleReady={googleReady} />
                 ))}
                 <button type="button" onClick={addTeamTransport}
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-amber-200 dark:border-amber-800 text-sm font-medium text-amber-600 hover:border-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all">
@@ -1948,15 +1685,10 @@ function StepTransporte({ form, set, calcLoading, calcError, onCalculate, google
 // ── Step 6: Extras ─────────────────────────────────────────────
 
 function StepExtras({ form, set }: { form: FormState; set: any }) {
-  function addItem() {
-    set("extraCosts", [...form.extraCosts, { name: "", value: "" }]);
-  }
-  function removeItem(i: number) {
-    set("extraCosts", form.extraCosts.filter((_, idx) => idx !== i));
-  }
+  function addItem() { set("extraCosts", [...form.extraCosts, { name: "", value: "" }]); }
+  function removeItem(i: number) { set("extraCosts", form.extraCosts.filter((_, idx) => idx !== i)); }
   function updateItem(i: number, field: "name" | "value", val: string) {
-    const updated = form.extraCosts.map((c, idx) => idx === i ? { ...c, [field]: val } : c);
-    set("extraCosts", updated);
+    set("extraCosts", form.extraCosts.map((c, idx) => idx === i ? { ...c, [field]: val } : c));
   }
   const total = form.extraCosts.reduce((s, c) => s + n(c.value), 0);
 
@@ -1965,8 +1697,7 @@ function StepExtras({ form, set }: { form: FormState; set: any }) {
       <p className="text-sm text-muted-foreground">Adicione qualquer custo extra relacionado ao evento (taxas, materiais, deslocamento especial, etc.).</p>
       {form.extraCosts.length === 0 && (
         <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-border rounded-xl gap-2 text-muted-foreground">
-          <PlusCircle className="h-6 w-6" />
-          <p className="text-sm">Nenhum custo extra adicionado</p>
+          <PlusCircle className="h-6 w-6" /><p className="text-sm">Nenhum custo extra adicionado</p>
         </div>
       )}
       {form.extraCosts.map((c, i) => (
@@ -1979,115 +1710,271 @@ function StepExtras({ form, set }: { form: FormState; set: any }) {
             <Label className="text-xs">Valor (R$)</Label>
             <Input inputMode="numeric" placeholder="0,00" value={c.value} onChange={(e) => updateItem(i, "value", applyBRLMask(e.target.value))} />
           </div>
-          <Button variant="ghost" size="icon" className="hover:text-destructive shrink-0" onClick={() => removeItem(i)}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <Button variant="ghost" size="icon" className="hover:text-destructive shrink-0" onClick={() => removeItem(i)}><Trash2 className="h-4 w-4" /></Button>
         </div>
       ))}
-      <Button type="button" variant="outline" onClick={addItem} className="w-full gap-2 border-dashed">
-        <PlusCircle className="h-4 w-4" /> Adicionar custo extra
-      </Button>
+      <Button type="button" variant="outline" onClick={addItem} className="w-full gap-2 border-dashed"><PlusCircle className="h-4 w-4" /> Adicionar custo extra</Button>
       {total > 0 && (
         <div className="rounded-lg bg-muted/50 border px-3 py-2 flex justify-between items-center text-sm">
-          <span className="text-muted-foreground">Total de custos extras</span>
-          <span className="font-bold">{fmt(total)}</span>
+          <span className="text-muted-foreground">Total de custos extras</span><span className="font-bold">{fmt(total)}</span>
         </div>
       )}
     </div>
   );
 }
 
-// ── Step 7: Resumo ─────────────────────────────────────────────
+// ── Step 7: Preço & Cliente ────────────────────────────────────
 
-interface QuoteTotals {
-  labor: number; accom: number; food: number;
-  staffLabor: number; staffAccom: number; staffFood: number;
-  transport: number; teamTransport: number; extras: number;
-  equipmentCostPerJob: number; swPerJob: number; infraPerJob: number;
-  grand: number;
+const PAYMENT_SUGGESTIONS = [
+  "50% na reserva e 50% na entrega do material",
+  "30% na reserva, 70% até o dia do evento",
+  "À vista com 5% de desconto ou em até 3x sem juros",
+  "Pix ou transferência até 5 dias após a entrega",
+];
+
+function StepPreco({ form, set, breakdown, finalPrice, profit }: {
+  form: FormState; set: any; breakdown: CostBreakdown; finalPrice: number; profit: number;
+}) {
+  const margin = n(form.marginPercent);
+  const discount = n(form.discount);
+  const clientItems = computeClientLineItems(breakdown, finalPrice);
+
+  return (
+    <div className="space-y-8">
+      {/* ── Preço ── */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center"><Tag className="h-4 w-4" /></div>
+          <div><p className="text-base font-semibold">Preço da proposta</p><p className="text-xs text-muted-foreground">Custo calculado {fmt(breakdown.total)} — defina quanto vai cobrar.</p></div>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="marginPercent">Margem sobre o custo (%)</Label>
+            <div className="relative">
+              <Input id="marginPercent" type="number" min="0" max="1000" step="1" placeholder="30" value={form.marginPercent} onChange={(e) => set("marginPercent", e.target.value)} className="pr-8" />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {[20, 30, 40, 50, 100].map((p) => (
+                <button key={p} type="button" onClick={() => set("marginPercent", String(p))}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${margin === p ? "bg-amber-500 border-amber-500 text-white" : "border-border hover:border-amber-400"}`}>
+                  {p}%
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="discount">Desconto (R$)</Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium pointer-events-none">R$</span>
+              <Input id="discount" inputMode="numeric" placeholder="0,00" value={form.discount} onChange={(e) => set("discount", applyBRLMask(e.target.value))} className="pl-9" />
+            </div>
+            <p className="text-xs text-muted-foreground">Opcional — aplicado sobre o preço com margem.</p>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-yellow-500/10 border border-amber-500/20 p-4 grid sm:grid-cols-3 gap-3">
+          <div><p className="text-xs text-muted-foreground">Custo total</p><p className="font-semibold">{fmt(breakdown.total)}</p></div>
+          <div><p className="text-xs text-muted-foreground">Preço da proposta</p><p className="text-2xl font-bold text-amber-500">{fmt(finalPrice)}</p></div>
+          <div>
+            <p className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3.5 w-3.5" /> Lucro previsto</p>
+            <p className={`font-semibold ${profit < 0 ? "text-destructive" : "text-emerald-600"}`}>{fmt(profit)}</p>
+          </div>
+        </div>
+        {profit < 0 && (
+          <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 rounded-lg p-3">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><p>O desconto deixou o preço abaixo do custo ({fmt(breakdown.total)}). Reduza o desconto ou aumente a margem.</p>
+          </div>
+        )}
+        {breakdown.total === 0 && (
+          <p className="text-xs text-muted-foreground flex items-start gap-1.5"><Info className="h-3.5 w-3.5 mt-0.5 shrink-0" /> O custo está zerado: volte aos passos anteriores e preencha mão de obra e demais custos.</p>
+        )}
+        {discount > 0 && margin === 0 && (
+          <p className="text-xs text-muted-foreground flex items-start gap-1.5"><Info className="h-3.5 w-3.5 mt-0.5 shrink-0" /> Sem margem e com desconto você trabalha no prejuízo.</p>
+        )}
+      </section>
+
+      <div className="border-t border-border" />
+
+      {/* ── Cliente ── */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center"><User className="h-4 w-4" /></div>
+          <div><p className="text-base font-semibold">Cliente</p><p className="text-xs text-muted-foreground">Necessário para enviar a proposta e gerar o contrato. Pode preencher depois.</p></div>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="clientName">Nome do cliente</Label>
+            <Input id="clientName" placeholder="ex: Maria Silva" value={form.clientName} onChange={(e) => set("clientName", e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="clientEmail">E-mail do cliente</Label>
+            <Input id="clientEmail" type="email" placeholder="maria@exemplo.com" value={form.clientEmail} onChange={(e) => set("clientEmail", e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="clientPhone">WhatsApp / telefone</Label>
+            <Input id="clientPhone" inputMode="tel" placeholder="(11) 99999-9999" value={form.clientPhone} onChange={(e) => set("clientPhone", e.target.value)} />
+            <p className="text-xs text-muted-foreground">Facilita o envio do link pelo WhatsApp.</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="clientDocument">CPF / CNPJ</Label>
+            <Input id="clientDocument" placeholder="Para o contrato" value={form.clientDocument} onChange={(e) => set("clientDocument", e.target.value)} />
+          </div>
+        </div>
+      </section>
+
+      <div className="border-t border-border" />
+
+      {/* ── O que o cliente vê ── */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 flex items-center justify-center"><Eye className="h-4 w-4" /></div>
+          <div><p className="text-base font-semibold">Conteúdo da proposta</p><p className="text-xs text-muted-foreground">O cliente nunca vê seu custo nem a margem — só o que está aqui.</p></div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="scopeNotes">Escopo e entregas</Label>
+          <Textarea id="scopeNotes" rows={4} placeholder="ex: Cobertura fotográfica de 8h, 300 fotos editadas em alta resolução, entrega em 20 dias úteis via galeria online..." value={form.scopeNotes} onChange={(e) => set("scopeNotes", e.target.value)} maxLength={4000} />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="paymentTerms">Condições de pagamento</Label>
+          <Textarea id="paymentTerms" rows={2} placeholder="ex: 50% na reserva e 50% na entrega" value={form.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} maxLength={2000} />
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {PAYMENT_SUGGESTIONS.map((s) => (
+              <button key={s} type="button" onClick={() => set("paymentTerms", s)} className="text-xs px-2.5 py-1 rounded-full border border-border hover:border-violet-400 transition-colors text-left">{s}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="validUntil">Validade da proposta</Label>
+            <Input id="validUntil" type="date" min={todayIso()} value={form.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {[7, 15, 30].map((d) => (
+                <button key={d} type="button" onClick={() => set("validUntil", addDaysIso(todayIso(), d))} className="text-xs px-2.5 py-1 rounded-full border border-border hover:border-amber-400 transition-colors">{d} dias</button>
+              ))}
+              {form.validUntil && <button type="button" onClick={() => set("validUntil", "")} className="text-xs px-2.5 py-1 rounded-full border border-border hover:border-destructive transition-colors">Sem validade</button>}
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Detalhar itens para o cliente?</Label>
+            <button type="button" onClick={() => set("showBreakdown", !form.showBreakdown)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left text-sm transition-all ${form.showBreakdown ? "border-violet-500 bg-violet-50 dark:bg-violet-900/20" : "border-border"}`}>
+              {form.showBreakdown ? <Eye className="h-4 w-4 text-violet-600 shrink-0" /> : <EyeOff className="h-4 w-4 text-muted-foreground shrink-0" />}
+              <span>{form.showBreakdown ? "Sim — mostra os itens abaixo (com a margem já distribuída)" : "Não — o cliente vê apenas o valor total"}</span>
+            </button>
+          </div>
+        </div>
+
+        {form.showBreakdown && clientItems.length > 0 && (
+          <div className="rounded-xl border bg-muted/30 p-4 space-y-1">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Prévia dos itens que o cliente verá</p>
+            {clientItems.map((i) => (
+              <div key={i.key} className="flex items-center justify-between text-sm py-1 border-b border-border/40 last:border-0">
+                <span className="text-muted-foreground">{i.label}</span><span className="font-medium">{fmt(i.amount)}</span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between text-sm pt-2 font-bold"><span>Total</span><span className="text-amber-500">{fmt(finalPrice)}</span></div>
+          </div>
+        )}
+      </section>
+    </div>
+  );
 }
 
-function StepResumo({ form, snapshot, totals, error, saving, onSave, isEditing }: {
-  form: FormState;
-  snapshot: BudgetSnapshot;
-  totals: QuoteTotals;
-  error: string; saving: boolean; onSave: () => void; isEditing?: boolean;
+// ── Step 8: Resumo ─────────────────────────────────────────────
+
+function StepResumo({ form, snapshot, breakdown, finalPrice, profit, error, saving, onSave, isEditing, teamAllowed, onGoTo }: {
+  form: FormState; snapshot: BudgetSnapshot; breakdown: CostBreakdown; finalPrice: number; profit: number;
+  error: string; saving: boolean; onSave: () => void; isEditing?: boolean; teamAllowed: boolean; onGoTo: (i: number) => void;
 }) {
   const jobs = Math.max(1, n(form.jobsPerMonth));
-  const transportTotal = form.transportType === "own_vehicle"
-    ? n(form.transportFuelCost) + n(form.transportTollCost)
-    : n(form.transportCost);
+  const members = teamAllowed ? form.staffMembers : [];
+  const hasClient = !!form.clientName.trim() && !!form.clientEmail.trim();
 
   type Row = { label: string; value: number; sub?: boolean; color?: string };
   const rows: Row[] = [
-    { label: `Mão de obra (${form.coverageHours}h × ${fmt(n(form.hourlyRate))})`, value: totals.labor },
-    ...(totals.accom > 0 ? [{ label: `Hospedagem (${form.accommodationDays} diária${n(form.accommodationDays) > 1 ? "s" : ""} × ${fmt(n(form.accommodationDailyRate))})`, value: totals.accom }] : []),
-    ...(totals.food > 0 ? [{ label: `Alimentação (${form.foodMeals} refeição${n(form.foodMeals) > 1 ? "ões" : ""} × ${fmt(n(form.foodCostPerMeal))})`, value: totals.food }] : []),
-    ...form.staffMembers.flatMap((m, idx) => {
-      const label = m.name || `Profissional ${idx + 1}`;
+    { label: `Mão de obra (${form.coverageHours}h × ${fmt(n(form.hourlyRate))})`, value: breakdown.labor },
+    ...(breakdown.accommodation > 0 ? [{ label: `Hospedagem (${form.accommodationDays} diária${n(form.accommodationDays) > 1 ? "s" : ""} × ${fmt(n(form.accommodationDailyRate))})`, value: breakdown.accommodation }] : []),
+    ...(breakdown.food > 0 ? [{ label: `Alimentação (${form.foodMeals} refeição${n(form.foodMeals) > 1 ? "ões" : ""} × ${fmt(n(form.foodCostPerMeal))})`, value: breakdown.food }] : []),
+    ...members.flatMap((m, idx) => {
       const labor = n(m.coverageHours) * n(m.hourlyRate);
-      return labor > 0 ? [{ label: `Mão de obra — ${label} (${m.coverageHours}h)`, value: labor, color: "text-violet-600" }] : [];
+      return labor > 0 ? [{ label: `Mão de obra — ${m.name || `Profissional ${idx + 1}`} (${m.coverageHours}h)`, value: labor, color: "text-violet-600" }] : [];
     }),
-    ...(totals.staffAccom > 0 ? [{ label: "Hospedagem da equipe", value: totals.staffAccom, sub: true }] : []),
-    ...(totals.staffFood > 0 ? [{ label: "Alimentação da equipe", value: totals.staffFood, sub: true }] : []),
-    ...(totals.teamTransport > 0 ? [{ label: "Transporte da equipe", value: totals.teamTransport }] : []),
-    ...(transportTotal > 0 ? [{
-      label: form.transportType === "air" ? "Transporte aéreo"
-        : form.transportType === "ground" ? "Transporte terrestre"
-        : `Transporte (${form.transportDistanceKm} km — combustível + pedágio)`,
-      value: transportTotal,
+    ...(breakdown.staffAccommodation > 0 ? [{ label: "Hospedagem da equipe", value: breakdown.staffAccommodation, sub: true }] : []),
+    ...(breakdown.staffFood > 0 ? [{ label: "Alimentação da equipe", value: breakdown.staffFood, sub: true }] : []),
+    ...(breakdown.teamTransport > 0 ? [{ label: "Transporte da equipe", value: breakdown.teamTransport }] : []),
+    ...(breakdown.transport > 0 ? [{
+      label: form.transportType === "air" ? "Transporte aéreo" : form.transportType === "ground" ? "Transporte terrestre" : `Transporte (${form.transportDistanceKm || "?"} km — combustível + pedágio${form.transportRoundTrip ? ", ida e volta" : ""})`,
+      value: breakdown.transport,
     }] : []),
-    ...(totals.extras > 0 ? [{ label: "Custos extras", value: totals.extras }] : []),
-    ...(snapshot.equipmentCostPerJob > 0 ? [{ label: "Depreciação de equipamentos (por job)", value: snapshot.equipmentCostPerJob, color: "text-amber-600" }] : []),
-    ...(totals.swPerJob > 0 ? [{ label: `Softwares por job (${fmt(snapshot.softwareMonthlyCost)}/mês ÷ ${jobs} jobs)`, value: totals.swPerJob, color: "text-violet-600" }] : []),
-    ...(totals.infraPerJob > 0 ? [{ label: `Infraestrutura por job (${fmt(snapshot.infrastructureMonthlyCost)}/mês ÷ ${jobs} jobs)`, value: totals.infraPerJob, color: "text-rose-600" }] : []),
+    ...(breakdown.extras > 0 ? [{ label: "Custos extras", value: breakdown.extras }] : []),
+    ...(breakdown.equipment > 0 ? [{ label: "Depreciação de equipamentos (por trabalho)", value: breakdown.equipment, color: "text-amber-600" }] : []),
+    ...(breakdown.software > 0 ? [{ label: `Softwares por trabalho (${fmt(snapshot.softwareMonthlyCost)}/mês ÷ ${jobs})`, value: breakdown.software, color: "text-violet-600" }] : []),
+    ...(breakdown.infrastructure > 0 ? [{ label: `Infraestrutura por trabalho (${fmt(snapshot.infrastructureMonthlyCost)}/mês ÷ ${jobs})`, value: breakdown.infrastructure, color: "text-rose-600" }] : []),
   ];
 
   return (
     <div className="space-y-6">
-      {/* Event header */}
       <div className="rounded-xl bg-amber-50/70 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-800/30 p-4 space-y-1">
         <p className="font-bold text-base">{form.eventName || "Evento sem nome"}</p>
         {form.eventLocation && <p className="text-sm text-muted-foreground">{form.eventLocation}</p>}
         {form.eventDate && (
           <p className="text-sm text-muted-foreground">
-            {new Date(form.eventDate + "T00:00:00").toLocaleDateString("pt-BR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+            {form.eventEndDate && form.eventEndDate !== form.eventDate ? `${formatDateOnly(form.eventDate)} a ${formatDateOnly(form.eventEndDate)}` : formatDateLong(form.eventDate)}
           </p>
         )}
         <p className="text-sm text-muted-foreground">{form.coverageHours} horas de cobertura</p>
       </div>
 
-      {/* Cost breakdown */}
-      <div className="space-y-1.5">
-        {rows.map((row, i) => (
-          <div key={i} className={`flex items-center justify-between text-sm py-1.5 border-b border-border/40 last:border-0 ${row.sub ? "pl-4" : ""}`}>
-            <span className="text-muted-foreground truncate pr-2">{row.label}</span>
-            <span className={`font-semibold shrink-0 ${row.color ?? ""}`}>{fmt(row.value)}</span>
-          </div>
-        ))}
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Composição do custo (só você vê)</p>
+        <div className="space-y-1.5">
+          {rows.map((row, i) => (
+            <div key={i} className={`flex items-center justify-between text-sm py-1.5 border-b border-border/40 last:border-0 ${row.sub ? "pl-4" : ""}`}>
+              <span className="text-muted-foreground truncate pr-2">{row.label}</span>
+              <span className={`font-semibold shrink-0 ${row.color ?? ""}`}>{fmt(row.value)}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Grand total */}
-      <div className="rounded-xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-yellow-500/10 border border-amber-500/20 p-5 flex items-center justify-between">
+      <div className="rounded-xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-yellow-500/10 border border-amber-500/20 p-5 space-y-2">
+        <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Custo total</span><span className="font-semibold">{fmt(breakdown.total)}</span></div>
+        <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Margem {n(form.marginPercent)}%{n(form.discount) > 0 ? ` − desconto ${fmt(n(form.discount))}` : ""}</span><span className={`font-semibold ${profit < 0 ? "text-destructive" : "text-emerald-600"}`}>{fmt(profit)}</span></div>
+        <div className="flex items-center justify-between pt-2 border-t border-amber-500/20">
+          <div><p className="text-sm font-semibold">Preço da proposta</p><p className="text-xs text-muted-foreground">O que o cliente vai ver</p></div>
+          <p className="text-3xl font-bold text-amber-500">{fmt(finalPrice)}</p>
+        </div>
+        <button type="button" onClick={() => onGoTo(STEP_PRICE)} className="text-xs text-amber-600 hover:underline">Ajustar preço</button>
+      </div>
+
+      <div className="rounded-xl border p-4 text-sm flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-muted-foreground">Custo total estimado</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Valor mínimo que deve ser cobrado para cobrir todos os custos</p>
+          <p className="font-semibold flex items-center gap-1.5"><User className="h-4 w-4 text-muted-foreground" /> Cliente</p>
+          {hasClient ? (
+            <p className="text-muted-foreground mt-1">{form.clientName} · {form.clientEmail}{form.clientPhone ? ` · ${form.clientPhone}` : ""}</p>
+          ) : (
+            <p className="text-muted-foreground mt-1">Não informado — necessário para enviar a proposta e gerar o contrato.</p>
+          )}
+          {form.validUntil && <p className="text-xs text-muted-foreground mt-1">Válida até {formatDateOnly(form.validUntil)}</p>}
         </div>
-        <div className="text-right">
-          <p className="text-3xl font-bold text-amber-500">{fmt(totals.grand)}</p>
-        </div>
+        <button type="button" onClick={() => onGoTo(STEP_PRICE)} className="text-xs text-amber-600 hover:underline shrink-0">{hasClient ? "Editar" : "Informar"}</button>
       </div>
 
       {error && (
         <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 rounded-lg p-3">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-          <p>{error}</p>
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><p>{error}</p>
         </div>
       )}
 
       <Button onClick={onSave} disabled={saving} className="w-full gap-2 bg-amber-500 hover:bg-amber-600 text-white text-base py-6">
-        {saving ? <><Loader2 className="h-5 w-5 animate-spin" /> Salvando...</> : <><Check className="h-5 w-5" /> {isEditing ? "Atualizar Orçamento" : "Salvar Orçamento"}</>}
+        {saving ? <><Loader2 className="h-5 w-5 animate-spin" /> Salvando...</> : <><Check className="h-5 w-5" /> {isEditing ? "Atualizar orçamento" : "Salvar orçamento"}</>}
       </Button>
+      <p className="text-xs text-muted-foreground text-center">Depois de salvar, você envia a proposta ao cliente pelo link ou gera o contrato direto.</p>
     </div>
   );
 }

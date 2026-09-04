@@ -56,6 +56,10 @@ export interface PlanLimits {
   /** "Nova versão" ilimitada por contrato (Free: 1 revisão por cadeia) */
   unlimitedContractRevisions: boolean;
   routeCalculationsPerMonth: number | null;
+  /** Propostas da Calculadora de Orçamento enviadas ao cliente (link público) por mês */
+  budgetProposalsPerMonth: number | null;
+  /** Orçamento com equipe adicional (mão de obra, hospedagem, alimentação e transporte da equipe) */
+  budgetTeamCosts: boolean;
   financeExport: boolean;
 
   /** Agenda privada de compromissos (o público vê só as datas fechadas) */
@@ -104,6 +108,8 @@ const FREE_LIMITS: PlanLimits = {
   customContractTemplates: false,
   unlimitedContractRevisions: false,
   routeCalculationsPerMonth: 3,
+  budgetProposalsPerMonth: 2,
+  budgetTeamCosts: false,
   financeExport: false,
   personalAgenda: false,
   calendarSync: false,
@@ -141,6 +147,8 @@ const PRO_LIMITS: PlanLimits = {
   customContractTemplates: true,
   unlimitedContractRevisions: true,
   routeCalculationsPerMonth: 50,
+  budgetProposalsPerMonth: 30,
+  budgetTeamCosts: true,
   financeExport: true,
   personalAgenda: true,
   calendarSync: true,
@@ -178,6 +186,8 @@ const ULTRA_LIMITS: PlanLimits = {
   customContractTemplates: true,
   unlimitedContractRevisions: true,
   routeCalculationsPerMonth: 200,
+  budgetProposalsPerMonth: null,
+  budgetTeamCosts: true,
   financeExport: true,
   personalAgenda: true,
   calendarSync: true,
@@ -219,6 +229,8 @@ export const FEATURE_LABELS: Record<keyof PlanLimits, string> = {
   customContractTemplates: "modelos de contrato próprios",
   unlimitedContractRevisions: "novas versões ilimitadas por contrato",
   routeCalculationsPerMonth: "cálculos de rota por mês",
+  budgetProposalsPerMonth: "propostas de orçamento enviadas por mês",
+  budgetTeamCosts: "orçamento com equipe adicional (mão de obra, hospedagem, alimentação e transporte da equipe)",
   financeExport: "exportação do financeiro",
   personalAgenda: "agenda privada de compromissos",
   calendarSync: "sincronização com Google Agenda, iCloud e Outlook",

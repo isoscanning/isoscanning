@@ -626,12 +626,16 @@ export interface AvailabilitySlot {
   contractId?: string | null;
   /** Reserva provisória criada ao aceitar o acordo de uma vaga. */
   jobApplicationId?: string | null;
+  /** Reserva provisória criada quando o cliente aprova uma proposta de orçamento. */
+  budgetQuoteId?: string | null;
   createdAt: Date;
 }
 
 /** Reserva gerada pelo fluxo de fechar trabalho — só é liberada pelo próprio fluxo. */
-export function isFlowReservation(slot: Pick<AvailabilitySlot, "contractId" | "jobApplicationId">): boolean {
-  return !!slot.contractId || !!slot.jobApplicationId;
+export function isFlowReservation(
+  slot: Pick<AvailabilitySlot, "contractId" | "jobApplicationId" | "budgetQuoteId">
+): boolean {
+  return !!slot.contractId || !!slot.jobApplicationId || !!slot.budgetQuoteId;
 }
 
 /**

@@ -142,6 +142,8 @@ export interface PublicJobOffer {
   status: string | null;
   startDate: string | null;
   endDate: string | null;
+  venue: string | null;
+  positions: number;
   employerName: string | null;
   createdAt: string;
   updatedAt: string;
@@ -150,7 +152,7 @@ export interface PublicJobOffer {
 export async function getPublicJobOffer(id: string): Promise<PublicJobOffer | null> {
   const { data, error } = await getClient()
     .from("job_offers")
-    .select("id, title, description, category, job_type, location_type, city, state, budget_min, budget_max, is_active, status, start_date, end_date, employer_name, deleted_at, created_at, updated_at")
+    .select("id, title, description, category, job_type, location_type, city, state, budget_min, budget_max, is_active, status, start_date, end_date, venue, positions, employer_name, deleted_at, created_at, updated_at")
     .eq("id", id)
     .is("deleted_at", null)
     .maybeSingle();
@@ -172,6 +174,8 @@ export async function getPublicJobOffer(id: string): Promise<PublicJobOffer | nu
     status: (row.status as string | null) ?? null,
     startDate: (row.start_date as string | null) ?? null,
     endDate: (row.end_date as string | null) ?? null,
+    venue: (row.venue as string | null) ?? null,
+    positions: Number(row.positions ?? 1) || 1,
     employerName: (row.employer_name as string | null) ?? null,
     createdAt: String(row.created_at ?? new Date().toISOString()),
     updatedAt: String(row.updated_at ?? row.created_at ?? new Date().toISOString()),

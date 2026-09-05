@@ -15,7 +15,11 @@ import {
     MoreVertical,
     Calendar,
     Search,
-    CheckCircle2
+    CheckCircle2,
+    Clock,
+    Users,
+    Receipt,
+    CalendarClock,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,15 +34,39 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { type JobOffer } from "@/lib/data-service";
+import {
+    formatJobBudget,
+    formatJobDateRange,
+    formatJobTimeRange,
+    jobCityState,
+    jobStatusInfo,
+    jobTypeLabel,
+    positionsLabel,
+} from "@/lib/jobs/job-offer-display";
 
 interface JobCardProps {
     vaga: JobOffer;
     isSelected: boolean;
     onToggleSelection: (checked: boolean) => void;
+    /** Pausar (aberta) ou reativar/reabrir (pausada/concluída). Expirada vai para a edição. */
     onToggleActive: () => void;
     onDelete: () => void;
     onConclude: () => void;
 }
+
+const STRIP_COLOR: Record<string, string> = {
+    open: "bg-green-500",
+    paused: "bg-yellow-500",
+    closed: "bg-gray-500",
+    expired: "bg-red-500",
+};
+
+const BADGE_CLASS: Record<string, string> = {
+    open: "bg-green-600 hover:bg-green-700 text-white",
+    paused: "",
+    closed: "bg-gray-200 text-gray-700",
+    expired: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+};
 
 export function JobCard({
     vaga,
@@ -48,21 +76,42 @@ export function JobCard({
     onDelete,
     onConclude
 }: JobCardProps) {
-    const getJobTypeLabel = (type: string) => {
-        const types: Record<string, string> = {
-            freelance: "Freelance",
-            full_time: "Tempo Integral",
-            part_time: "Meio Período",
-            project: "Por Projeto",
-        };
-        return types[type] || type;
-    };
+    const status = jobStatusInfo(vaga);
+    const isOpen = status.status === "open";
+    const isExpired = status.status === "expired";
+    const dates = formatJobDateRange(vaga.startDate, vaga.endDate);
+    const times = formatJobTimeRange(vaga.startTime, vaga.endTime);
+    const editHref = `/dashboard/vagas/editar/${vaga.id}`;
+
+    const statusBadge = (
+        <Badge
+            variant={isOpen ? "default" : "secondary"}
+            className={`text-xs ${BADGE_CLASS[status.status]}`}
+            title={status.hint}
+        >
+            {status.label}
+        </Badge>
+    );
+
+    /** Item de reativação: expirada precisa de novas datas → vai para a edição. */
+    const reactivateItem = (compact: boolean) =>
+        isExpired ? (
+            <DropdownMenuItem asChild>
+                <Link href={editHref}>
+                    <CalendarClock className="mr-2 h-4 w-4" /> {compact ? "Novas datas e reabrir" : "Editar datas e reabrir"}
+                </Link>
+            </DropdownMenuItem>
+        ) : (
+            <DropdownMenuItem onClick={onToggleActive}>
+                <Play className="mr-2 h-4 w-4" /> {vaga.status === "closed" ? (compact ? "Reabrir" : "Reabrir Vaga") : (compact ? "Reativar" : "Reativar Vaga")}
+            </DropdownMenuItem>
+        );
 
     return (
-        <Card className={`overflow-hidden transition-all hover:shadow-md ${!vaga.isActive ? 'opacity-75 bg-muted/30' : ''} ${isSelected ? 'ring-2 ring-primary border-primary' : ''}`}>
+        <Card className={`overflow-hidden transition-all hover:shadow-md ${!isOpen ? 'opacity-75 bg-muted/30' : ''} ${isSelected ? 'ring-2 ring-primary border-primary' : ''}`}>
             <CardContent className="p-0">
                 {/* Mobile: Status strip at top */}
-                <div className={`md:hidden h-1.5 ${vaga.status === 'closed' ? 'bg-gray-500' : vaga.isActive ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                <div className={`md:hidden h-1.5 ${STRIP_COLOR[status.status]}`} />
 
                 <div className="flex">
                     {/* Selection Strip - hidden on mobile, shown in content area */}
@@ -74,7 +123,7 @@ export function JobCard({
                     </div>
 
                     {/* Desktop: Status Strip */}
-                    <div className={`hidden md:block w-2 ${vaga.status === 'closed' ? 'bg-gray-500' : vaga.isActive ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                    <div className={`hidden md:block w-2 ${STRIP_COLOR[status.status]}`} />
 
                     <div className="flex-1 p-4 md:p-6 space-y-3 md:space-y-4">
                         {/* Mobile: Checkbox row */}
@@ -84,9 +133,7 @@ export function JobCard({
                                     checked={isSelected}
                                     onCheckedChange={(checked) => onToggleSelection(checked as boolean)}
                                 />
-                                <Badge variant={vaga.status === 'closed' ? "secondary" : vaga.isActive ? "default" : "secondary"} className={`text-xs ${vaga.status === 'closed' ? "bg-gray-200 text-gray-700" : vaga.isActive ? "bg-green-600 hover:bg-green-700" : ""}`}>
-                                    {vaga.status === 'closed' ? "Concluída" : vaga.isActive ? "Ativa" : "Pausada"}
-                                </Badge>
+                                {statusBadge}
                                 <Badge variant="outline" className="text-muted-foreground text-xs">
                                     {vaga.category}
                                 </Badge>
@@ -110,7 +157,7 @@ export function JobCard({
                                         </Link>
                                     </DropdownMenuItem>
                                     <DropdownMenuItem asChild>
-                                        <Link href={`/dashboard/vagas/editar/${vaga.id}`}>
+                                        <Link href={editHref}>
                                             <Edit className="mr-2 h-4 w-4" /> Editar
                                         </Link>
                                     </DropdownMenuItem>
@@ -119,16 +166,12 @@ export function JobCard({
                                             <CheckCircle2 className="mr-2 h-4 w-4" /> Concluir
                                         </DropdownMenuItem>
                                     )}
-                                    {vaga.status === 'open' && (
+                                    {isOpen && (
                                         <DropdownMenuItem onClick={onToggleActive}>
                                             <Pause className="mr-2 h-4 w-4" /> Pausar
                                         </DropdownMenuItem>
                                     )}
-                                    {(vaga.status === 'paused' || vaga.status === 'closed') && (
-                                        <DropdownMenuItem onClick={onToggleActive}>
-                                            <Play className="mr-2 h-4 w-4" /> Reativar
-                                        </DropdownMenuItem>
-                                    )}
+                                    {!isOpen && reactivateItem(true)}
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
                                         className="text-destructive focus:text-destructive"
@@ -144,19 +187,32 @@ export function JobCard({
                             <div className="space-y-1 min-w-0 flex-1">
                                 {/* Desktop badges */}
                                 <div className="hidden md:flex items-center gap-2 mb-2">
-                                    <Badge variant={vaga.status === 'closed' ? "secondary" : vaga.isActive ? "default" : "secondary"} className={vaga.status === 'closed' ? "bg-gray-200 text-gray-700" : vaga.isActive ? "bg-green-600 hover:bg-green-700" : ""}>
-                                        {vaga.status === 'closed' ? "Concluída" : vaga.isActive ? "Ativa" : "Pausada"}
-                                    </Badge>
+                                    {statusBadge}
                                     <Badge variant="outline" className="text-muted-foreground">
                                         {vaga.category}
                                     </Badge>
+                                    {(vaga.positions ?? 1) > 1 && (
+                                        <Badge variant="outline" className="text-muted-foreground gap-1">
+                                            <Users className="h-3 w-3" /> {positionsLabel(vaga.positions)}
+                                        </Badge>
+                                    )}
+                                    {vaga.requiresInvoice && (
+                                        <Badge variant="outline" className="text-muted-foreground gap-1" title="Exige nota fiscal">
+                                            <Receipt className="h-3 w-3" /> NF
+                                        </Badge>
+                                    )}
                                 </div>
                                 <h3 className="text-base md:text-xl font-bold text-foreground line-clamp-2 md:line-clamp-1">
                                     {vaga.title}
                                 </h3>
-                                <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground">
-                                    <Calendar className="h-3 w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
-                                    <span>Publicado em {format(new Date(vaga.createdAt), "d 'de' MMM, yyyy", { locale: ptBR })}</span>
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs md:text-sm text-muted-foreground">
+                                    <span className="flex items-center gap-1.5">
+                                        <Calendar className="h-3 w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
+                                        Publicado em {format(new Date(vaga.createdAt), "d 'de' MMM, yyyy", { locale: ptBR })}
+                                    </span>
+                                    {isExpired && (
+                                        <span className="text-red-600 dark:text-red-400 font-medium">{status.hint}</span>
+                                    )}
                                 </div>
                             </div>
 
@@ -184,7 +240,7 @@ export function JobCard({
                                             </Link>
                                         </DropdownMenuItem>
                                         <DropdownMenuItem asChild>
-                                            <Link href={`/dashboard/vagas/editar/${vaga.id}`}>
+                                            <Link href={editHref}>
                                                 <Edit className="mr-2 h-4 w-4" /> Editar
                                             </Link>
                                         </DropdownMenuItem>
@@ -193,16 +249,12 @@ export function JobCard({
                                                 <CheckCircle2 className="mr-2 h-4 w-4" /> Concluir Vaga
                                             </DropdownMenuItem>
                                         )}
-                                        {vaga.status === 'open' && (
+                                        {isOpen && (
                                             <DropdownMenuItem onClick={onToggleActive}>
                                                 <Pause className="mr-2 h-4 w-4" /> Pausar Vaga
                                             </DropdownMenuItem>
                                         )}
-                                        {(vaga.status === 'paused' || vaga.status === 'closed') && (
-                                            <DropdownMenuItem onClick={onToggleActive}>
-                                                <Play className="mr-2 h-4 w-4" /> {vaga.status === 'closed' ? 'Reabrir Vaga' : 'Reativar Vaga'}
-                                            </DropdownMenuItem>
-                                        )}
+                                        {!isOpen && reactivateItem(false)}
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem
                                             className="text-destructive focus:text-destructive"
@@ -219,27 +271,33 @@ export function JobCard({
                         <div className="flex flex-wrap gap-x-4 gap-y-2 pt-2 text-xs md:text-sm text-muted-foreground">
                             <div className="flex items-center gap-1.5">
                                 <Briefcase className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary/70 flex-shrink-0" />
-                                <span>{getJobTypeLabel(vaga.jobType)}</span>
+                                <span>{jobTypeLabel(vaga.jobType)}</span>
                             </div>
                             <div className="flex items-center gap-1.5">
                                 <MapPin className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary/70 flex-shrink-0" />
-                                <span className="truncate max-w-[150px] md:max-w-none">
+                                <span className="truncate max-w-[220px] md:max-w-none">
                                     {vaga.locationType === "remote"
                                         ? "Remoto"
-                                        : `${vaga.city || "Cidade"}/${vaga.state || "UF"}`}
+                                        : vaga.venue
+                                            ? `${vaga.venue} · ${jobCityState(vaga)}`
+                                            : jobCityState(vaga)}
                                 </span>
                             </div>
+                            {dates && (
+                                <div className="flex items-center gap-1.5">
+                                    <CalendarClock className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary/70 flex-shrink-0" />
+                                    <span>{dates}</span>
+                                </div>
+                            )}
+                            {times && (
+                                <div className="flex items-center gap-1.5">
+                                    <Clock className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary/70 flex-shrink-0" />
+                                    <span>{times}</span>
+                                </div>
+                            )}
                             <div className="flex items-center gap-1.5">
                                 <DollarSign className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary/70 flex-shrink-0" />
-                                <span>
-                                    {(vaga.budgetMin || vaga.budgetMax) ? (
-                                        <>
-                                            {vaga.budgetMin && `R$ ${vaga.budgetMin}`}
-                                            {vaga.budgetMin && vaga.budgetMax && " - "}
-                                            {vaga.budgetMax && `R$ ${vaga.budgetMax}`}
-                                        </>
-                                    ) : "Valor não informado"}
-                                </span>
+                                <span>{formatJobBudget(vaga)}</span>
                             </div>
                         </div>
                     </div>

@@ -25,6 +25,17 @@ import {
 } from "lucide-react";
 import { fetchJobOffers, fetchSpecialties, type JobOffer, type Specialty } from "@/lib/data-service";
 import { trackEvent } from "@/lib/analytics";
+import {
+    formatJobBudget,
+    formatJobDateRange,
+    formatJobTimeRange,
+    hasJobBudget,
+    jobLocationLabel,
+    jobTypeColor,
+    jobTypeLabel,
+    positionsLabel,
+    publishedAgo,
+} from "@/lib/jobs/job-offer-display";
 import Link from "next/link";
 import { ParticleBackground } from "@/components/particle-background";
 import { ScrollReveal } from "@/components/scroll-reveal";
@@ -124,25 +135,8 @@ export default function VagasPublicasPage() {
         return () => clearTimeout(timeoutId);
     }, [searchTerm]);
 
-    const getJobTypeLabel = (type: string) => {
-        const types: Record<string, string> = {
-            freelance: "Freelance",
-            full_time: "Tempo Integral",
-            part_time: "Meio Período",
-            project: "Por Projeto",
-        };
-        return types[type] || type;
-    };
-
-    const getJobTypeColor = (type: string) => {
-        switch (type) {
-            case "freelance": return "bg-blue-500";
-            case "full_time": return "bg-green-500";
-            case "part_time": return "bg-orange-500";
-            case "project": return "bg-purple-500";
-            default: return "bg-gray-500";
-        }
-    };
+    const getJobTypeLabel = jobTypeLabel;
+    const getJobTypeColor = jobTypeColor;
 
     return (
         <div className="min-h-screen flex flex-col bg-background">
@@ -435,38 +429,44 @@ export default function VagasPublicasPage() {
 
                                                 <div className="space-y-3 text-sm text-muted-foreground mb-6 flex-1">
                                                     <div className="flex items-center gap-2">
-                                                        <MapPin className="h-4 w-4 text-muted-foreground/70" />
-                                                        <span>
-                                                            {vaga.locationType === "remote"
-                                                                ? "Remoto"
-                                                                : `${vaga.city || "Cidade não informada"}${vaga.state ? `, ${vaga.state}` : ""}`}
-                                                        </span>
+                                                        <MapPin className="h-4 w-4 text-muted-foreground/70 shrink-0" />
+                                                        <span className="line-clamp-1">{jobLocationLabel(vaga, "Cidade não informada")}</span>
                                                     </div>
 
-                                                    {(vaga.budgetMin !== null && vaga.budgetMin !== undefined) ||
-                                                        (vaga.budgetMax !== null && vaga.budgetMax !== undefined) ? (
+                                                    {hasJobBudget(vaga) && (
                                                         <div className="flex items-center gap-2">
-                                                            <DollarSign className="h-4 w-4 text-muted-foreground/70" />
-                                                            <span>
-                                                                {vaga.budgetMin !== null && vaga.budgetMin !== undefined && `A partir de R$ ${vaga.budgetMin}`}
-                                                                {!vaga.budgetMin && vaga.budgetMax !== null && vaga.budgetMax !== undefined && `Até R$ ${vaga.budgetMax}`}
-                                                            </span>
+                                                            <DollarSign className="h-4 w-4 text-muted-foreground/70 shrink-0" />
+                                                            <span>{formatJobBudget(vaga)}</span>
                                                         </div>
-                                                    ) : null}
-
-                                                    <div className="flex items-center gap-2">
-                                                        <Clock className="h-4 w-4 text-muted-foreground/70" />
-                                                        <span>Publicado em {new Date(vaga.createdAt).toLocaleDateString()}</span>
-                                                    </div>
+                                                    )}
 
                                                     {vaga.startDate && (
                                                         <div className="flex items-center gap-2">
-                                                            <Calendar className="h-4 w-4 text-muted-foreground/70" />
+                                                            <Calendar className="h-4 w-4 text-muted-foreground/70 shrink-0" />
                                                             <span>
-                                                                Início: {new Date(vaga.startDate).toLocaleDateString()}
+                                                                {formatJobDateRange(vaga.startDate, vaga.endDate)}
+                                                                {formatJobTimeRange(vaga.startTime, vaga.endTime) && (
+                                                                    <span className="text-muted-foreground/80"> · {formatJobTimeRange(vaga.startTime, vaga.endTime)}</span>
+                                                                )}
                                                             </span>
                                                         </div>
                                                     )}
+
+                                                    {((vaga.positions ?? 1) > 1 || vaga.requiresInvoice) && (
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            {(vaga.positions ?? 1) > 1 && (
+                                                                <Badge variant="outline" className="rounded-full font-normal">{positionsLabel(vaga.positions)}</Badge>
+                                                            )}
+                                                            {vaga.requiresInvoice && (
+                                                                <Badge variant="outline" className="rounded-full font-normal">Exige NF</Badge>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    <div className="flex items-center gap-2">
+                                                        <Clock className="h-4 w-4 text-muted-foreground/70 shrink-0" />
+                                                        <span>Publicado {publishedAgo(vaga.createdAt).toLowerCase()}</span>
+                                                    </div>
                                                 </div>
 
                                                 <Button className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors" asChild>

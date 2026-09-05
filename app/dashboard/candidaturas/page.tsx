@@ -48,6 +48,7 @@ import {
     formatBRL,
     formatDateOnly,
 } from "@/components/jobs/negotiation";
+import { formatJobDateRange, formatJobTimeRange, jobLocationLabel } from "@/lib/jobs/job-offer-display";
 
 /** 403 de plano → o modal de upgrade já foi aberto pelo interceptor do apiClient. */
 const isPlanError = (error: unknown) => isPlanErrorBody((error as any)?.response?.data);
@@ -357,6 +358,28 @@ function MinhasCandidaturasInner() {
                                                         </div>
                                                     )}
                                                 </div>
+
+                                                {/* Quando/onde: detalhes de execução da vaga */}
+                                                {(app.jobOffer.startDate || app.jobOffer.startTime || app.jobOffer.venue || app.jobOffer.city) && (
+                                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                                        {app.jobOffer.startDate && (
+                                                            <span className="flex items-center gap-1.5">
+                                                                <CalendarDays className="h-3.5 w-3.5" />
+                                                                {formatJobDateRange(app.jobOffer.startDate, app.jobOffer.endDate)}
+                                                            </span>
+                                                        )}
+                                                        {formatJobTimeRange(app.jobOffer.startTime, app.jobOffer.endTime) && (
+                                                            <span className="flex items-center gap-1.5">
+                                                                <Clock className="h-3.5 w-3.5" />
+                                                                {formatJobTimeRange(app.jobOffer.startTime, app.jobOffer.endTime)}
+                                                            </span>
+                                                        )}
+                                                        <span className="flex items-center gap-1.5">
+                                                            <MapPin className="h-3.5 w-3.5" />
+                                                            {jobLocationLabel(app.jobOffer)}
+                                                        </span>
+                                                    </div>
+                                                )}
 
                                                 {/* Resumo do acordo (quando existe) */}
                                                 {app.agreementText && (

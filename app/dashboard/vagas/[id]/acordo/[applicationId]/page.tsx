@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { isPlanErrorBody } from "@/lib/plans/plan-limits";
 import { NegotiationHistory, formatBRL, formatDateOnly, parseBRL } from "@/components/jobs/negotiation";
+import { formatJobTimeRange, jobLocationLabel } from "@/lib/jobs/job-offer-display";
 
 const apiErrorMessage = (error: unknown, fallback: string) => {
     const msg = (error as any)?.response?.data?.message;
@@ -80,12 +81,14 @@ export default function AcordoVagaPage() {
                         jobData.budgetMax || jobData.budgetMin || 0;
 
                     setAgreementValue(initialValue ? initialValue.toFixed(2).replace('.', ',') : "");
-                    setAgreementDeadline(candidateData.agreementDeadline ?? "");
-                    setAgreementScope(jobData.description);
-                    setAgreementLocation(
-                        candidateData.agreementLocation ??
-                        (jobData.locationType === 'remote' ? 'Remoto' : `${jobData.city || ''} / ${jobData.state || ''}`)
+                    // Detalhes de execução da vaga (SQL 78) entram como ponto de partida
+                    setAgreementDeadline(candidateData.agreementDeadline ?? jobData.deliveryDeadline ?? "");
+                    setAgreementScope(
+                        jobData.deliverables
+                            ? `${jobData.description}\n\nEntregáveis:\n${jobData.deliverables}`
+                            : jobData.description
                     );
+                    setAgreementLocation(candidateData.agreementLocation ?? jobLocationLabel(jobData, ""));
                     // Datas do serviço: as do acordo anterior, senão as da vaga → viram reserva na agenda
                     const start = toDateInput(candidateData.agreementStartDate ?? jobData.startDate);
                     const end = toDateInput(candidateData.agreementEndDate ?? jobData.endDate) || start;
@@ -113,6 +116,13 @@ export default function AcordoVagaPage() {
                 ? `de ${formatDateOnly(agreementStartDate)} a ${formatDateOnly(agreementEndDate)}`
                 : `em ${formatDateOnly(agreementStartDate)}`)
             : "a combinar entre as partes";
+        const serviceTime = formatJobTimeRange(jobOffer.startTime, jobOffer.endTime);
+        const paymentTerms = jobOffer.paymentTerms?.trim()
+            ? `Condições de pagamento: ${jobOffer.paymentTerms.trim()}.`
+            : "As condições de pagamento deverão ser combinadas diretamente entre as partes.";
+        const invoiceClause = jobOffer.requiresInvoice
+            ? "\nO CONTRATADO deverá emitir nota fiscal referente ao serviço prestado."
+            : "";
 
         const text = `TERMO DE PRESTAÇÃO DE SERVIÇOS AUDIOVISUAIS (FOTO E VÍDEO)
 
@@ -127,12 +137,12 @@ ${agreementScope}
 
 2. DO LOCAL, DATA E PRAZO
 Os serviços serão executados no local: ${agreementLocation}.
-Data de realização do serviço: ${serviceDates}.
+Data de realização do serviço: ${serviceDates}.${serviceTime ? `\nHorário: ${serviceTime}.` : ""}
 O prazo de entrega dos materiais finais é: ${agreementDeadline}.
 
 3. DO VALOR E PAGAMENTO
 Pela prestação dos serviços, o CONTRATANTE pagará ao CONTRATADO o valor total de R$ ${agreementValue}.
-As condições de pagamento deverão ser combinadas diretamente entre as partes.
+${paymentTerms}${invoiceClause}
 
 4. DAS OBRIGAÇÕES
 O CONTRATADO compromete-se a entregar os serviços com qualidade e dentro do prazo estipulado.

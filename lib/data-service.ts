@@ -98,15 +98,30 @@ export interface JobOffer {
   budgetMax?: number | null;
   requirements?: string | null;
   isActive: boolean;
-  status: 'open' | 'paused' | 'closed';
+  /** "expired" é automático: a data do trabalho passou (só reabre editando as datas). */
+  status: 'open' | 'paused' | 'closed' | 'expired';
   createdAt: string;
   updatedAt: string;
   employerAvatarUrl?: string;
   employerCreatedAt?: string;
-  startDate?: string;
-  endDate?: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  // ─── Detalhes de execução (SQL 78) ───────────────────────────────────
+  /** Horário de início/término do trabalho, "HH:MM". */
+  startTime?: string | null;
+  endTime?: string | null;
+  /** Local de execução (nome do espaço, bairro ou endereço). */
+  venue?: string | null;
+  /** Quantidade de profissionais a contratar (>= 1). */
+  positions?: number | null;
+  /** O que deve ser entregue (ex.: 300 fotos editadas, vídeo de 3 min). */
+  deliverables?: string | null;
+  /** Prazo de entrega do material (texto livre). */
+  deliveryDeadline?: string | null;
+  /** Forma e prazo de pagamento (texto livre). */
+  paymentTerms?: string | null;
   specialtyId?: string | null;
-  requiresInvoice?: boolean;
+  requiresInvoice?: boolean | null;
 }
 
 export interface Specialty {
@@ -168,12 +183,27 @@ export interface CreateJobOfferData {
   budgetMax?: number;
   requirements?: string;
   isActive?: boolean;
+  /** ISO (meia-noite UTC do dia escolhido). */
   startDate?: string;
   endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  venue?: string;
+  positions?: number;
+  deliverables?: string;
+  deliveryDeadline?: string;
+  paymentTerms?: string;
   specialtyId?: string;
   requiresInvoice?: boolean;
-  status?: 'open' | 'paused' | 'closed';
 }
+
+/**
+ * PUT /job-offers/:id tem semântica de PATCH: campo ausente não muda,
+ * `null` limpa (orçamento, datas, horários, local…).
+ */
+export type UpdateJobOfferData = {
+  [K in keyof CreateJobOfferData]?: CreateJobOfferData[K] | null;
+} & { isActive?: boolean };
 
 export interface AppNotification {
   id: string;
@@ -771,14 +801,22 @@ export const updateJobStatus = async (jobId: string, status: 'open' | 'paused' |
   }
 };
 
-export const bulkUpdateJobStatus = async (jobIds: string[], status: 'open' | 'paused' | 'closed'): Promise<boolean> => {
+/**
+ * Status em lote. Devolve os ids que mudaram de fato: ao reabrir, vagas
+ * com data no passado ficam de fora (precisam de novas datas).
+ */
+export const bulkUpdateJobStatus = async (
+  jobIds: string[],
+  status: 'open' | 'paused' | 'closed'
+): Promise<{ updated: string[]; count: number }> => {
   try {
-    await apiClient.post('/job-offers/bulk-status', {
+    const response = await apiClient.post('/job-offers/bulk-status', {
       ids: jobIds,
       status,
       isActive: status === 'open',
     });
-    return true;
+    const updated: string[] = Array.isArray(response?.data?.updated) ? response.data.updated : jobIds;
+    return { updated, count: updated.length };
   } catch (error) {
     console.error("Error bulk updating job status:", error);
     throw error;
@@ -786,17 +824,19 @@ export const bulkUpdateJobStatus = async (jobIds: string[], status: 'open' | 'pa
 };
 
 /**
- * Update an existing job offer
+ * Update an existing job offer (PATCH semantics — see UpdateJobOfferData).
+ * Preserva a mensagem do backend (ex.: datas no passado, orçamento invertido).
  */
 export async function updateJobOffer(
   id: string,
-  data: Partial<CreateJobOfferData>
-): Promise<void> {
+  data: UpdateJobOfferData
+): Promise<JobOffer> {
   try {
-    await apiClient.put(`/job-offers/${id}`, data);
-  } catch (error) {
+    const response = await apiClient.put(`/job-offers/${id}`, data);
+    return response.data;
+  } catch (error: any) {
     console.error("[data-service] Error updating job offer:", error);
-    throw new Error("Erro ao atualizar vaga");
+    throw backendError(error, "Erro ao atualizar vaga");
   }
 }
 
@@ -842,7 +882,12 @@ const JOB_APPLICATION_SELECT = `
     budget_min,
     budget_max,
     start_date,
-    end_date
+    end_date,
+    start_time,
+    end_time,
+    venue,
+    positions,
+    status
   )
 `;
 
@@ -878,6 +923,11 @@ function mapJobApplicationRow(app: any): JobApplication {
       budgetMax: app.job_offers.budget_max,
       startDate: app.job_offers.start_date ?? undefined,
       endDate: app.job_offers.end_date ?? undefined,
+      startTime: app.job_offers.start_time ? String(app.job_offers.start_time).slice(0, 5) : undefined,
+      endTime: app.job_offers.end_time ? String(app.job_offers.end_time).slice(0, 5) : undefined,
+      venue: app.job_offers.venue ?? undefined,
+      positions: app.job_offers.positions ?? 1,
+      status: app.job_offers.status ?? undefined,
     },
   };
 }
@@ -965,6 +1015,11 @@ export interface JobApplication {
     budgetMax?: number;
     startDate?: string;
     endDate?: string;
+    startTime?: string;
+    endTime?: string;
+    venue?: string;
+    positions?: number;
+    status?: string;
   };
 }
 

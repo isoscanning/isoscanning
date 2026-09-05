@@ -9,7 +9,8 @@ import { Footer } from "@/components/footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, Loader2, User, CheckCircle2, RefreshCcw } from "lucide-react";
+import { ChevronLeft, Loader2, User, CheckCircle2, RefreshCcw, CalendarDays, Clock, MapPin, Users, Pencil } from "lucide-react";
+import { formatJobDateRange, formatJobTimeRange, jobLocationLabel, jobStatusInfo, positionsLabel } from "@/lib/jobs/job-offer-display";
 import Link from "next/link";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -152,7 +153,13 @@ function CandidatosVagaInner() {
         } catch (error) {
             console.error("Erro ao reabrir vaga:", error);
             if (!isPlanError(error)) {
-                toast({ variant: "destructive", title: "Erro", description: "Não foi possível reabrir a vaga." });
+                // Ex.: data no passado — o backend explica
+                const msg = (error as any)?.response?.data?.message;
+                toast({
+                    variant: "destructive",
+                    title: "Não foi possível reabrir a vaga",
+                    description: Array.isArray(msg) ? msg.join(" ") : (typeof msg === "string" && msg) || "Tente novamente.",
+                });
             }
         }
     };
@@ -170,6 +177,12 @@ function CandidatosVagaInner() {
     }
 
     if (!jobOffer) return null;
+
+    const statusInfo = jobStatusInfo(jobOffer);
+    const positions = jobOffer.positions && jobOffer.positions > 0 ? jobOffer.positions : 1;
+    const acceptedCount = candidates.filter((c) => c.status === "accepted").length;
+    const jobDates = formatJobDateRange(jobOffer.startDate, jobOffer.endDate);
+    const jobTimes = formatJobTimeRange(jobOffer.startTime, jobOffer.endTime);
 
     return (
         <div className="min-h-screen flex flex-col bg-background">
@@ -191,20 +204,55 @@ function CandidatosVagaInner() {
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-4">
-                        {jobOffer.status === 'open' && (
+                    {/* Resumo da execução: o que o contratante combinou na vaga */}
+                    <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1.5">
+                            <CalendarDays className="h-4 w-4" /> {jobDates ?? "Data a combinar"}
+                        </span>
+                        {jobTimes && (
+                            <span className="flex items-center gap-1.5">
+                                <Clock className="h-4 w-4" /> {jobTimes}
+                            </span>
+                        )}
+                        <span className="flex items-center gap-1.5">
+                            <MapPin className="h-4 w-4" /> {jobLocationLabel(jobOffer)}
+                        </span>
+                        <span className={`flex items-center gap-1.5 ${acceptedCount >= positions ? "text-emerald-600 dark:text-emerald-400 font-medium" : ""}`}>
+                            <Users className="h-4 w-4" /> {acceptedCount} de {positionsLabel(positions)} aprovado{acceptedCount === 1 ? "" : "s"}
+                        </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 mt-4">
+                        {statusInfo.status === 'open' && (
                             <Button onClick={() => setIsConcludeDialogOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
                                 <CheckCircle2 className="mr-2 h-4 w-4" /> Concluir Vaga
                             </Button>
                         )}
-                        {jobOffer.status === 'closed' && (
+                        {(statusInfo.status === 'closed' || statusInfo.status === 'paused') && (
                             <Button onClick={() => setIsReopenDialogOpen(true)} variant="outline">
                                 <RefreshCcw className="mr-2 h-4 w-4" /> Reabrir Vaga
+                            </Button>
+                        )}
+                        {statusInfo.status === 'expired' && (
+                            <Button variant="outline" asChild>
+                                <Link href={`/dashboard/vagas/editar/${jobOffer.id}`}>
+                                    <Pencil className="mr-2 h-4 w-4" /> Editar datas e reabrir
+                                </Link>
                             </Button>
                         )}
                         <Badge variant="outline" className="text-sm py-1 px-3">
                             {candidates.length} {candidates.length === 1 ? 'Candidato' : 'Candidatos'}
                         </Badge>
+                        {statusInfo.status !== 'open' && (
+                            <Badge variant="secondary" className="text-sm py-1 px-3" title={statusInfo.hint}>
+                                {statusInfo.label}
+                            </Badge>
+                        )}
+                        {acceptedCount >= positions && statusInfo.status === 'open' && (
+                            <span className="text-xs text-muted-foreground">
+                                Todas as posições preenchidas — você pode concluir a vaga.
+                            </span>
+                        )}
                     </div>
                 </div>
 

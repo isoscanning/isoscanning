@@ -44,6 +44,12 @@ import {
     Star,
     ArrowUpRight,
     MoreHorizontal,
+    Users,
+    Receipt,
+    ClipboardList,
+    Wallet,
+    Timer,
+    Settings2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { fetchJobOfferById, type JobOffer, applyToJob, fetchJobApplication, type JobApplication } from "@/lib/data-service";
@@ -57,6 +63,20 @@ import { useToast } from "@/components/ui/use-toast";
 import { usePlan } from "@/lib/plans/use-plan";
 import { isPlanErrorBody } from "@/lib/plans/plan-limits";
 import { PlanBadge, UpgradeButton } from "@/components/plan/plan-gate";
+import {
+    formatJobBudget,
+    formatJobDateRange,
+    formatJobTimeRange,
+    isJobOpen,
+    jobCityState,
+    jobLocationLabel,
+    jobStatusInfo,
+    jobTypeColor,
+    jobTypeLabel,
+    locationTypeLabel,
+    positionsLabel,
+    publishedAgo,
+} from "@/lib/jobs/job-offer-display";
 
 export default function DetalhesVagaPage() {
     const params = useParams();
@@ -166,6 +186,10 @@ export default function DetalhesVagaPage() {
         }
     };
 
+    const isOwner = !!userProfile && !!vaga && userProfile.id === vaga.employerId;
+    const statusInfo = vaga ? jobStatusInfo(vaga) : null;
+    const acceptingApplications = !!vaga && isJobOpen(vaga);
+
     const handleApply = async () => {
         if (!userProfile) {
             toast({
@@ -174,6 +198,16 @@ export default function DetalhesVagaPage() {
                 variant: "destructive",
             });
             router.push("/login");
+            return;
+        }
+
+        if (isOwner) {
+            toast({ title: "Esta vaga é sua", description: "Você não pode se candidatar à própria vaga." });
+            return;
+        }
+
+        if (!acceptingApplications) {
+            toast({ title: "Vaga fora do ar", description: "Esta vaga não está mais recebendo candidaturas." });
             return;
         }
 
@@ -270,34 +304,9 @@ export default function DetalhesVagaPage() {
         }
     };
 
-    const getJobTypeLabel = (type: string) => {
-        const types: Record<string, string> = {
-            freelance: "Freelance",
-            full_time: "Tempo Integral",
-            part_time: "Meio Período",
-            project: "Por Projeto",
-        };
-        return types[type] || type;
-    };
-
-    const getJobTypeColor = (type: string) => {
-        switch (type) {
-            case "freelance": return "bg-blue-500";
-            case "full_time": return "bg-green-500";
-            case "part_time": return "bg-orange-500";
-            case "project": return "bg-purple-500";
-            default: return "bg-gray-500";
-        }
-    };
-
-    const getLocationLabel = (type: string) => {
-        const types: Record<string, string> = {
-            on_site: "Presencial",
-            remote: "Remoto",
-            hybrid: "Híbrido",
-        };
-        return types[type] || type;
-    };
+    const getJobTypeLabel = jobTypeLabel;
+    const getJobTypeColor = jobTypeColor;
+    const getLocationLabel = locationTypeLabel;
 
     const formatMemberSince = (dateString?: string) => {
         if (!dateString) return "";
@@ -373,12 +382,24 @@ export default function DetalhesVagaPage() {
                                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-white ${getJobTypeColor(vaga.jobType)}`}>
                                     {getJobTypeLabel(vaga.jobType)}
                                 </span>
-                                {vaga.isActive ? (
+                                {statusInfo?.status === "open" ? (
                                     <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-white bg-emerald-500">
                                         Ativa
                                     </span>
                                 ) : (
-                                    <Badge variant="destructive" className="rounded-full">Encerrada</Badge>
+                                    <Badge variant={statusInfo?.tone === "warning" ? "secondary" : "destructive"} className="rounded-full">
+                                        {statusInfo?.label ?? "Encerrada"}
+                                    </Badge>
+                                )}
+                                {(vaga.positions ?? 1) > 1 && (
+                                    <Badge variant="outline" className="rounded-full gap-1">
+                                        <Users className="h-3 w-3" /> {positionsLabel(vaga.positions)}
+                                    </Badge>
+                                )}
+                                {vaga.requiresInvoice && (
+                                    <Badge variant="outline" className="rounded-full gap-1">
+                                        <Receipt className="h-3 w-3" /> Exige NF
+                                    </Badge>
                                 )}
                             </div>
 
@@ -393,11 +414,22 @@ export default function DetalhesVagaPage() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <MapPin className="h-5 w-5" />
-                                    <span>{getLocationLabel(vaga.locationType)}</span>
+                                    <span>
+                                        {getLocationLabel(vaga.locationType)}
+                                        {vaga.locationType !== "remote" && (vaga.city || vaga.state)
+                                            ? ` · ${[vaga.city, vaga.state].filter(Boolean).join(", ")}`
+                                            : ""}
+                                    </span>
                                 </div>
+                                {vaga.startDate && (
+                                    <div className="flex items-center gap-2">
+                                        <Calendar className="h-5 w-5" />
+                                        <span>{formatJobDateRange(vaga.startDate, vaga.endDate)}</span>
+                                    </div>
+                                )}
                                 <div className="flex items-center gap-2">
                                     <Clock className="h-5 w-5" />
-                                    <span>Há {Math.floor((new Date().getTime() - new Date(vaga.createdAt).getTime()) / (1000 * 60 * 60 * 24))} dias</span>
+                                    <span>{publishedAgo(vaga.createdAt)}</span>
                                 </div>
                             </div>
                         </div>
@@ -437,6 +469,75 @@ export default function DetalhesVagaPage() {
                                     </div>
                                 </div>
                             )}
+
+                            <Separator />
+
+                            {/* Como será o trabalho (detalhes de execução — SQL 78) */}
+                            <div className="space-y-6">
+                                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                                    <Settings2 className="h-6 w-6 text-primary" />
+                                    Como será o trabalho
+                                </h2>
+                                <dl className="grid gap-4 sm:grid-cols-2 rounded-xl border bg-card p-6 shadow-sm text-sm">
+                                    <div className="flex gap-3">
+                                        <Calendar className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                                        <div>
+                                            <dt className="text-muted-foreground">Data</dt>
+                                            <dd className="font-medium text-foreground">{formatJobDateRange(vaga.startDate, vaga.endDate) ?? "A combinar"}</dd>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <Timer className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                                        <div>
+                                            <dt className="text-muted-foreground">Horário</dt>
+                                            <dd className="font-medium text-foreground">{formatJobTimeRange(vaga.startTime, vaga.endTime) ?? "A combinar"}</dd>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <MapPin className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                                        <div>
+                                            <dt className="text-muted-foreground">Local de execução</dt>
+                                            <dd className="font-medium text-foreground">{jobLocationLabel(vaga, "A combinar")}</dd>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <Users className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                                        <div>
+                                            <dt className="text-muted-foreground">Profissionais</dt>
+                                            <dd className="font-medium text-foreground">{positionsLabel(vaga.positions)}</dd>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <ClipboardList className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                                        <div>
+                                            <dt className="text-muted-foreground">Prazo de entrega</dt>
+                                            <dd className="font-medium text-foreground">{vaga.deliveryDeadline || "A combinar"}</dd>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <Wallet className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                                        <div>
+                                            <dt className="text-muted-foreground">Pagamento</dt>
+                                            <dd className="font-medium text-foreground">
+                                                {vaga.paymentTerms || "A combinar"}
+                                                {vaga.requiresInvoice && <span className="block text-xs text-muted-foreground mt-0.5">Exige emissão de nota fiscal.</span>}
+                                            </dd>
+                                        </div>
+                                    </div>
+                                </dl>
+
+                                {vaga.deliverables && (
+                                    <div className="space-y-3">
+                                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                                            <ClipboardList className="h-5 w-5 text-primary" />
+                                            Entregáveis
+                                        </h3>
+                                        <div className="bg-muted/30 rounded-xl p-6 border">
+                                            <p className="whitespace-pre-wrap text-muted-foreground leading-relaxed">{vaga.deliverables}</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
                             <Separator />
 
@@ -498,18 +599,8 @@ export default function DetalhesVagaPage() {
                                 <CardContent className="space-y-6">
                                     <div className="space-y-1">
                                         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Orçamento Estimado</span>
-                                        <div className="text-3xl font-bold text-foreground">
-                                            {(vaga.budgetMin !== null && vaga.budgetMin !== undefined) ||
-                                                (vaga.budgetMax !== null && vaga.budgetMax !== undefined) ? (
-                                                <>
-                                                    {vaga.budgetMin !== null && vaga.budgetMin !== undefined && `R$ ${vaga.budgetMin}`}
-                                                    {vaga.budgetMin !== null && vaga.budgetMin !== undefined &&
-                                                        vaga.budgetMax !== null && vaga.budgetMax !== undefined && " - "}
-                                                    {vaga.budgetMax !== null && vaga.budgetMax !== undefined && `R$ ${vaga.budgetMax}`}
-                                                </>
-                                            ) : (
-                                                "Valor não informado"
-                                            )}
+                                        <div className="text-2xl font-bold text-foreground">
+                                            {formatJobBudget(vaga)}
                                         </div>
                                         {appliedDetails?.counterProposal && (
                                             <div className="mt-2 flex items-center gap-1.5 text-emerald-700 font-bold bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 w-fit">
@@ -520,39 +611,78 @@ export default function DetalhesVagaPage() {
                                     </div>
 
                                     <div className="space-y-4 pt-4 border-t">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-muted-foreground flex items-center gap-2">
-                                                <Calendar className="h-4 w-4" /> Início
+                                        <div className="flex justify-between gap-3 text-sm">
+                                            <span className="text-muted-foreground flex items-center gap-2 shrink-0">
+                                                <Calendar className="h-4 w-4" /> Data
                                             </span>
-                                            <span className="font-medium">{vaga.startDate ? new Date(vaga.startDate).toLocaleDateString() : "Imediato"}</span>
+                                            <span className="font-medium text-right">{formatJobDateRange(vaga.startDate, vaga.endDate) ?? "A combinar"}</span>
                                         </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-muted-foreground flex items-center gap-2">
-                                                <Clock className="h-4 w-4" /> Término
-                                            </span>
-                                            <span className="font-medium">{vaga.endDate ? new Date(vaga.endDate).toLocaleDateString() : "A definir"}</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-muted-foreground flex items-center gap-2">
+                                        {formatJobTimeRange(vaga.startTime, vaga.endTime) && (
+                                            <div className="flex justify-between gap-3 text-sm">
+                                                <span className="text-muted-foreground flex items-center gap-2 shrink-0">
+                                                    <Clock className="h-4 w-4" /> Horário
+                                                </span>
+                                                <span className="font-medium text-right">{formatJobTimeRange(vaga.startTime, vaga.endTime)}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between gap-3 text-sm">
+                                            <span className="text-muted-foreground flex items-center gap-2 shrink-0">
                                                 <MapPin className="h-4 w-4" /> Local
                                             </span>
-                                            <span className="font-medium">
-                                                {vaga.locationType === "remote"
-                                                    ? "Remoto"
-                                                    : `${vaga.city || "N/A"}/${vaga.state || "UF"}`}
+                                            <span className="font-medium text-right">
+                                                {vaga.locationType === "remote" ? "Remoto" : jobCityState(vaga)}
                                             </span>
                                         </div>
+                                        <div className="flex justify-between gap-3 text-sm">
+                                            <span className="text-muted-foreground flex items-center gap-2 shrink-0">
+                                                <Users className="h-4 w-4" /> Profissionais
+                                            </span>
+                                            <span className="font-medium text-right">{positionsLabel(vaga.positions)}</span>
+                                        </div>
+                                        {vaga.deliveryDeadline && (
+                                            <div className="flex justify-between gap-3 text-sm">
+                                                <span className="text-muted-foreground flex items-center gap-2 shrink-0">
+                                                    <ClipboardList className="h-4 w-4" /> Entrega
+                                                </span>
+                                                <span className="font-medium text-right">{vaga.deliveryDeadline}</span>
+                                            </div>
+                                        )}
+                                        {vaga.requiresInvoice && (
+                                            <div className="flex justify-between gap-3 text-sm">
+                                                <span className="text-muted-foreground flex items-center gap-2 shrink-0">
+                                                    <Receipt className="h-4 w-4" /> Nota fiscal
+                                                </span>
+                                                <span className="font-medium text-right">Obrigatória</span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="space-y-3 pt-2">
-                                        <Button
-                                            className="w-full font-bold text-base h-11 shadow-lg shadow-primary/20"
-                                            size="lg"
-                                            onClick={handleApply}
-                                            disabled={applying || hasApplied}
-                                        >
-                                            {applying ? "Enviando..." : hasApplied ? "Já Candidatado" : "Candidatar-se Agora"}
-                                        </Button>
+                                        {isOwner ? (
+                                            <>
+                                                <Button className="w-full font-bold text-base h-11 shadow-lg shadow-primary/20" size="lg" asChild>
+                                                    <Link href={`/dashboard/vagas/${vaga.id}/candidatos`}>Gerenciar candidatos</Link>
+                                                </Button>
+                                                <Button variant="outline" className="w-full h-11" asChild>
+                                                    <Link href={`/dashboard/vagas/editar/${vaga.id}`}>Editar vaga</Link>
+                                                </Button>
+                                            </>
+                                        ) : (
+                                            <Button
+                                                className="w-full font-bold text-base h-11 shadow-lg shadow-primary/20"
+                                                size="lg"
+                                                onClick={handleApply}
+                                                disabled={applying || hasApplied || !acceptingApplications}
+                                            >
+                                                {applying
+                                                    ? "Enviando..."
+                                                    : hasApplied
+                                                        ? "Já Candidatado"
+                                                        : acceptingApplications
+                                                            ? "Candidatar-se Agora"
+                                                            : `Vaga ${statusInfo?.label.toLowerCase() ?? "encerrada"}`}
+                                            </Button>
+                                        )}
                                         <Button
                                             variant="outline"
                                             className="w-full h-11"
@@ -561,7 +691,7 @@ export default function DetalhesVagaPage() {
                                             <Share2 className="mr-2 h-4 w-4" /> Compartilhar Vaga
                                         </Button>
 
-                                        {userProfile?.id !== vaga.employerId && !hasApplied && (
+                                        {!isOwner && !hasApplied && acceptingApplications && (
                                             <Dialog open={isProposalModalOpen} onOpenChange={setIsProposalModalOpen}>
                                                 <DialogTrigger asChild>
                                                     <Button variant="outline" className="w-full border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 mt-2">
@@ -633,15 +763,8 @@ export default function DetalhesVagaPage() {
                     <div className="flex items-center gap-4 max-w-md mx-auto">
                         <div className="flex-1">
                             <p className="text-xs text-muted-foreground uppercase font-medium">Orçamento</p>
-                            <p className="font-bold text-lg leading-tight text-foreground">
-                                {(vaga.budgetMin !== null && vaga.budgetMin !== undefined) ||
-                                    (vaga.budgetMax !== null && vaga.budgetMax !== undefined) ? (
-                                    <>
-                                        {vaga.budgetMin !== null && vaga.budgetMin !== undefined && `R$ ${vaga.budgetMin}`}
-                                    </>
-                                ) : (
-                                    "A combinar"
-                                )}
+                            <p className="font-bold text-base leading-tight text-foreground">
+                                {formatJobBudget(vaga, "A combinar")}
                             </p>
                             {appliedDetails?.counterProposal && (
                                 <p className="text-emerald-700 font-bold text-sm mt-0.5">
@@ -649,15 +772,27 @@ export default function DetalhesVagaPage() {
                                 </p>
                             )}
                         </div>
-                        <Button
-                            size="lg"
-                            className="font-bold shadow-lg"
-                            onClick={handleApply}
-                            disabled={applying || hasApplied}
-                        >
-                            {applying ? "Enviando..." : hasApplied ? "Já Candidatado" : "Candidatar-se"}
-                        </Button>
-                        {userProfile?.id !== vaga.employerId && !hasApplied && (
+                        {isOwner ? (
+                            <Button size="lg" className="font-bold shadow-lg" asChild>
+                                <Link href={`/dashboard/vagas/${vaga.id}/candidatos`}>Candidatos</Link>
+                            </Button>
+                        ) : (
+                            <Button
+                                size="lg"
+                                className="font-bold shadow-lg"
+                                onClick={handleApply}
+                                disabled={applying || hasApplied || !acceptingApplications}
+                            >
+                                {applying
+                                    ? "Enviando..."
+                                    : hasApplied
+                                        ? "Já Candidatado"
+                                        : acceptingApplications
+                                            ? "Candidatar-se"
+                                            : `Vaga ${statusInfo?.label.toLowerCase() ?? "encerrada"}`}
+                            </Button>
+                        )}
+                        {!isOwner && !hasApplied && acceptingApplications && (
                             <Dialog open={isProposalModalOpen} onOpenChange={setIsProposalModalOpen}>
                                 <DialogTrigger asChild>
                                     <Button variant="outline" size="icon" className="h-12 w-12 shrink-0 border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800">

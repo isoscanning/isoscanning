@@ -87,8 +87,10 @@ export default async function JobOfferPage({ params }: Props) {
       title: job.title,
       description: summarize(job.description, 1000) || job.title,
       datePosted: job.createdAt,
-      ...(job.endDate ? { validThrough: job.endDate } : {}),
+      // Vale até o último dia do trabalho (a vaga expira sozinha depois disso)
+      ...(job.endDate || job.startDate ? { validThrough: (job.endDate ?? job.startDate) as string } : {}),
       employmentType: employmentType(job.jobType),
+      totalJobOpenings: job.positions,
       hiringOrganization: {
         "@type": "Organization",
         name: job.employerName || SITE_NAME,
@@ -98,6 +100,7 @@ export default async function JobOfferPage({ params }: Props) {
         : {
           jobLocation: {
             "@type": "Place",
+            ...(job.venue ? { name: job.venue } : {}),
             address: {
               "@type": "PostalAddress",
               ...(job.city ? { addressLocality: job.city } : {}),

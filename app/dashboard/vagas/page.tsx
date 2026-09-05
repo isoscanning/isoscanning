@@ -9,7 +9,6 @@ import {
     Card,
     CardContent,
     CardDescription,
-    CardHeader,
     CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,14 +35,33 @@ import { JobCard } from "./components/job-card";
 import { BulkActionBar } from "./components/bulk-action-bar";
 import { usePlan } from "@/lib/plans/use-plan";
 import { isPlanErrorBody, startOfCurrentMonth } from "@/lib/plans/plan-limits";
+import { jobStatusInfo, type JobOfferStatus } from "@/lib/jobs/job-offer-display";
 
 /** 403 de plano → o modal de upgrade já foi aberto pelo interceptor do apiClient. */
 const isPlanError = (error: unknown) => isPlanErrorBody((error as any)?.response?.data);
+
+/** Mensagem do backend (ex.: "vaga com data no passado") ou o fallback. */
+const apiErrorMessage = (error: unknown, fallback: string) => {
+    const msg = (error as any)?.response?.data?.message;
+    if (Array.isArray(msg)) return msg.join(" ");
+    return typeof msg === "string" && msg ? msg : fallback;
+};
+
+type StatusFilter = "all" | JobOfferStatus;
+
+const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
+    { value: "all", label: "Todas" },
+    { value: "open", label: "Ativas" },
+    { value: "paused", label: "Pausadas" },
+    { value: "closed", label: "Concluídas" },
+    { value: "expired", label: "Expiradas" },
+];
 
 export default function MinhasVagasPage() {
     const router = useRouter();
     const { userProfile, loading } = useAuth();
     const [vagas, setVagas] = useState<JobOffer[]>([]);
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
     const [loadingVagas, setLoadingVagas] = useState(true);
     const [isDeleting, setIsDeleting] = useState(false);
     const [vagaToDelete, setVagaToDelete] = useState<string | null>(null);
@@ -82,6 +100,11 @@ export default function MinhasVagasPage() {
     }, [userProfile, loading, router, fetchVagas]);
 
     const handleToggleActive = async (vaga: JobOffer) => {
+        // Expirada: a data passou — só reabre com novas datas (tela de edição)
+        if (jobStatusInfo(vaga).status === "expired") {
+            router.push(`/dashboard/vagas/editar/${vaga.id}`);
+            return;
+        }
         try {
             const newStatus: 'open' | 'paused' | 'closed' = vaga.status === 'open' ? 'paused' : 'open';
             const newIsActive = newStatus === 'open';
@@ -98,7 +121,11 @@ export default function MinhasVagasPage() {
         } catch (error) {
             console.error("Erro ao alterar status da vaga:", error);
             if (!isPlanError(error)) {
-                toast({ variant: "destructive", title: "Erro", description: "Erro ao alterar status da vaga" });
+                toast({
+                    variant: "destructive",
+                    title: "Não foi possível alterar o status",
+                    description: apiErrorMessage(error, "Erro ao alterar status da vaga"),
+                });
             }
         }
     };
@@ -125,8 +152,18 @@ export default function MinhasVagasPage() {
         }
     };
 
+    // Filtro por situação (contagens por status para os chips)
+    const statusCounts = vagas.reduce<Record<string, number>>((acc, v) => {
+        const s = jobStatusInfo(v).status;
+        acc[s] = (acc[s] ?? 0) + 1;
+        return acc;
+    }, {});
+    const visibleVagas = statusFilter === "all"
+        ? vagas
+        : vagas.filter((v) => jobStatusInfo(v).status === statusFilter);
+
     const handleSelectAll = (checked: boolean) => {
-        setSelectedJobIds(checked ? vagas.map(v => v.id) : []);
+        setSelectedJobIds(checked ? visibleVagas.map(v => v.id) : []);
     };
 
     const handleSelectJob = (jobId: string, checked: boolean) => {
@@ -167,18 +204,27 @@ export default function MinhasVagasPage() {
                 toast({ title: "Vagas excluídas", description: `${selectedJobIds.length} vagas foram excluídas.` });
             } else {
                 const status = action === 'conclude' ? 'closed' : action === 'pause' ? 'paused' : 'open';
-                await bulkUpdateJobStatus(selectedJobIds, status);
+                const result = await bulkUpdateJobStatus(selectedJobIds, status);
+                // O backend devolve só o que mudou: ao reativar, vagas com data
+                // no passado ficam de fora (precisam de novas datas).
+                const updated = new Set(result?.updated ?? selectedJobIds);
+                const skipped = selectedJobIds.length - updated.size;
 
-                setVagas(vagas.map(v => selectedJobIds.includes(v.id) ? { ...v, status, isActive: status === 'open' } : v));
+                setVagas(vagas.map(v => updated.has(v.id) ? { ...v, status, isActive: status === 'open' } : v));
 
                 const actionName = action === 'conclude' ? 'concluídas' : action === 'pause' ? 'pausadas' : 'reativadas';
-                toast({ title: "Sucesso", description: `${selectedJobIds.length} vagas foram ${actionName}.` });
+                toast({
+                    title: "Sucesso",
+                    description: skipped > 0
+                        ? `${updated.size} vaga(s) ${actionName}. ${skipped} não reativada(s): a data do trabalho já passou — edite as datas.`
+                        : `${updated.size} vagas foram ${actionName}.`,
+                });
             }
             setSelectedJobIds([]);
         } catch (error) {
             console.error("Erro na ação em massa:", error);
             if (!isPlanError(error)) {
-                toast({ variant: "destructive", title: "Erro", description: "Falha ao processar ação em massa." });
+                toast({ variant: "destructive", title: "Erro", description: apiErrorMessage(error, "Falha ao processar ação em massa.") });
             }
         } finally {
             setIsBulkProcessing(false);
@@ -188,10 +234,9 @@ export default function MinhasVagasPage() {
     // Derived flags for BulkActionBar
     const selectedJobs = vagas.filter(v => selectedJobIds.includes(v.id));
     const hasOpenJobs = selectedJobs.some(v => v.status === 'open');
-    const hasPausedJobs = selectedJobs.some(v => v.status === 'paused');
-    const hasClosedJobs = selectedJobs.some(v => v.status === 'closed');
     const hasNonClosedJobs = selectedJobs.some(v => v.status !== 'closed');
-    const hasNonOpenJobs = selectedJobs.some(v => v.status !== 'open');
+    // Expirada não reativa em lote (precisa de novas datas na edição)
+    const hasNonOpenJobs = selectedJobs.some(v => v.status === 'paused' || v.status === 'closed');
 
     if (loading) {
         return (
@@ -235,15 +280,37 @@ export default function MinhasVagasPage() {
                     </div>
 
                     {vagas.length > 0 && (
-                        <div className="flex items-center gap-2 py-2 px-1">
-                            <Checkbox
-                                id="select-all"
-                                checked={selectedJobIds.length === vagas.length && vagas.length > 0}
-                                onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
-                            />
-                            <label htmlFor="select-all" className="text-sm font-medium cursor-pointer select-none text-muted-foreground">
-                                {selectedJobIds.length === 0 ? "Selecionar todas" : `${selectedJobIds.length} selecionada${selectedJobIds.length > 1 ? 's' : ''}`}
-                            </label>
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between py-2 px-1">
+                            <div className="flex items-center gap-2">
+                                <Checkbox
+                                    id="select-all"
+                                    checked={visibleVagas.length > 0 && selectedJobIds.length === visibleVagas.length}
+                                    onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                                />
+                                <label htmlFor="select-all" className="text-sm font-medium cursor-pointer select-none text-muted-foreground">
+                                    {selectedJobIds.length === 0 ? "Selecionar todas" : `${selectedJobIds.length} selecionada${selectedJobIds.length > 1 ? 's' : ''}`}
+                                </label>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrar por situação">
+                                {STATUS_FILTERS.map((f) => {
+                                    const count = f.value === "all" ? vagas.length : (statusCounts[f.value] ?? 0);
+                                    if (f.value !== "all" && count === 0) return null;
+                                    const active = statusFilter === f.value;
+                                    return (
+                                        <button
+                                            key={f.value}
+                                            type="button"
+                                            onClick={() => { setStatusFilter(f.value); setSelectedJobIds([]); }}
+                                            aria-pressed={active}
+                                            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${active
+                                                ? "bg-primary text-primary-foreground border-primary"
+                                                : "bg-background text-muted-foreground hover:bg-muted"}`}
+                                        >
+                                            {f.label} <span className="opacity-70">({count})</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
                     )}
 
@@ -276,9 +343,15 @@ export default function MinhasVagasPage() {
                                 </Button>
                             </CardContent>
                         </Card>
+                    ) : visibleVagas.length === 0 ? (
+                        <Card className="border-dashed">
+                            <CardContent className="py-12 text-center text-muted-foreground">
+                                Nenhuma vaga nesta situação.
+                            </CardContent>
+                        </Card>
                     ) : (
                         <div className="grid grid-cols-1 gap-6 pb-24">
-                            {vagas.map((vaga) => (
+                            {visibleVagas.map((vaga) => (
                                 <JobCard
                                     key={vaga.id}
                                     vaga={vaga}

@@ -14,18 +14,23 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  ArrowLeft, Clock, CheckCircle2, MapPin, Phone, Send,
+  ArrowLeft, Clock, MapPin, Phone, Send,
   MessageSquare, X, SkipForward, RotateCcw, PartyPopper, Link2, HardDrive, Lock,
-  Timer, ChevronRight,
+  Timer, ChevronRight, ChevronsDown, FilterX,
 } from "lucide-react";
 import { BriefingTimeShiftDialog } from "@/components/briefing-time-shift-dialog";
 import { BriefingIncidentsCard } from "@/components/briefing-incidents-card";
+import { BriefingItemFilters, useBriefingItemFilter } from "@/components/briefing-item-filters";
+import {
+  EMPTY_ITEM_FILTER, filterSections, firstPendingItemId,
+} from "@/lib/briefing-pro-filters";
 import { toast } from "sonner";
 import { briefingProService } from "@/lib/briefing-pro-service";
 import {
   BriefingComment,
   BriefingDetail,
   BriefingItem,
+  ITEM_TYPE_LABELS,
   PRIORITY_CONFIG,
   ProfileSummary,
 } from "@/lib/briefing-pro-types";
@@ -73,6 +78,12 @@ export default function ExecutionModePage() {
   const feedRef = useRef<HTMLDivElement | null>(null);
   const pollingRef = useRef(false);
   const scrolledToCurrentRef = useRef(false);
+  const [flashId, setFlashId] = useState<string | null>(null);
+
+  // Filtro (tipo / pessoa / só pendentes) — salvo por briefing no navegador
+  const {
+    filter: itemFilter, setFilter: setItemFilter, ready: filterReady, active: filterActive,
+  } = useBriefingItemFilter(briefingId);
 
   // Relógio para o marcador "Agora / A seguir"
   useEffect(() => {
@@ -123,6 +134,21 @@ export default function ExecutionModePage() {
   const doneCount = allItems.filter((i) => i.status === "done" || i.status === "skipped").length;
   const progress = allItems.length ? Math.round((doneCount / allItems.length) * 100) : 0;
 
+  const visibleSections = useMemo(
+    () => (detail ? filterSections(detail.sections, itemFilter, userProfile?.id) : []),
+    [detail, itemFilter, userProfile?.id]
+  );
+  const visibleItemCount = visibleSections.reduce((acc, s) => acc + s.items.length, 0);
+  const people = useMemo(() => {
+    if (!detail) return [] as Array<{ id: string; profile: ProfileSummary | null }>;
+    return [
+      { id: detail.briefing.owner_id, profile: detail.profiles[detail.briefing.owner_id] ?? null },
+      ...detail.members.map((m) => ({ id: m.user_id, profile: m.profile ?? null })),
+    ];
+  }, [detail]);
+  // Primeira tarefa ainda não feita (respeitando o filtro): alvo do foco inicial
+  const firstPendingId = useMemo(() => firstPendingItemId(visibleSections), [visibleSections]);
+
   // "Agora": último item com horário <= agora ainda não concluído.
   // "A seguir": primeiro item com horário > agora. Só durante a execução.
   const { currentItemId, nextItemId } = useMemo(() => {
@@ -144,16 +170,23 @@ export default function ExecutionModePage() {
     return { currentItemId: current?.id ?? null, nextItemId: next?.id ?? null };
   }, [detail?.briefing.status, allItems, now]);
 
-  // Auto-scroll único até o item atual ao abrir a tela
+  const scrollToItem = useCallback((itemId: string) => {
+    document
+      .getElementById(`exec-item-${itemId}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFlashId(itemId);
+    setTimeout(() => setFlashId((current) => (current === itemId ? null : current)), 1800);
+  }, []);
+
+  // Ao abrir a tela, vai direto à primeira tarefa ainda não feita (ou, se não
+  // houver, ao item "Agora") — evita rolar a lista inteira para achar onde parou.
   useEffect(() => {
-    if (!currentItemId || scrolledToCurrentRef.current) return;
+    if (!detail || !filterReady || scrolledToCurrentRef.current) return;
+    const target = firstPendingId ?? currentItemId;
+    if (!target) return;
     scrolledToCurrentRef.current = true;
-    setTimeout(() => {
-      document
-        .getElementById(`exec-item-${currentItemId}`)
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 300);
-  }, [currentItemId]);
+    setTimeout(() => scrollToItem(target), 300);
+  }, [detail, filterReady, firstPendingId, currentItemId, scrollToItem]);
 
   async function setItemStatus(item: BriefingItem, status: string) {
     // Otimista
@@ -172,6 +205,13 @@ export default function ExecutionModePage() {
           }
         : prev
     );
+    // Com "Só pendentes" ativo o item some da lista na hora — dá para desfazer
+    if (itemFilter.onlyPending && (status === "done" || status === "skipped")) {
+      toast(status === "done" ? "Item concluído" : "Item pulado", {
+        description: "Ele saiu da lista porque o filtro \"Só pendentes\" está ativo.",
+        action: { label: "Desfazer", onClick: () => setItemStatus(item, "pending") },
+      });
+    }
     try {
       await briefingProService.updateItemStatus(item.id, status);
     } catch {
@@ -253,17 +293,17 @@ export default function ExecutionModePage() {
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-6 max-w-3xl pb-40">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
           <Button
             variant="ghost"
             size="sm"
-            className="gap-2"
+            className="gap-2 -ml-2"
             onClick={() => router.push(`/dashboard/briefing-pro/${briefingId}`)}
           >
             <ArrowLeft className="h-4 w-4" />
             Briefing
           </Button>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
             {canEdit && (
               <Button
                 variant="outline"
@@ -273,15 +313,21 @@ export default function ExecutionModePage() {
                 onClick={() => setTimeShiftOpen(true)}
               >
                 <Timer className="h-4 w-4" />
-                Ajustar horários
+                <span className="hidden sm:inline">Ajustar horários</span>
+                <span className="sm:hidden">Horários</span>
               </Button>
             )}
-            <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 gap-1">
+            <Badge
+              variant="secondary"
+              className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 gap-1"
+              title={`Atualiza a cada ${POLL_MS / 1000}s`}
+            >
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
               </span>
-              Ao vivo · atualiza a cada {POLL_MS / 1000}s
+              Ao vivo
+              <span className="hidden sm:inline"> · atualiza a cada {POLL_MS / 1000}s</span>
             </Badge>
           </div>
         </div>
@@ -289,8 +335,8 @@ export default function ExecutionModePage() {
         {/* Painel de progresso */}
         <Card className="mb-4 border-blue-200 dark:border-blue-900">
           <CardContent className="py-4">
-            <div className="flex items-center justify-between mb-2">
-              <div>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div className="min-w-0">
                 <h1 className="font-bold text-lg leading-tight">{briefing.title}</h1>
                 <p className="text-xs text-muted-foreground">
                   {briefing.event_date &&
@@ -314,6 +360,18 @@ export default function ExecutionModePage() {
                 <PartyPopper className="h-4 w-4" />
                 Tudo concluído! Excelente trabalho, equipe.
               </p>
+            )}
+            {firstPendingId && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3 gap-1 w-full sm:w-auto"
+                title="Rola até a primeira tarefa ainda não feita"
+                onClick={() => scrollToItem(firstPendingId)}
+              >
+                <ChevronsDown className="h-4 w-4" />
+                Ir para a próxima pendente
+              </Button>
             )}
 
             {/* Acesso rápido: locações e contatos */}
@@ -359,9 +417,43 @@ export default function ExecutionModePage() {
           </Card>
         )}
 
+        {allItems.length > 0 && (
+          <BriefingItemFilters
+            className="mb-4"
+            filter={itemFilter}
+            onChange={setItemFilter}
+            items={allItems}
+            people={people}
+            userId={userProfile?.id}
+            showPendingToggle
+            visibleCount={visibleItemCount}
+            totalCount={allItems.length}
+          />
+        )}
+
         {/* Checklist por seção */}
         <div className="space-y-4">
-          {detail.sections.map((section) => {
+          {filterActive && visibleSections.length === 0 && (
+            <Card className="border-dashed">
+              <CardContent className="py-8 text-center text-sm text-muted-foreground space-y-3">
+                <p>
+                  {itemFilter.onlyPending && progress === 100
+                    ? "Nenhuma tarefa pendente — tudo feito!"
+                    : "Nenhum item corresponde ao filtro."}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  onClick={() => setItemFilter(EMPTY_ITEM_FILTER)}
+                >
+                  <FilterX className="h-4 w-4" />
+                  Limpar filtros
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+          {visibleSections.map((section) => {
             const sectionDone = section.items.filter(
               (i) => i.status === "done" || i.status === "skipped"
             ).length;
@@ -394,7 +486,7 @@ export default function ExecutionModePage() {
                       <div
                         key={item.id}
                         id={`exec-item-${item.id}`}
-                        className={`rounded-lg px-2 py-2 ${isDone || isSkipped ? "opacity-60" : ""} hover:bg-muted/50 ${isCurrent ? "ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/10" : ""}`}
+                        className={`rounded-lg px-2 py-2 transition-shadow ${isDone || isSkipped ? "opacity-60" : ""} hover:bg-muted/50 ${isCurrent ? "ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/10" : ""} ${flashId === item.id ? "ring-2 ring-amber-400" : ""}`}
                       >
                         <div className="flex items-start gap-3">
                           <Checkbox
@@ -444,6 +536,11 @@ export default function ExecutionModePage() {
                               {item.priority === "high" && !isDone && (
                                 <Badge variant="secondary" className={`text-xs ${PRIORITY_CONFIG.high.className}`}>
                                   Alta
+                                </Badge>
+                              )}
+                              {item.item_type !== "task" && (
+                                <Badge variant="outline" className="text-xs">
+                                  {ITEM_TYPE_LABELS[item.item_type]}
                                 </Badge>
                               )}
                             </div>
@@ -575,6 +672,7 @@ export default function ExecutionModePage() {
             incidents={detail.incidents}
             myRole={detail.my_role}
             userId={userProfile?.id}
+            profiles={detail.profiles}
             onChanged={() => load(true)}
           />
         </div>

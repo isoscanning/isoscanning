@@ -19,7 +19,7 @@ export type BriefingStatus =
 
 export type MemberRole = "editor" | "viewer";
 export type EffectiveRole = "owner" | "editor" | "viewer";
-export type ItemType = "task" | "photo" | "video" | "material" | "note" | "break";
+export type ItemType = "task" | "photo" | "video" | "drone" | "material" | "note" | "break";
 export type ItemPriority = "low" | "medium" | "high";
 export type ItemStatus = "pending" | "in_progress" | "done" | "skipped";
 export type DeliverableStatus = "pending" | "in_production" | "delivered" | "approved";
@@ -189,6 +189,21 @@ export interface BriefingComment {
 
 export type IncidentSeverity = "low" | "medium" | "high";
 
+/**
+ * Desfecho de uma intercorrência encerrada (migration 79): resolvida,
+ * contornada com adaptação ou não solucionada (com motivo + justificativa).
+ */
+export type IncidentOutcome = "resolved" | "workaround" | "unresolved";
+
+export type UnresolvedReason =
+  | "no_time"
+  | "no_resource"
+  | "weather"
+  | "third_party"
+  | "access"
+  | "safety"
+  | "other";
+
 export interface BriefingIncident {
   id: string;
   briefing_id: string;
@@ -196,8 +211,12 @@ export interface BriefingIncident {
   author_id: string;
   severity: IncidentSeverity;
   description: string;
+  /** true = encerrada com qualquer desfecho (ver `outcome`). */
   resolved: boolean;
+  /** Como foi resolvida/contornada, ou a justificativa de não ter sido solucionada. */
   resolution: string | null;
+  outcome: IncidentOutcome | null;
+  unresolved_reason: UnresolvedReason | null;
   resolved_by: string | null;
   resolved_at: string | null;
   occurred_at: string;
@@ -367,6 +386,7 @@ export const ITEM_TYPE_LABELS: Record<ItemType, string> = {
   task: "Tarefa",
   photo: "Foto",
   video: "Vídeo",
+  drone: "Drone",
   material: "Material",
   note: "Observação",
   break: "Intervalo",
@@ -415,6 +435,37 @@ export const STORAGE_TYPE_LABELS: Record<StorageType, string> = {
 export const MEMBER_ROLE_LABELS: Record<MemberRole, string> = {
   editor: "Editor",
   viewer: "Visualizador",
+};
+
+export const INCIDENT_OUTCOME_CONFIG: Record<
+  IncidentOutcome,
+  { label: string; description: string; className: string }
+> = {
+  resolved: {
+    label: "Resolvida",
+    description: "O problema foi solucionado.",
+    className: "text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800",
+  },
+  workaround: {
+    label: "Contornada",
+    description: "Não foi resolvida, mas houve uma adaptação para seguir o trabalho.",
+    className: "text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800",
+  },
+  unresolved: {
+    label: "Não solucionada",
+    description: "Não foi possível resolver — registre o motivo para o relatório.",
+    className: "text-red-600 dark:text-red-400 border-red-300 dark:border-red-800",
+  },
+};
+
+export const UNRESOLVED_REASON_LABELS: Record<UnresolvedReason, string> = {
+  no_time: "Falta de tempo no cronograma",
+  no_resource: "Equipamento ou recurso indisponível",
+  weather: "Clima ou condições do local",
+  third_party: "Dependia de terceiros (cliente, fornecedor)",
+  access: "Acesso ou autorização negada",
+  safety: "Risco à segurança",
+  other: "Outro motivo",
 };
 
 export const INCIDENT_SEVERITY_CONFIG: Record<

@@ -22,7 +22,9 @@ import {
   BRIEFING_STATUS_CONFIG,
   BRIEFING_TYPE_LABELS,
   DELIVERABLE_STATUS_CONFIG,
+  INCIDENT_OUTCOME_CONFIG,
   INCIDENT_SEVERITY_CONFIG,
+  UNRESOLVED_REASON_LABELS,
   ITEM_TYPE_LABELS,
   MEMBER_ROLE_LABELS,
   STORAGE_TYPE_LABELS,
@@ -410,12 +412,26 @@ export default function BriefingPrintPage() {
                   </span>{" "}
                   {formatDateTime(incident.occurred_at)} · registrada por{" "}
                   {incident.profile?.display_name ?? nameOf(incident.author_id)} ·{" "}
-                  {incident.resolved ? "RESOLVIDA" : "EM ABERTO"}
+                  {incident.resolved
+                    ? INCIDENT_OUTCOME_CONFIG[incident.outcome ?? "resolved"].label.toUpperCase()
+                    : "EM ABERTO"}
                 </p>
                 <p className="mt-0.5">{incident.description}</p>
-                {incident.resolved && incident.resolution && (
+                {incident.resolved && incident.outcome === "unresolved" && (
                   <p className="text-xs text-gray-700 mt-0.5">
-                    <span className="font-semibold">Resolução</span>
+                    <span className="font-semibold">Motivo</span>
+                    {incident.resolved_by ? ` (${nameOf(incident.resolved_by)})` : ""}:{" "}
+                    {incident.unresolved_reason
+                      ? UNRESOLVED_REASON_LABELS[incident.unresolved_reason]
+                      : "não informado"}
+                    {incident.resolution ? ` — ${incident.resolution}` : ""}
+                  </p>
+                )}
+                {incident.resolved && incident.outcome !== "unresolved" && incident.resolution && (
+                  <p className="text-xs text-gray-700 mt-0.5">
+                    <span className="font-semibold">
+                      {incident.outcome === "workaround" ? "Contorno" : "Resolução"}
+                    </span>
                     {incident.resolved_by ? ` (${nameOf(incident.resolved_by)})` : ""}: {incident.resolution}
                   </p>
                 )}

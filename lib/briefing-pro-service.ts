@@ -22,9 +22,11 @@ import {
   BriefingSubitem,
   GeneratedBriefingStructure,
   GeneratedSection,
+  IncidentOutcome,
   MemberRole,
   PublicBriefingView,
   RefineMode,
+  UnresolvedReason,
 } from "./briefing-pro-types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
@@ -350,7 +352,15 @@ export const briefingProService = {
 
   async updateIncident(
     incidentId: string,
-    payload: { description?: string; severity?: string; resolved?: boolean; resolution?: string }
+    payload: {
+      description?: string;
+      severity?: string;
+      /** false = reabrir. Para encerrar, prefira `outcome`. */
+      resolved?: boolean;
+      resolution?: string;
+      outcome?: IncidentOutcome;
+      unresolved_reason?: UnresolvedReason;
+    }
   ): Promise<BriefingIncident> {
     const { data } = await apiClient.patch(`/briefing-pro/incidents/${incidentId}`, payload);
     return data;

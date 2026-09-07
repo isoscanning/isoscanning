@@ -315,3 +315,19 @@
     display: none;
   }
 }
+
+/* ─── Ações reveladas no hover ────────────────────────────────────────────
+   Tailwind v4 só aplica `hover:` em dispositivos com mouse; no toque, botões
+   escondidos com `opacity-0 group-hover:opacity-100` nunca aparecem. Estas
+   classes escondem só onde existe hover real e revelam no hover/foco do pai. */
+@media (hover: hover) and (pointer: fine) {
+  .hover-reveal {
+    opacity: 0;
+    transition: opacity 150ms ease;
+  }
+  .hover-reveal-parent:hover .hover-reveal,
+  .hover-reveal-parent:focus-within .hover-reveal,
+  .hover-reveal:focus-visible {
+    opacity: 1;
+  }
+}

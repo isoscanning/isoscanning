@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-  DndContext, DragEndEvent, PointerSensor, closestCenter, useSensor, useSensors,
+  DndContext, DragEndEvent, KeyboardSensor, MouseSensor, TouchSensor,
+  closestCenter, useSensor, useSensors,
 } from "@dnd-kit/core";
 import {
-  SortableContext, arrayMove, useSortable, verticalListSortingStrategy,
+  SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable,
+  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useAuth } from "@/lib/auth-context";
@@ -45,10 +47,13 @@ import {
   ShieldCheck, Loader2, Search, X, ExternalLink, HardDrive,
   MessageSquare, Send, Sparkles, Eye, Lock, CornerDownRight,
   GripVertical, Timer, Printer, Share2, Link2 as LinkIcon, RefreshCw, Copy,
+  ArrowUp, ArrowDown, FilterX,
 } from "lucide-react";
 import { BriefingTimeShiftDialog } from "@/components/briefing-time-shift-dialog";
 import { BriefingRecalcDialog } from "@/components/briefing-recalc-dialog";
 import { BriefingIncidentsCard } from "@/components/briefing-incidents-card";
+import { BriefingItemFilters, useBriefingItemFilter } from "@/components/briefing-item-filters";
+import { EMPTY_ITEM_FILTER, filterSections } from "@/lib/briefing-pro-filters";
 import { toast } from "sonner";
 import { briefingProService } from "@/lib/briefing-pro-service";
 import { tokenManager } from "@/lib/token-manager";
@@ -134,6 +139,88 @@ function SortableShell({
   );
 }
 
+/**
+ * Ações de um item. No desktop (lg+) são ícones revelados no hover da linha;
+ * em telas menores um menu ⋮ sempre visível — no toque não existe hover, e o
+ * Tailwind v4 nem aplica `hover:` nesses dispositivos. As setas ↑↓ são a
+ * alternativa ao arrastar para reordenar.
+ */
+function ItemRowActions({
+  canMoveUp, canMoveDown, onMoveUp, onMoveDown, onLink, onEdit, onDelete,
+}: {
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onLink: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <>
+      <div className="hidden lg:flex gap-0.5 shrink-0 hover-reveal">
+        <Button
+          variant="ghost" size="icon" className="h-7 w-7"
+          title="Mover para cima" disabled={!canMoveUp} onClick={onMoveUp}
+        >
+          <ArrowUp className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost" size="icon" className="h-7 w-7"
+          title="Mover para baixo" disabled={!canMoveDown} onClick={onMoveDown}
+        >
+          <ArrowDown className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost" size="icon" className="h-7 w-7"
+          title="Anexar link de material" onClick={onLink}
+        >
+          <Link2 className="h-3.5 w-3.5" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7" title="Editar item" onClick={onEdit}>
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost" size="icon" className="h-7 w-7 text-destructive"
+          title="Excluir item" onClick={onDelete}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost" size="icon"
+            className="h-7 w-7 shrink-0 lg:hidden text-muted-foreground"
+            aria-label="Ações do item"
+          >
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem disabled={!canMoveUp} onClick={onMoveUp}>
+            <ArrowUp className="h-4 w-4 mr-2" />Mover para cima
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={!canMoveDown} onClick={onMoveDown}>
+            <ArrowDown className="h-4 w-4 mr-2" />Mover para baixo
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={onLink}>
+            <Link2 className="h-4 w-4 mr-2" />Anexar link
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onEdit}>
+            <Pencil className="h-4 w-4 mr-2" />Editar
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={onDelete}>
+            <Trash2 className="h-4 w-4 mr-2" />Excluir
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  );
+}
+
 /** Badge de horário com edição inline (clica no horário e digita). */
 function InlineTimeBadge({
   item, canEdit, onSaved,
@@ -200,7 +287,7 @@ function InlineTimeBadge({
 
   return (
     <button
-      className="opacity-0 group-hover/item:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
+      className="hover-reveal text-muted-foreground hover:text-foreground"
       title="Definir horário"
       onClick={() => setEditing(true)}
     >
@@ -259,8 +346,12 @@ export default function BriefingDetailPage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  // Mouse: arrasta após 5px; toque: segura 200ms (não briga com a rolagem);
+  // teclado: espaço + setas no handle. As setas ↑↓ nas ações cobrem o resto.
   const dndSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   useEffect(() => {
@@ -311,6 +402,19 @@ export default function BriefingDetailPage() {
     ];
   }, [detail]);
 
+  // Filtro de itens (tipo / pessoa) — fica salvo por briefing no navegador
+  const { filter: itemFilter, setFilter: setItemFilter, active: filterActive } =
+    useBriefingItemFilter(briefingId);
+  const allItems = useMemo(
+    () => (detail ? detail.sections.flatMap((s) => s.items) : []),
+    [detail]
+  );
+  const visibleSections = useMemo(
+    () => (detail ? filterSections(detail.sections, itemFilter, userProfile?.id) : []),
+    [detail, itemFilter, userProfile?.id]
+  );
+  const visibleItemCount = visibleSections.reduce((acc, s) => acc + s.items.length, 0);
+
   async function handleStatusChange(status: BriefingStatus) {
     setBusy(true);
     try {
@@ -341,15 +445,8 @@ export default function BriefingDetailPage() {
     }
   }
 
-  async function handleItemDragEnd(sectionId: string, event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id || !detail) return;
-    const section = detail.sections.find((s) => s.id === sectionId);
-    if (!section) return;
-    const oldIndex = section.items.findIndex((i) => i.id === active.id);
-    const newIndex = section.items.findIndex((i) => i.id === over.id);
-    if (oldIndex < 0 || newIndex < 0) return;
-    const reordered = arrayMove(section.items, oldIndex, newIndex);
+  /** Aplica uma nova ordem de itens na seção (otimista) e persiste. */
+  async function applyItemOrder(sectionId: string, reordered: BriefingItem[]) {
     setDetail((prev) =>
       prev
         ? {
@@ -369,6 +466,28 @@ export default function BriefingDetailPage() {
       toast.error("Erro ao reordenar os itens");
       refresh();
     }
+  }
+
+  async function handleItemDragEnd(sectionId: string, event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !detail) return;
+    const section = detail.sections.find((s) => s.id === sectionId);
+    if (!section) return;
+    const oldIndex = section.items.findIndex((i) => i.id === active.id);
+    const newIndex = section.items.findIndex((i) => i.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    await applyItemOrder(sectionId, arrayMove(section.items, oldIndex, newIndex));
+  }
+
+  /** Move um item uma posição para cima (-1) ou para baixo (+1) — alternativa ao arrastar. */
+  async function moveItem(sectionId: string, itemId: string, direction: -1 | 1) {
+    if (!detail) return;
+    const section = detail.sections.find((s) => s.id === sectionId);
+    if (!section) return;
+    const index = section.items.findIndex((i) => i.id === itemId);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= section.items.length) return;
+    await applyItemOrder(sectionId, arrayMove(section.items, index, target));
   }
 
   async function handleConfirmRead() {
@@ -435,17 +554,17 @@ export default function BriefingDetailPage() {
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8 max-w-5xl">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
           <Button
             variant="ghost"
             size="sm"
-            className="gap-2"
+            className="gap-2 -ml-2"
             onClick={() => router.push("/dashboard/briefing-pro")}
           >
             <ArrowLeft className="h-4 w-4" />
             Briefings
           </Button>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2 min-w-0">
             {isOwner && (
               <Button
                 variant="outline"
@@ -455,7 +574,7 @@ export default function BriefingDetailPage() {
                 onClick={() => setShareOpen(true)}
               >
                 <Share2 className="h-4 w-4" />
-                Compartilhar
+                <span className="hidden sm:inline">Compartilhar</span>
                 {briefing.share_token && (
                   <span className="w-2 h-2 rounded-full bg-emerald-500" title="Link ativo" />
                 )}
@@ -471,16 +590,20 @@ export default function BriefingDetailPage() {
               onClick={() => window.open(`/dashboard/briefing-pro/${briefingId}/imprimir`, "_blank")}
             >
               <Printer className="h-4 w-4" />
-              {briefing.status === "completed" ? "Relatório PDF" : "Exportar PDF"}
+              <span className="hidden sm:inline">
+                {briefing.status === "completed" ? "Relatório PDF" : "Exportar PDF"}
+              </span>
+              <span className="sm:hidden">PDF</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
               className="gap-2"
+              title="Equipe do briefing"
               onClick={() => setTeamOpen(true)}
             >
               <Users className="h-4 w-4" />
-              Equipe ({detail.members.length + 1})
+              <span className="hidden sm:inline">Equipe </span>({detail.members.length + 1})
             </Button>
             <Button
               size="sm"
@@ -616,13 +739,14 @@ export default function BriefingDetailPage() {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Coluna principal: seções e itens */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-semibold">Estrutura do briefing</h2>
               {canEdit && (
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="gap-1" onClick={() => setTimeShiftOpen(true)}>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" className="gap-1" title="Ajustar horários" onClick={() => setTimeShiftOpen(true)}>
                     <Timer className="h-4 w-4" />
-                    Ajustar horários
+                    <span className="hidden sm:inline">Ajustar horários</span>
+                    <span className="sm:hidden">Horários</span>
                   </Button>
                   <Button variant="outline" size="sm" className="gap-1" onClick={() => setRecalcOpen(true)}>
                     <Clock className="h-4 w-4" />
@@ -636,10 +760,39 @@ export default function BriefingDetailPage() {
               )}
             </div>
 
+            {allItems.length > 0 && (
+              <BriefingItemFilters
+                filter={itemFilter}
+                onChange={setItemFilter}
+                items={allItems}
+                people={allPeople}
+                userId={userProfile?.id}
+                visibleCount={visibleItemCount}
+                totalCount={allItems.length}
+              />
+            )}
+
             {detail.sections.length === 0 && (
               <Card className="border-dashed">
                 <CardContent className="py-10 text-center text-sm text-muted-foreground">
                   Nenhuma seção ainda. {canEdit ? "Crie a primeira seção para adicionar itens." : ""}
+                </CardContent>
+              </Card>
+            )}
+
+            {filterActive && visibleSections.length === 0 && detail.sections.length > 0 && (
+              <Card className="border-dashed">
+                <CardContent className="py-8 text-center text-sm text-muted-foreground space-y-3">
+                  <p>Nenhum item corresponde ao filtro.</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1"
+                    onClick={() => setItemFilter(EMPTY_ITEM_FILTER)}
+                  >
+                    <FilterX className="h-4 w-4" />
+                    Limpar filtros
+                  </Button>
                 </CardContent>
               </Card>
             )}
@@ -650,18 +803,18 @@ export default function BriefingDetailPage() {
               onDragEnd={handleSectionDragEnd}
             >
             <SortableContext
-              items={detail.sections.map((s) => s.id)}
+              items={visibleSections.map((s) => s.id)}
               strategy={verticalListSortingStrategy}
             >
             <div className="space-y-4">
-            {detail.sections.map((section) => (
-              <SortableShell key={section.id} id={section.id} disabled={!canEdit}>
+            {visibleSections.map((section) => (
+              <SortableShell key={section.id} id={section.id} disabled={!canEdit || filterActive}>
               {(sectionHandle) => (
               <Card>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-1 min-w-0">
-                      {canEdit && (
+                      {canEdit && !filterActive && (
                         <button
                           {...sectionHandle}
                           className="mt-0.5 text-muted-foreground/50 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none shrink-0"
@@ -731,21 +884,22 @@ export default function BriefingDetailPage() {
                     items={section.items.map((i) => i.id)}
                     strategy={verticalListSortingStrategy}
                   >
-                  {section.items.map((item) => {
+                  {section.items.map((item, itemIndex) => {
                     const itemLinks = detail.links.filter((l) => l.item_id === item.id);
                     const assignee = item.assigned_to ? detail.profiles[item.assigned_to] : null;
                     const isDone = item.status === "done" || item.status === "skipped";
                     return (
-                      <SortableShell key={item.id} id={item.id} disabled={!canEdit}>
+                      <SortableShell key={item.id} id={item.id} disabled={!canEdit || filterActive}>
                       {(itemHandle) => (
-                      <div className="flex items-start gap-2 rounded-lg px-2 py-2 hover:bg-muted/50 group/item">
-                        {canEdit && (
+                      <div className="flex items-start gap-1.5 sm:gap-2 rounded-lg px-1 sm:px-2 py-2 hover:bg-muted/50 hover-reveal-parent">
+                        {canEdit && !filterActive && (
                           <button
                             {...itemHandle}
-                            className="mt-1 text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0"
-                            title="Arrastar para reordenar"
+                            className="mt-0.5 -ml-0.5 p-0.5 rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted cursor-grab active:cursor-grabbing touch-none shrink-0"
+                            title="Arrastar para reordenar (ou use as setas ↑↓ nas ações)"
+                            aria-label={`Reordenar item ${item.title}`}
                           >
-                            <GripVertical className="h-3.5 w-3.5" />
+                            <GripVertical className="h-4 w-4" />
                           </button>
                         )}
                         <Checkbox
@@ -810,34 +964,23 @@ export default function BriefingDetailPage() {
                           )}
                         </div>
                         {canEdit && (
-                          <div className="opacity-0 group-hover/item:opacity-100 transition-opacity flex gap-1">
-                            <Button
-                              variant="ghost" size="icon" className="h-7 w-7"
-                              title="Anexar link de material"
-                              onClick={() => setLinkDialog({ itemId: item.id })}
-                            >
-                              <Link2 className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost" size="icon" className="h-7 w-7"
-                              onClick={() => setItemDialog({ sectionId: section.id, item })}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost" size="icon" className="h-7 w-7 text-destructive"
-                              onClick={async () => {
-                                try {
-                                  await briefingProService.deleteItem(item.id);
-                                  refresh();
-                                } catch {
-                                  toast.error("Erro ao excluir o item");
-                                }
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
+                          <ItemRowActions
+                            canMoveUp={!filterActive && itemIndex > 0}
+                            canMoveDown={!filterActive && itemIndex < section.items.length - 1}
+                            onMoveUp={() => moveItem(section.id, item.id, -1)}
+                            onMoveDown={() => moveItem(section.id, item.id, 1)}
+                            onLink={() => setLinkDialog({ itemId: item.id })}
+                            onEdit={() => setItemDialog({ sectionId: section.id, item })}
+                            onDelete={async () => {
+                              if (!confirm(`Excluir o item "${item.title}"?`)) return;
+                              try {
+                                await briefingProService.deleteItem(item.id);
+                                refresh();
+                              } catch {
+                                toast.error("Erro ao excluir o item");
+                              }
+                            }}
+                          />
                         )}
                       </div>
                       )}
@@ -894,7 +1037,7 @@ export default function BriefingDetailPage() {
                   return (
                     <Card key={del.id}>
                       <CardContent className="py-4">
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="font-medium text-sm">
@@ -930,7 +1073,7 @@ export default function BriefingDetailPage() {
                             )}
                           </div>
                           {canEdit && (
-                            <div className="flex flex-col items-end gap-2 shrink-0">
+                            <div className="flex sm:flex-col items-center sm:items-end gap-2 shrink-0">
                               <Select
                                 value={del.status}
                                 onValueChange={async (v) => {
@@ -1042,7 +1185,7 @@ export default function BriefingDetailPage() {
                 {detail.links
                   .filter((l) => !l.item_id && !l.deliverable_id)
                   .map((link) => (
-                    <div key={link.id} className="flex items-start gap-2 group/link">
+                    <div key={link.id} className="flex items-start gap-2 hover-reveal-parent">
                       <span className="mt-0.5 text-muted-foreground">
                         {link.storage_type === "external_hd" ? (
                           <HardDrive className="h-4 w-4" />
@@ -1071,7 +1214,7 @@ export default function BriefingDetailPage() {
                       {canEdit && (
                         <Button
                           variant="ghost" size="icon"
-                          className="h-6 w-6 opacity-0 group-hover/link:opacity-100 text-destructive"
+                          className="h-6 w-6 hover-reveal text-destructive"
                           onClick={async () => {
                             try {
                               await briefingProService.deleteLink(link.id);
@@ -1172,6 +1315,7 @@ export default function BriefingDetailPage() {
               incidents={detail.incidents}
               myRole={detail.my_role}
               userId={userProfile?.id}
+              profiles={detail.profiles}
               onChanged={refresh}
             />
 
@@ -1389,7 +1533,7 @@ function SubitemChecklist({
       {item.subitems.map((sub) => {
         const status = optimistic[sub.id] ?? sub.status;
         return (
-          <div key={sub.id} className="flex items-center gap-2 pl-4 group/sub">
+          <div key={sub.id} className="flex items-center gap-2 pl-4 hover-reveal-parent">
             <Checkbox
               checked={status === "done"}
               onCheckedChange={() => toggle(sub.id, status)}
@@ -1403,7 +1547,8 @@ function SubitemChecklist({
             {canEdit && (
               <Button
                 variant="ghost" size="icon"
-                className="h-5 w-5 opacity-0 group-hover/sub:opacity-100 text-destructive"
+                className="h-6 w-6 hover-reveal text-destructive"
+                title="Remover subitem"
                 onClick={async () => {
                   try {
                     await briefingProService.deleteSubitem(sub.id);
@@ -1500,7 +1645,7 @@ function CommentsCard({
             <p className="text-sm text-muted-foreground">Nenhum comentário ainda.</p>
           )}
           {comments.map((c) => (
-            <div key={c.id} className="flex items-start gap-2 group/comment">
+            <div key={c.id} className="flex items-start gap-2 hover-reveal-parent">
               <Avatar profile={c.profile} size={7} />
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-muted-foreground">
@@ -1514,7 +1659,7 @@ function CommentsCard({
               {(c.author_id === userId || isOwner) && (
                 <Button
                   variant="ghost" size="icon"
-                  className="h-6 w-6 opacity-0 group-hover/comment:opacity-100 text-destructive"
+                  className="h-6 w-6 hover-reveal text-destructive"
                   onClick={() => onDelete(c.id)}
                 >
                   <X className="h-3 w-3" />
@@ -2244,7 +2389,7 @@ function ItemDialog({
             <Label>Detalhes</Label>
             <Textarea rows={2} value={form.description} onChange={(e) => set("description", e.target.value)} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Tipo</Label>
               <Select value={form.item_type} onValueChange={(v) => set("item_type", v)}>
@@ -2268,7 +2413,7 @@ function ItemDialog({
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Horário (cronograma)</Label>
               <Input
@@ -2422,7 +2567,7 @@ function DeliverableDialog({
             <Label>Descrição</Label>
             <Textarea rows={2} value={form.description} onChange={(e) => set("description", e.target.value)} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Prazo</Label>
               <Input type="date" value={form.due_date} onChange={(e) => set("due_date", e.target.value)} />
@@ -2442,7 +2587,7 @@ function DeliverableDialog({
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Entregar para</Label>
               <Input

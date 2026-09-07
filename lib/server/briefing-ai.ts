@@ -6,7 +6,7 @@
 import { callGroqText, GROQ_FAST_MODEL, GROQ_TPM_BUDGET } from "./groq";
 
 export const BRIEFING_TYPES = ["photography", "video", "social_media", "marketing", "event", "other"];
-export const BRIEFING_ITEM_TYPES = ["task", "photo", "video", "material", "note"];
+export const BRIEFING_ITEM_TYPES = ["task", "photo", "video", "drone", "material", "note"];
 export const BRIEFING_PRIORITIES = ["low", "medium", "high"];
 
 export interface RawGeneratedItem {
@@ -94,7 +94,7 @@ export function normalizeSections(raw: RawGeneratedSection[] | unknown): Normali
 export const ITEM_JSON_FORMAT = `{
   "title": "item específico e acionável",
   "description": "detalhes de como executar / o que não pode faltar",
-  "item_type": "um de: task | photo | video | material | note",
+  "item_type": "um de: task | photo | video | drone | material | note (drone = tomadas aéreas)",
   "priority": "um de: low | medium | high",
   "scheduled_time": "HH:MM apenas para itens de cronograma",
   "is_required": "true apenas para itens CRÍTICOS que não podem ser pulados de forma alguma (momentos únicos, exigências explícitas do cliente)",

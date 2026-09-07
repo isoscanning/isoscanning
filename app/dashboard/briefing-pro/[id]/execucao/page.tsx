@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { BriefingTimeShiftDialog } from "@/components/briefing-time-shift-dialog";
 import { BriefingIncidentsCard } from "@/components/briefing-incidents-card";
+import { BriefingCompletedBy } from "@/components/briefing-completed-by";
 import { BriefingItemFilters, useBriefingItemFilter } from "@/components/briefing-item-filters";
 import {
   EMPTY_ITEM_FILTER, filterSections, firstPendingItemId,
@@ -586,11 +587,14 @@ export default function ExecutionModePage() {
                                   {assignee.display_name}
                                 </span>
                               )}
-                              {completedBy && (isDone || isSkipped) && (
-                                <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
-                                  <Avatar profile={completedBy} size={4} />
-                                  {isSkipped ? "pulado" : "feito"} por {completedBy.display_name}
-                                </span>
+                              {(isDone || isSkipped) && (
+                                <BriefingCompletedBy
+                                  item={item}
+                                  people={people}
+                                  profiles={detail.profiles}
+                                  canEdit={canEdit}
+                                  onChanged={() => load(true)}
+                                />
                               )}
                               {itemLinks.map((link) => (
                                 <a

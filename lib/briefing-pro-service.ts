@@ -247,8 +247,16 @@ export const briefingProService = {
     return data;
   },
 
-  async updateItemStatus(itemId: string, status: string): Promise<BriefingItem> {
-    const { data } = await apiClient.post(`/briefing-pro/items/${itemId}/status`, { status });
+  /** `completedBy`: dono/editores podem concluir em nome de outro membro. */
+  async updateItemStatus(
+    itemId: string,
+    status: string,
+    completedBy?: string
+  ): Promise<BriefingItem> {
+    const { data } = await apiClient.post(`/briefing-pro/items/${itemId}/status`, {
+      status,
+      ...(completedBy ? { completed_by: completedBy } : {}),
+    });
     return data;
   },
 

@@ -52,6 +52,7 @@ import {
 import { BriefingTimeShiftDialog } from "@/components/briefing-time-shift-dialog";
 import { BriefingRecalcDialog } from "@/components/briefing-recalc-dialog";
 import { BriefingIncidentsCard } from "@/components/briefing-incidents-card";
+import { BriefingCompletedBy } from "@/components/briefing-completed-by";
 import { BriefingItemFilters, useBriefingItemFilter } from "@/components/briefing-item-filters";
 import { EMPTY_ITEM_FILTER, filterSections } from "@/lib/briefing-pro-filters";
 import { toast } from "sonner";
@@ -934,6 +935,15 @@ export default function BriefingDetailPage() {
                                 <Avatar profile={assignee} size={5} />
                                 <span className="text-xs text-muted-foreground">{assignee.display_name}</span>
                               </span>
+                            )}
+                            {isDone && (
+                              <BriefingCompletedBy
+                                item={item}
+                                people={allPeople}
+                                profiles={detail.profiles}
+                                canEdit={canEdit}
+                                onChanged={refresh}
+                              />
                             )}
                           </div>
                           {item.description && (
@@ -2320,11 +2330,16 @@ function ItemDialog({
     scheduled_time: item?.scheduled_time ?? "",
     duration_minutes: item?.duration_minutes ? String(item.duration_minutes) : "",
     assigned_to: item?.assigned_to ?? "none",
+    completed_by: item?.completed_by ?? "none",
     section_id: item?.section_id ?? sectionId,
   });
   const [isRequired, setIsRequired] = useState(item?.is_required ?? false);
   const [saving, setSaving] = useState(false);
   const set = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
+  // Item já fechado: dono/editores podem corrigir quem executou
+  const itemClosed = !!item && (item.status === "done" || item.status === "skipped");
+  const executorOutsideTeam =
+    itemClosed && !!item?.completed_by && !people.some((p) => p.id === item.completed_by);
 
   async function save() {
     if (!form.title.trim()) return;
@@ -2340,6 +2355,9 @@ function ItemDialog({
         ? parseInt(form.duration_minutes, 10)
         : (item ? null : undefined),
       assigned_to: form.assigned_to === "none" ? (item ? null : undefined) : form.assigned_to,
+      ...(itemClosed
+        ? { completed_by: form.completed_by === "none" ? null : form.completed_by }
+        : {}),
     };
     try {
       if (item) {
@@ -2446,6 +2464,28 @@ function ItemDialog({
               </Select>
             </div>
           </div>
+          {itemClosed && (
+            <div className="space-y-2">
+              <Label>Executado por</Label>
+              <Select value={form.completed_by} onValueChange={(v) => set("completed_by", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Não informado</SelectItem>
+                  {executorOutsideTeam && item?.completed_by && (
+                    <SelectItem value={item.completed_by}>Membro que saiu da equipe</SelectItem>
+                  )}
+                  {people.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.profile?.display_name ?? "Usuário"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Quem de fato executou este item — é o nome que vai para o relatório pós-execução.
+              </p>
+            </div>
+          )}
           <label className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer">
             <Checkbox
               checked={isRequired}

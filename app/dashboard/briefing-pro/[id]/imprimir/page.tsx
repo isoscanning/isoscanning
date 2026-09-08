@@ -100,12 +100,19 @@ function printRoleTone(role: string): string {
     .join(" ");
 }
 
+// Margens do PDF sem depender da janela de impressão: @page fica em 0 (assim o
+// resultado é igual com "Padrão" ou "Nenhuma" e sem cabeçalho/rodapé do
+// navegador), a folha carrega a margem lateral e o thead/tfoot do .print-frame
+// — que o navegador repete em TODAS as páginas — dá a margem superior/inferior.
 const PRINT_STYLES = `
 @media print {
-  @page { size: A4; margin: 12mm 12mm 16mm; }
+  @page { margin: 0; }
   html, body { background: #fff !important; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  .print-sheet { box-shadow: none !important; max-width: none !important; margin: 0 !important; padding: 0 !important; border-radius: 0 !important; }
+  .print-sheet { box-shadow: none !important; max-width: none !important; margin: 0 !important; padding: 0 14mm !important; border-radius: 0 !important; }
+  .print-frame { display: table; width: 100%; }
+  .print-frame > thead { display: table-header-group; }
+  .print-frame > tfoot { display: table-footer-group; }
   a { text-decoration: none; color: inherit; }
 }
 `;
@@ -359,6 +366,15 @@ export default function BriefingPrintPage() {
 
       {/* Folha */}
       <div className="print-sheet max-w-[210mm] mx-auto my-6 bg-white shadow-lg rounded-md px-10 py-9 text-[12px] leading-relaxed">
+        {/* thead/tfoot só existem na impressão e se repetem em cada página:
+            são a margem superior e inferior do PDF (ver PRINT_STYLES). */}
+        <table className="print-frame w-full border-collapse">
+          <thead className="hidden print:table-header-group">
+            <tr><td className="p-0"><div className="h-[12mm]" /></td></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="p-0 align-top">
         {/* Cabeçalho com marca */}
         <header className="flex items-start justify-between gap-6 pb-4 border-b-2 border-gray-900">
           <div className="min-w-0">
@@ -880,6 +896,13 @@ export default function BriefingPrintPage() {
             </span>
           )}
         </footer>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot className="hidden print:table-footer-group">
+            <tr><td className="p-0"><div className="h-[14mm]" /></td></tr>
+          </tfoot>
+        </table>
       </div>
     </div>
   );

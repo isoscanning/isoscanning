@@ -1,11 +1,15 @@
 // Filtros de itens do Briefing Pro (edição e Dia de Execução): por tipo
-// (foto, vídeo, drone...), por pessoa responsável e "só pendentes".
+// (foto, vídeo, drone...), por pessoa da equipe (quem faz) e "só pendentes".
 // Funções puras — a persistência (localStorage) e a UI ficam em
 // components/briefing-item-filters.tsx.
 
+import { effectiveCrewIds } from "./briefing-pro-crew";
 import { ItemStatus, ItemType } from "./briefing-pro-types";
 
-/** "all" = todos; "me" = meus itens; "unassigned" = sem responsável; senão = id do usuário. */
+/**
+ * "all" = todos; "me" = itens de pessoas da equipe vinculadas a mim;
+ * "unassigned" = sem ninguém (nem herdado da seção); senão = id da pessoa da equipe.
+ */
 export type PersonFilter = "all" | "me" | "unassigned" | (string & {});
 
 export interface BriefingItemFilter {
@@ -30,9 +34,21 @@ export const ITEM_TYPE_ORDER: ItemType[] = [
 type FilterableItem = {
   id: string;
   item_type: ItemType;
-  assigned_to: string | null;
   status: ItemStatus;
+  crew_ids: string[];
 };
+
+type FilterableSection<I extends FilterableItem> = {
+  crew_ids: string[];
+  items: I[];
+};
+
+export interface PersonFilterContext {
+  /** Quem cuida da seção do item (herança quando o item não tem ninguém). */
+  sectionCrewIds: string[];
+  /** Ids da equipe vinculados ao usuário logado. */
+  myCrewIds: string[];
+}
 
 export function isItemFilterActive(filter: BriefingItemFilter): boolean {
   return filter.types.length > 0 || filter.person !== "all" || filter.onlyPending;
@@ -45,19 +61,19 @@ export function isPendingStatus(status: ItemStatus): boolean {
 export function matchesItemFilter(
   item: FilterableItem,
   filter: BriefingItemFilter,
-  userId?: string | null
+  ctx: PersonFilterContext
 ): boolean {
   if (filter.types.length > 0 && !filter.types.includes(item.item_type)) return false;
   if (filter.onlyPending && !isPendingStatus(item.status)) return false;
+  if (filter.person === "all") return true;
+  const { ids } = effectiveCrewIds(item, { crew_ids: ctx.sectionCrewIds });
   switch (filter.person) {
-    case "all":
-      return true;
     case "unassigned":
-      return !item.assigned_to;
+      return ids.length === 0;
     case "me":
-      return Boolean(userId) && item.assigned_to === userId;
+      return ctx.myCrewIds.some((id) => ids.includes(id));
     default:
-      return item.assigned_to === filter.person;
+      return ids.includes(filter.person);
   }
 }
 
@@ -65,22 +81,24 @@ export function matchesItemFilter(
  * Aplica o filtro às seções. Com filtro ativo, seções sem itens
  * correspondentes somem; sem filtro, devolve as seções como estão.
  */
-export function filterSections<I extends FilterableItem, S extends { items: I[] }>(
+export function filterSections<I extends FilterableItem, S extends FilterableSection<I>>(
   sections: S[],
   filter: BriefingItemFilter,
-  userId?: string | null
+  myCrewIds: string[] = []
 ): S[] {
   if (!isItemFilterActive(filter)) return sections;
   return sections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => matchesItemFilter(item, filter, userId)),
+      items: section.items.filter((item) =>
+        matchesItemFilter(item, filter, { sectionCrewIds: section.crew_ids, myCrewIds })
+      ),
     }))
     .filter((section) => section.items.length > 0);
 }
 
 /** Primeiro item ainda não feito (nem pulado), na ordem das seções e posições. */
-export function firstPendingItemId<I extends FilterableItem>(
+export function firstPendingItemId<I extends { id: string; status: ItemStatus }>(
   sections: Array<{ items: I[] }>
 ): string | null {
   for (const section of sections) {
@@ -91,7 +109,7 @@ export function firstPendingItemId<I extends FilterableItem>(
 }
 
 /** Tipos presentes entre os itens, na ordem canônica, com contagem. */
-export function countItemTypes<I extends FilterableItem>(
+export function countItemTypes<I extends { item_type: ItemType }>(
   items: I[]
 ): Array<{ type: ItemType; count: number }> {
   const counts = new Map<ItemType, number>();

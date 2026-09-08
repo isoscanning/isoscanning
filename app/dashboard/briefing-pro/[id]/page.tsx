@@ -54,7 +54,10 @@ import { BriefingRecalcDialog } from "@/components/briefing-recalc-dialog";
 import { BriefingIncidentsCard } from "@/components/briefing-incidents-card";
 import { BriefingCompletedBy } from "@/components/briefing-completed-by";
 import { BriefingItemFilters, useBriefingItemFilter } from "@/components/briefing-item-filters";
+import { CrewAssignPopover, CrewCheckboxList } from "@/components/briefing-crew-assign";
+import { CrewDraft, CrewEditor, newCrewDraft } from "@/components/briefing-crew-editor";
 import { EMPTY_ITEM_FILTER, filterSections } from "@/lib/briefing-pro-filters";
+import { jobRoleTone, myCrewIds } from "@/lib/briefing-pro-crew";
 import { toast } from "sonner";
 import { briefingProService } from "@/lib/briefing-pro-service";
 import { tokenManager } from "@/lib/token-manager";
@@ -63,6 +66,7 @@ import { PlanBadge } from "@/components/plan/plan-gate";
 import { notifyPlanLimit } from "@/lib/plans/plan-events";
 import {
   BriefingContact,
+  BriefingCrew,
   BriefingDeliverable,
   BriefingDetail,
   BriefingItem,
@@ -345,6 +349,7 @@ export default function BriefingDetailPage() {
   const [timeShiftOpen, setTimeShiftOpen] = useState(false);
   const [recalcOpen, setRecalcOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [crewDialog, setCrewDialog] = useState(false);
   const [busy, setBusy] = useState(false);
 
   // Mouse: arrasta após 5px; toque: segura 200ms (não briga com a rolagem);
@@ -411,7 +416,10 @@ export default function BriefingDetailPage() {
     [detail]
   );
   const visibleSections = useMemo(
-    () => (detail ? filterSections(detail.sections, itemFilter, userProfile?.id) : []),
+    () =>
+      detail
+        ? filterSections(detail.sections, itemFilter, myCrewIds(detail.crew, userProfile?.id))
+        : [],
     [detail, itemFilter, userProfile?.id]
   );
   const visibleItemCount = visibleSections.reduce((acc, s) => acc + s.items.length, 0);
@@ -766,7 +774,7 @@ export default function BriefingDetailPage() {
                 filter={itemFilter}
                 onChange={setItemFilter}
                 items={allItems}
-                people={allPeople}
+                crew={detail.crew}
                 userId={userProfile?.id}
                 visibleCount={visibleItemCount}
                 totalCount={allItems.length}
@@ -829,6 +837,19 @@ export default function BriefingDetailPage() {
                         {section.description && (
                           <CardDescription className="mt-0.5">{section.description}</CardDescription>
                         )}
+                        <div className="mt-1.5">
+                          <CrewAssignPopover
+                            crew={detail.crew}
+                            selectedIds={section.crew_ids}
+                            canEdit={canEdit}
+                            title="Quem cuida desta seção"
+                            addLabel="Quem cuida desta seção?"
+                            onSave={async (ids) => {
+                              await briefingProService.setSectionCrew(section.id, ids);
+                              await refresh();
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
                     {canEdit && (
@@ -887,7 +908,6 @@ export default function BriefingDetailPage() {
                   >
                   {section.items.map((item, itemIndex) => {
                     const itemLinks = detail.links.filter((l) => l.item_id === item.id);
-                    const assignee = item.assigned_to ? detail.profiles[item.assigned_to] : null;
                     const isDone = item.status === "done" || item.status === "skipped";
                     return (
                       <SortableShell key={item.id} id={item.id} disabled={!canEdit || filterActive}>
@@ -930,12 +950,17 @@ export default function BriefingDetailPage() {
                                 {ITEM_TYPE_LABELS[item.item_type]}
                               </Badge>
                             )}
-                            {assignee && (
-                              <span className="flex items-center gap-1">
-                                <Avatar profile={assignee} size={5} />
-                                <span className="text-xs text-muted-foreground">{assignee.display_name}</span>
-                              </span>
-                            )}
+                            <CrewAssignPopover
+                              crew={detail.crew}
+                              selectedIds={item.crew_ids}
+                              inheritedIds={section.crew_ids}
+                              canEdit={canEdit}
+                              title="Quem faz este item"
+                              onSave={async (ids) => {
+                                await briefingProService.setItemCrew(item.id, ids);
+                                await refresh();
+                              }}
+                            />
                             {isDone && (
                               <BriefingCompletedBy
                                 item={item}
@@ -1170,6 +1195,59 @@ export default function BriefingDetailPage() {
 
           {/* Coluna lateral */}
           <div className="space-y-4">
+            {/* Equipe do trabalho e funções */}
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Equipe e funções
+                  </CardTitle>
+                  {canEdit && (
+                    <Button
+                      variant="ghost" size="icon" className="h-7 w-7"
+                      title="Editar equipe e funções"
+                      onClick={() => setCrewDialog(true)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <CardDescription className="text-xs">
+                  Quem trabalha no dia e a função de cada um. Atribua quem faz o quê em cada seção e item.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {detail.crew.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Nenhuma pessoa ainda.{canEdit ? " Cadastre a equipe para atribuir quem faz o quê." : ""}
+                  </p>
+                )}
+                {detail.crew.map((member) => (
+                  <div key={member.id} className="flex items-center gap-2 text-sm">
+                    {member.profile ? (
+                      <Avatar profile={member.profile} size={6} />
+                    ) : (
+                      <span className="h-6 w-6 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-semibold shrink-0">
+                        {member.name.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="flex-1 min-w-0 truncate">
+                      {member.name}
+                      {member.profile?.username && (
+                        <span className="text-xs text-muted-foreground"> @{member.profile.username}</span>
+                      )}
+                    </span>
+                    {member.job_role && (
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${jobRoleTone(member.job_role)}`}>
+                        {member.job_role}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
             {/* Links gerais de materiais */}
             <Card>
               <CardHeader className="pb-2">
@@ -1404,6 +1482,7 @@ export default function BriefingDetailPage() {
           sectionId={itemDialog.sectionId}
           item={itemDialog.item}
           people={allPeople}
+          crew={detail.crew}
           sections={detail.sections.map((s) => ({ id: s.id, title: s.title }))}
           onClose={() => setItemDialog(null)}
           onSaved={() => { setItemDialog(null); refresh(); }}
@@ -1415,6 +1494,15 @@ export default function BriefingDetailPage() {
           briefing={briefing}
           onClose={() => setShareOpen(false)}
           onChanged={refresh}
+        />
+      )}
+
+      {crewDialog && (
+        <CrewDialog
+          detail={detail}
+          people={allPeople}
+          onClose={() => setCrewDialog(false)}
+          onSaved={() => { setCrewDialog(false); refresh(); }}
         />
       )}
 
@@ -2312,12 +2400,15 @@ function RefineSectionDialog({
 // ─── Dialog: item ────────────────────────────────────────────────────────────
 
 function ItemDialog({
-  briefingId, sectionId, item, people, sections, onClose, onSaved,
+  briefingId, sectionId, item, people, crew, sections, onClose, onSaved,
 }: {
   briefingId: string;
   sectionId: string;
   item?: BriefingItem;
+  /** Usuários com acesso (para "Executado por"). */
   people: Array<{ id: string; profile: ProfileSummary | null }>;
+  /** Equipe do trabalho (para "Quem faz"). */
+  crew: BriefingCrew[];
   sections: Array<{ id: string; title: string }>;
   onClose: () => void;
   onSaved: () => void;
@@ -2329,10 +2420,13 @@ function ItemDialog({
     priority: item?.priority ?? "medium",
     scheduled_time: item?.scheduled_time ?? "",
     duration_minutes: item?.duration_minutes ? String(item.duration_minutes) : "",
-    assigned_to: item?.assigned_to ?? "none",
     completed_by: item?.completed_by ?? "none",
     section_id: item?.section_id ?? sectionId,
   });
+  const [crewIds, setCrewIds] = useState<string[]>(item?.crew_ids ?? []);
+  const crewChanged =
+    crewIds.length !== (item?.crew_ids.length ?? 0) ||
+    crewIds.some((id) => !item?.crew_ids.includes(id));
   const [isRequired, setIsRequired] = useState(item?.is_required ?? false);
   const [saving, setSaving] = useState(false);
   const set = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
@@ -2354,7 +2448,6 @@ function ItemDialog({
       duration_minutes: form.duration_minutes
         ? parseInt(form.duration_minutes, 10)
         : (item ? null : undefined),
-      assigned_to: form.assigned_to === "none" ? (item ? null : undefined) : form.assigned_to,
       ...(itemClosed
         ? { completed_by: form.completed_by === "none" ? null : form.completed_by }
         : {}),
@@ -2365,8 +2458,13 @@ function ItemDialog({
           ...payload,
           ...(form.section_id !== item.section_id ? { section_id: form.section_id } : {}),
         });
+        if (crewChanged) await briefingProService.setItemCrew(item.id, crewIds);
       } else {
-        await briefingProService.createItem(briefingId, { ...payload, section_id: form.section_id });
+        const created = await briefingProService.createItem(briefingId, {
+          ...payload,
+          section_id: form.section_id,
+        });
+        if (crewIds.length > 0) await briefingProService.setItemCrew(created.id, crewIds);
       }
       onSaved();
     } catch {
@@ -2450,18 +2548,22 @@ function ItemDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label>Responsável</Label>
-              <Select value={form.assigned_to} onValueChange={(v) => set("assigned_to", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Ninguém</SelectItem>
-                  {people.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.profile?.display_name ?? "Usuário"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Quem faz</Label>
+              <div className="rounded-md border p-2">
+                <CrewCheckboxList
+                  crew={crew}
+                  selected={crewIds}
+                  onToggle={(id) =>
+                    setCrewIds((prev) =>
+                      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+                    )
+                  }
+                  emptyHint="Cadastre a equipe no card “Equipe e funções” para atribuir."
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Sem ninguém marcado, o item fica com quem cuida da seção.
+              </p>
             </div>
           </div>
           {itemClosed && (
@@ -2509,6 +2611,127 @@ function ItemDialog({
           <Button onClick={save} disabled={saving || !form.title.trim()}>
             {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             Salvar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Dialog: equipe do trabalho e funções ────────────────────────────────────
+
+function CrewDialog({
+  detail, people, onClose, onSaved,
+}: {
+  detail: BriefingDetail;
+  /** Dono + membros com acesso — sugestões de vínculo. */
+  people: Array<{ id: string; profile: ProfileSummary | null }>;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [drafts, setDrafts] = useState<CrewDraft[]>(() =>
+    detail.crew.map((c) =>
+      newCrewDraft({
+        id: c.id,
+        name: c.name,
+        job_role: c.job_role,
+        user_id: c.user_id,
+        profile: c.profile ?? null,
+        phone: c.phone ?? "",
+      })
+    )
+  );
+  const [saving, setSaving] = useState(false);
+  const quickProfiles = people
+    .map((p) => p.profile)
+    .filter((p): p is ProfileSummary => Boolean(p));
+  const linkedIds = new Set(drafts.map((d) => d.user_id).filter(Boolean));
+  const notInCrew = quickProfiles.filter((p) => !linkedIds.has(p.id));
+
+  async function save() {
+    setSaving(true);
+    try {
+      const originalById = new Map(detail.crew.map((c) => [c.id, c]));
+      const keptIds = new Set(drafts.map((d) => d.id).filter(Boolean));
+      for (const original of detail.crew) {
+        if (!keptIds.has(original.id)) await briefingProService.deleteCrewMember(original.id);
+      }
+      let position = 0;
+      for (const draft of drafts) {
+        const name = draft.name.trim();
+        if (!name) continue;
+        const jobRole = draft.job_role.trim();
+        const phone = draft.phone.trim();
+        const original = draft.id ? originalById.get(draft.id) : undefined;
+        if (draft.id && original) {
+          const patch: Parameters<typeof briefingProService.updateCrewMember>[1] = {};
+          if (name !== original.name) patch.name = name;
+          if (jobRole !== original.job_role) patch.job_role = jobRole;
+          if ((draft.user_id ?? null) !== original.user_id) patch.user_id = draft.user_id ?? null;
+          if (phone !== (original.phone ?? "")) patch.phone = phone;
+          if (position !== original.position) patch.position = position;
+          if (Object.keys(patch).length > 0) {
+            await briefingProService.updateCrewMember(draft.id, patch);
+          }
+        } else {
+          await briefingProService.addCrewMember(detail.briefing.id, {
+            name,
+            job_role: jobRole || undefined,
+            user_id: draft.user_id ?? undefined,
+            phone: phone || undefined,
+          });
+        }
+        position += 1;
+      }
+      toast.success("Equipe atualizada");
+      onSaved();
+    } catch (err) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || "Erro ao salvar a equipe");
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Equipe e funções
+          </DialogTitle>
+          <DialogDescription>
+            Quem trabalha no dia e a função de cada um (Foto, Drone, Coordenação, Auxiliar...).
+            Vincular a um usuário cadastrado liga notificações e o filtro “Meus itens”.
+            Remover alguém apaga as atribuições dessa pessoa.
+          </DialogDescription>
+        </DialogHeader>
+        {notInCrew.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-muted-foreground">Adicionar da equipe de acesso:</span>
+            {notInCrew.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className="rounded-full border px-2 py-0.5 hover:bg-muted"
+                onClick={() =>
+                  setDrafts((prev) => [
+                    ...prev,
+                    newCrewDraft({ name: p.display_name, user_id: p.id, profile: p }),
+                  ])
+                }
+              >
+                + {p.display_name}
+              </button>
+            ))}
+          </div>
+        )}
+        <CrewEditor value={drafts} onChange={setDrafts} quickProfiles={quickProfiles} />
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button onClick={save} disabled={saving} className="gap-2">
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            Salvar equipe
           </Button>
         </DialogFooter>
       </DialogContent>

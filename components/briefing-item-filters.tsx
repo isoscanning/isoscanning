@@ -1,8 +1,8 @@
 "use client";
 
 // Barra de filtros dos itens do Briefing Pro: chips por tipo (foto, vídeo,
-// drone...), seletor de pessoa e "só pendentes". Usada na edição do briefing
-// e no Dia de Execução; o filtro fica salvo por briefing no navegador.
+// drone...), seletor de pessoa da equipe (quem faz) e "só pendentes". Usada
+// na edição do briefing e no Dia de Execução; o filtro fica salvo por briefing.
 
 import { useCallback, useEffect, useState, type ComponentType } from "react";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,8 @@ import {
   readStoredItemFilter,
   writeStoredItemFilter,
 } from "@/lib/briefing-pro-filters";
-import { ITEM_TYPE_LABELS, ItemType, ProfileSummary } from "@/lib/briefing-pro-types";
+import { crewLabel, myCrewIds } from "@/lib/briefing-pro-crew";
+import { BriefingCrew, ITEM_TYPE_LABELS, ItemType } from "@/lib/briefing-pro-types";
 
 const TYPE_ICONS: Record<ItemType, ComponentType<{ className?: string }>> = {
   photo: Camera,
@@ -79,14 +80,15 @@ function Chip({
 }
 
 export function BriefingItemFilters({
-  filter, onChange, items, people, userId, showPendingToggle = false,
+  filter, onChange, items, crew, userId, showPendingToggle = false,
   visibleCount, totalCount, className,
 }: {
   filter: BriefingItemFilter;
   onChange: (next: BriefingItemFilter) => void;
   /** Todos os itens do briefing (sem filtro) — define quais chips aparecem. */
-  items: Array<{ id: string; item_type: ItemType; assigned_to: string | null; status: "pending" | "in_progress" | "done" | "skipped" }>;
-  people: Array<{ id: string; profile: ProfileSummary | null }>;
+  items: Array<{ id: string; item_type: ItemType }>;
+  /** Equipe do trabalho (opções de "quem faz"). */
+  crew: BriefingCrew[];
   userId?: string | null;
   showPendingToggle?: boolean;
   visibleCount: number;
@@ -95,7 +97,8 @@ export function BriefingItemFilters({
 }) {
   const typeCounts = countItemTypes(items);
   const showTypes = typeCounts.length > 1;
-  const showPeople = people.length > 1 || items.some((i) => i.assigned_to);
+  const showPeople = crew.length > 0;
+  const mine = myCrewIds(crew, userId);
   const active = isItemFilterActive(filter);
 
   if (!showTypes && !showPeople && !showPendingToggle) return null;
@@ -106,6 +109,11 @@ export function BriefingItemFilters({
       : [...filter.types, type];
     onChange({ ...filter, types });
   };
+
+  // Pessoa que saiu da equipe continua salva no filtro: mostra como opção "(removida)"
+  const personKnown =
+    filter.person === "all" || filter.person === "me" || filter.person === "unassigned" ||
+    crew.some((c) => c.id === filter.person);
 
   return (
     <div className={`rounded-lg border bg-muted/30 px-3 py-2 ${className ?? ""}`}>
@@ -148,24 +156,25 @@ export function BriefingItemFilters({
             onValueChange={(v) => onChange({ ...filter, person: v })}
           >
             <SelectTrigger
-              className={`h-7 w-auto min-w-0 max-w-[180px] rounded-full text-xs px-2.5 gap-1 ${
+              className={`h-7 w-auto min-w-0 max-w-[200px] rounded-full text-xs px-2.5 gap-1 ${
                 filter.person !== "all" ? "border-primary text-foreground" : "text-muted-foreground"
               }`}
-              aria-label="Filtrar por pessoa"
+              aria-label="Filtrar por pessoa da equipe"
             >
-              <SelectValue placeholder="Pessoa" />
+              <SelectValue placeholder="Quem faz" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas as pessoas</SelectItem>
-              {userId && <SelectItem value="me">Meus itens</SelectItem>}
+              <SelectItem value="all">Toda a equipe</SelectItem>
+              {mine.length > 0 && <SelectItem value="me">Meus itens</SelectItem>}
               <SelectItem value="unassigned">Sem responsável</SelectItem>
-              {people
-                .filter((p) => p.id !== userId)
-                .map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.profile?.display_name ?? "Usuário"}
-                  </SelectItem>
-                ))}
+              {crew.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {crewLabel(c)}
+                </SelectItem>
+              ))}
+              {!personKnown && (
+                <SelectItem value={filter.person}>Pessoa removida da equipe</SelectItem>
+              )}
             </SelectContent>
           </Select>
         )}

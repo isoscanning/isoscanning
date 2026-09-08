@@ -22,9 +22,11 @@ import { BriefingTimeShiftDialog } from "@/components/briefing-time-shift-dialog
 import { BriefingIncidentsCard } from "@/components/briefing-incidents-card";
 import { BriefingCompletedBy } from "@/components/briefing-completed-by";
 import { BriefingItemFilters, useBriefingItemFilter } from "@/components/briefing-item-filters";
+import { CrewAssignPopover } from "@/components/briefing-crew-assign";
 import {
   EMPTY_ITEM_FILTER, filterSections, firstPendingItemId,
 } from "@/lib/briefing-pro-filters";
+import { myCrewIds } from "@/lib/briefing-pro-crew";
 import { toast } from "sonner";
 import { briefingProService } from "@/lib/briefing-pro-service";
 import {
@@ -136,7 +138,10 @@ export default function ExecutionModePage() {
   const progress = allItems.length ? Math.round((doneCount / allItems.length) * 100) : 0;
 
   const visibleSections = useMemo(
-    () => (detail ? filterSections(detail.sections, itemFilter, userProfile?.id) : []),
+    () =>
+      detail
+        ? filterSections(detail.sections, itemFilter, myCrewIds(detail.crew, userProfile?.id))
+        : [],
     [detail, itemFilter, userProfile?.id]
   );
   const visibleItemCount = visibleSections.reduce((acc, s) => acc + s.items.length, 0);
@@ -424,7 +429,7 @@ export default function ExecutionModePage() {
             filter={itemFilter}
             onChange={setItemFilter}
             items={allItems}
-            people={people}
+            crew={detail.crew}
             userId={userProfile?.id}
             showPendingToggle
             visibleCount={visibleItemCount}
@@ -467,6 +472,17 @@ export default function ExecutionModePage() {
                       {sectionDone}/{section.items.length}
                     </span>
                   </CardTitle>
+                  {section.crew_ids.length > 0 && (
+                    <div className="mt-1">
+                      <CrewAssignPopover
+                        crew={detail.crew}
+                        selectedIds={section.crew_ids}
+                        canEdit={false}
+                        title="Quem cuida desta seção"
+                        onSave={async () => undefined}
+                      />
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-1 pt-0">
                   {section.items.length === 0 && (
@@ -477,10 +493,6 @@ export default function ExecutionModePage() {
                     const isSkipped = item.status === "skipped";
                     const isCurrent = item.id === currentItemId;
                     const isNext = item.id === nextItemId;
-                    const completedBy = item.completed_by
-                      ? detail.profiles[item.completed_by]
-                      : null;
-                    const assignee = item.assigned_to ? detail.profiles[item.assigned_to] : null;
                     const itemLinks = detail.links.filter((l) => l.item_id === item.id);
                     const itemComments = comments.filter((c) => c.item_id === item.id);
                     return (
@@ -581,11 +593,18 @@ export default function ExecutionModePage() {
                               </div>
                             )}
                             <div className="flex flex-wrap items-center gap-2 mt-1">
-                              {assignee && !completedBy && (
-                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <Avatar profile={assignee} size={4} />
-                                  {assignee.display_name}
-                                </span>
+                              {!isDone && !isSkipped && (
+                                <CrewAssignPopover
+                                  crew={detail.crew}
+                                  selectedIds={item.crew_ids}
+                                  inheritedIds={section.crew_ids}
+                                  canEdit={canEdit}
+                                  title="Quem faz este item"
+                                  onSave={async (ids) => {
+                                    await briefingProService.setItemCrew(item.id, ids);
+                                    await load(true);
+                                  }}
+                                />
                               )}
                               {(isDone || isSkipped) && (
                                 <BriefingCompletedBy

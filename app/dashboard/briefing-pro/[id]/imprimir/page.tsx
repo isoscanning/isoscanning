@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { briefingProService } from "@/lib/briefing-pro-service";
+import { crewIndex, effectiveCrewIds } from "@/lib/briefing-pro-crew";
 import { tierAllows } from "@/components/plan/plan-gate";
 import { useOwnerPlanTier } from "@/components/social-media/premium-gate";
 import {
@@ -108,6 +109,13 @@ export default function BriefingPrintPage() {
   const isReport = briefing.status === "completed";
   const statusCfg = BRIEFING_STATUS_CONFIG[briefing.status];
   const allItems = detail.sections.flatMap((s) => s.items);
+  const crewById = crewIndex(detail.crew);
+  const crewNames = (ids: string[]) =>
+    ids
+      .map((id) => crewById.get(id))
+      .filter((c): c is NonNullable<typeof c> => Boolean(c))
+      .map((c) => (c.job_role ? `${c.name} (${c.job_role})` : c.name))
+      .join(", ");
   const doneItems = allItems.filter((i) => i.status === "done");
   const skippedItems = allItems.filter((i) => i.status === "skipped");
   const ownerProfile = detail.profiles[briefing.owner_id];
@@ -256,6 +264,22 @@ export default function BriefingPrintPage() {
           </section>
         )}
 
+        {/* Equipe do trabalho e funções */}
+        {detail.crew.length > 0 && (
+          <section className="mb-6 break-inside-avoid">
+            <h2 className="text-base font-bold border-b border-gray-300 pb-1 mb-3">Equipe e funções</h2>
+            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1">
+              {detail.crew.map((member) => (
+                <p key={member.id} className="text-sm">
+                  <span className="font-semibold">{member.name}</span>
+                  {member.job_role && <span className="text-gray-600"> — {member.job_role}</span>}
+                  {member.phone && <span className="text-xs text-gray-500"> · {member.phone}</span>}
+                </p>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Estrutura / checklist */}
         <section className="mb-6">
           <h2 className="text-base font-bold border-b border-gray-300 pb-1 mb-3">
@@ -273,9 +297,15 @@ export default function BriefingPrintPage() {
               {section.description && (
                 <p className="text-xs text-gray-600 px-2 mt-0.5">{section.description}</p>
               )}
+              {section.crew_ids.length > 0 && (
+                <p className="text-xs text-gray-700 px-2 mt-0.5">
+                  <span className="font-semibold">Equipe:</span> {crewNames(section.crew_ids)}
+                </p>
+              )}
               <div className="mt-1">
                 {section.items.map((item) => {
                   const itemLinks = detail.links.filter((l) => l.item_id === item.id);
+                  const who = effectiveCrewIds(item, section);
                   return (
                     <div key={item.id} className="px-2 py-1.5 border-b border-gray-100 last:border-0">
                       <p>
@@ -293,9 +323,9 @@ export default function BriefingPrintPage() {
                         {item.item_type !== "task" && (
                           <span className="text-xs text-gray-500 ml-1">[{ITEM_TYPE_LABELS[item.item_type]}]</span>
                         )}
-                        {item.assigned_to && (
-                          <span className="text-xs text-gray-600 ml-1">
-                            → {nameOf(item.assigned_to)}
+                        {who.ids.length > 0 && (
+                          <span className={`text-xs ml-1 ${who.inherited ? "text-gray-400" : "text-gray-600"}`}>
+                            → {crewNames(who.ids)}
                           </span>
                         )}
                       </p>

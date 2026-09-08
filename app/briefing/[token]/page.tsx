@@ -15,10 +15,12 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ClipboardList, Clock, MapPin, Phone, Package, Link2, HardDrive,
-  Lock, CheckCircle2, CornerDownRight, Loader2, UserPlus, LogIn, AlertTriangle,
+  Lock, CheckCircle2, CornerDownRight, Loader2, UserPlus, LogIn, AlertTriangle, Users,
 } from "lucide-react";
 import { toast } from "sonner";
+import { CrewBadges, CrewChip } from "@/components/briefing-crew-assign";
 import { briefingProService } from "@/lib/briefing-pro-service";
+import { crewIndex, effectiveCrewIds } from "@/lib/briefing-pro-crew";
 import {
   PublicBriefingView,
   BRIEFING_STATUS_CONFIG,
@@ -102,6 +104,7 @@ export default function PublicBriefingPage() {
   const { briefing } = view;
   const statusCfg = BRIEFING_STATUS_CONFIG[briefing.status];
   const allItems = view.sections.flatMap((s) => s.items);
+  const crewById = crewIndex(view.crew);
   const doneCount = allItems.filter((i) => i.status === "done" || i.status === "skipped").length;
   const progress = allItems.length ? Math.round((doneCount / allItems.length) * 100) : 0;
   const roleLabel = view.share_role === "editor" ? "editar o conteúdo" : "acompanhar e comentar";
@@ -212,6 +215,24 @@ export default function PublicBriefingPage() {
           </CardContent>
         </Card>
 
+        {/* Equipe do trabalho e funções */}
+        {view.crew.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Users className="h-4 w-4" />Equipe e funções
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-1.5">
+                {view.crew.map((member) => (
+                  <CrewChip key={member.id} member={member} />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Locações e contatos */}
         {(briefing.locations.length > 0 || briefing.contacts.length > 0) && (
           <div className="grid sm:grid-cols-2 gap-4 mb-6">
@@ -272,11 +293,13 @@ export default function PublicBriefingPage() {
                 {section.description && (
                   <CardDescription>{section.description}</CardDescription>
                 )}
+                <CrewBadges crewIds={section.crew_ids} crewById={crewById} className="mt-1" />
               </CardHeader>
               <CardContent className="space-y-2">
                 {section.items.map((item) => {
                   const isDone = item.status === "done" || item.status === "skipped";
                   const itemLinks = view.links.filter((l) => l.item_id === item.id);
+                  const who = effectiveCrewIds(item, section);
                   return (
                     <div key={item.id} className="flex items-start gap-2 text-sm">
                       <CheckCircle2
@@ -302,6 +325,7 @@ export default function PublicBriefingPage() {
                               Alta
                             </Badge>
                           )}
+                          <CrewBadges crewIds={who.ids} crewById={crewById} inherited={who.inherited} />
                         </div>
                         {item.description && (
                           <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>

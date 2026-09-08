@@ -9,6 +9,7 @@ import {
   Briefing,
   BriefingComment,
   BriefingContact,
+  BriefingCrew,
   BriefingDeliverable,
   BriefingDetail,
   BriefingIncident,
@@ -68,6 +69,16 @@ export interface CreateBriefingPayload {
     deliver_to?: string;
     delivery_method?: string;
   }>;
+  /** Equipe do trabalho com funções (quem faz o quê é atribuído depois). */
+  crew?: CrewMemberPayload[];
+}
+
+export interface CrewMemberPayload {
+  name: string;
+  job_role?: string;
+  user_id?: string;
+  phone?: string;
+  notes?: string;
 }
 
 export const briefingProService = {
@@ -202,6 +213,43 @@ export const briefingProService = {
 
   async removeMember(memberId: string): Promise<void> {
     await apiClient.delete(`/briefing-pro/members/${memberId}`);
+  },
+
+  // ─── Equipe do trabalho (funções) e atribuições ───────────────────────────
+
+  async addCrewMember(briefingId: string, payload: CrewMemberPayload): Promise<BriefingCrew> {
+    const { data } = await apiClient.post(`/briefing-pro/${briefingId}/crew`, payload);
+    return data;
+  },
+
+  async updateCrewMember(
+    crewId: string,
+    payload: Omit<Partial<CrewMemberPayload>, "user_id"> & {
+      /** null desvincula do perfil. */
+      user_id?: string | null;
+      position?: number;
+    }
+  ): Promise<BriefingCrew> {
+    const { data } = await apiClient.patch(`/briefing-pro/crew/${crewId}`, payload);
+    return data;
+  },
+
+  async deleteCrewMember(crewId: string): Promise<void> {
+    await apiClient.delete(`/briefing-pro/crew/${crewId}`);
+  },
+
+  /** Quem faz este item (vazio = herda da seção). */
+  async setItemCrew(itemId: string, crewIds: string[]): Promise<{ crew_ids: string[] }> {
+    const { data } = await apiClient.put(`/briefing-pro/items/${itemId}/crew`, { crew_ids: crewIds });
+    return data;
+  },
+
+  /** Quem cuida desta seção (momento). */
+  async setSectionCrew(sectionId: string, crewIds: string[]): Promise<{ crew_ids: string[] }> {
+    const { data } = await apiClient.put(`/briefing-pro/sections/${sectionId}/crew`, {
+      crew_ids: crewIds,
+    });
+    return data;
   },
 
   // ─── Seções ───────────────────────────────────────────────────────────────

@@ -37,6 +37,7 @@ import {
   unsupportedFileMessage,
 } from "@/lib/briefing-pro-file";
 import { briefingProService, CreateBriefingPayload } from "@/lib/briefing-pro-service";
+import { CrewDraft, CrewEditor } from "@/components/briefing-crew-editor";
 import { tokenManager } from "@/lib/token-manager";
 import { notifyPlanLimit } from "@/lib/plans/plan-events";
 import {
@@ -153,6 +154,18 @@ export default function NewBriefingPage() {
   const [eventTime, setEventTime] = useState("");
   const [withDefaults, setWithDefaults] = useState(true);
 
+  // Equipe do trabalho (nome + função) — vale para os dois modos
+  const [crew, setCrew] = useState<CrewDraft[]>([]);
+  const crewPayload = (): CreateBriefingPayload["crew"] =>
+    crew
+      .filter((c) => c.name.trim())
+      .map((c) => ({
+        name: c.name.trim(),
+        job_role: c.job_role.trim() || undefined,
+        user_id: c.user_id ?? undefined,
+        phone: c.phone.trim() || undefined,
+      }));
+
   // IA
   const [aiText, setAiText] = useState("");
   const [aiType, setAiType] = useState<string>("auto");
@@ -185,6 +198,7 @@ export default function NewBriefingPage() {
         event_date: eventDate || undefined,
         event_time: eventTime || undefined,
         sections: withDefaults ? DEFAULT_SECTIONS[briefingType] : undefined,
+        crew: crewPayload(),
       };
       const briefing = await briefingProService.create(payload);
       toast.success("Briefing criado!");
@@ -294,7 +308,7 @@ export default function NewBriefingPage() {
     if (!preview) return;
     setSaving(true);
     try {
-      const briefing = await briefingProService.create(preview);
+      const briefing = await briefingProService.create({ ...preview, crew: crewPayload() });
       toast.success("Briefing criado! Ajuste o que quiser na tela de edição.");
       router.push(`/dashboard/briefing-pro/${briefing.id}`);
     } catch (err) {
@@ -444,6 +458,13 @@ export default function NewBriefingPage() {
                   placeholder="O que esse trabalho precisa alcançar?"
                   rows={3}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Equipe e funções
+                </Label>
+                <CrewEditor value={crew} onChange={setCrew} />
               </div>
               <label className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer">
                 <Checkbox
@@ -698,6 +719,22 @@ export default function NewBriefingPage() {
                     </span>
                   )}
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Equipe e funções
+                </CardTitle>
+                <CardDescription>
+                  Quem trabalha no dia e a função de cada um. Depois de salvar, você atribui quem
+                  faz o quê em cada seção e item.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CrewEditor value={crew} onChange={setCrew} />
               </CardContent>
             </Card>
 

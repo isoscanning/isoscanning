@@ -9,37 +9,43 @@ import {
   isItemFilterActive,
   matchesItemFilter,
 } from "../briefing-pro-filters";
+import { effectiveCrewIds, myCrewIds } from "../briefing-pro-crew";
 import type { ItemStatus, ItemType } from "../briefing-pro-types";
 
 function item(
   id: string,
-  overrides: Partial<{ item_type: ItemType; assigned_to: string | null; status: ItemStatus }> = {}
+  overrides: Partial<{ item_type: ItemType; crew_ids: string[]; status: ItemStatus }> = {}
 ) {
   return {
     id,
     item_type: overrides.item_type ?? ("task" as ItemType),
-    assigned_to: overrides.assigned_to ?? null,
+    crew_ids: overrides.crew_ids ?? [],
     status: overrides.status ?? ("pending" as ItemStatus),
   };
 }
 
+// Equipe: ana (Foto), bia (Drone). A seção s2 é da ana; o item "e" não tem ninguém → herda.
 const sections = [
   {
     id: "s1",
+    crew_ids: [],
     items: [
-      item("a", { item_type: "photo", assigned_to: "ana", status: "done" }),
-      item("b", { item_type: "video", assigned_to: "bia" }),
+      item("a", { item_type: "photo", crew_ids: ["ana"], status: "done" }),
+      item("b", { item_type: "video", crew_ids: ["bia"] }),
       item("c", { item_type: "drone" }),
     ],
   },
   {
     id: "s2",
+    crew_ids: ["ana"],
     items: [
-      item("d", { item_type: "photo", assigned_to: "ana", status: "skipped" }),
-      item("e", { item_type: "task", assigned_to: "ana" }),
+      item("d", { item_type: "photo", crew_ids: ["bia"], status: "skipped" }),
+      item("e", { item_type: "task" }),
     ],
   },
 ];
+
+const noCtx = { sectionCrewIds: [] as string[], myCrewIds: [] as string[] };
 
 describe("isItemFilterActive", () => {
   it("vazio não é ativo; qualquer critério ativa", () => {
@@ -50,39 +56,68 @@ describe("isItemFilterActive", () => {
   });
 });
 
+describe("effectiveCrewIds", () => {
+  it("atribuição própria vence; sem ela herda a seção", () => {
+    expect(effectiveCrewIds({ crew_ids: ["x"] }, { crew_ids: ["y"] })).toEqual({ ids: ["x"], inherited: false });
+    expect(effectiveCrewIds({ crew_ids: [] }, { crew_ids: ["y"] })).toEqual({ ids: ["y"], inherited: true });
+    expect(effectiveCrewIds({ crew_ids: [] }, { crew_ids: [] })).toEqual({ ids: [], inherited: false });
+  });
+});
+
+describe("myCrewIds", () => {
+  it("devolve as pessoas da equipe vinculadas ao usuário", () => {
+    const crew = [
+      { id: "ana", user_id: "u1" },
+      { id: "bia", user_id: null },
+      { id: "carla", user_id: "u1" },
+    ];
+    expect(myCrewIds(crew, "u1")).toEqual(["ana", "carla"]);
+    expect(myCrewIds(crew, "u2")).toEqual([]);
+    expect(myCrewIds(crew, null)).toEqual([]);
+  });
+});
+
 describe("matchesItemFilter", () => {
   it("filtra por tipo (vários tipos = OU)", () => {
     const f = { ...EMPTY_ITEM_FILTER, types: ["photo", "drone"] as ItemType[] };
-    expect(matchesItemFilter(item("x", { item_type: "photo" }), f)).toBe(true);
-    expect(matchesItemFilter(item("x", { item_type: "drone" }), f)).toBe(true);
-    expect(matchesItemFilter(item("x", { item_type: "video" }), f)).toBe(false);
+    expect(matchesItemFilter(item("x", { item_type: "photo" }), f, noCtx)).toBe(true);
+    expect(matchesItemFilter(item("x", { item_type: "drone" }), f, noCtx)).toBe(true);
+    expect(matchesItemFilter(item("x", { item_type: "video" }), f, noCtx)).toBe(false);
   });
 
-  it("filtra por pessoa: me / unassigned / id", () => {
-    const me = item("x", { assigned_to: "ana" });
+  it("filtra por pessoa da equipe, inclusive herdada da seção", () => {
+    const own = item("x", { crew_ids: ["ana"] });
+    const inherits = item("y");
+    const ctx = { sectionCrewIds: ["bia"], myCrewIds: [] };
+    expect(matchesItemFilter(own, { ...EMPTY_ITEM_FILTER, person: "ana" }, ctx)).toBe(true);
+    expect(matchesItemFilter(own, { ...EMPTY_ITEM_FILTER, person: "bia" }, ctx)).toBe(false);
+    expect(matchesItemFilter(inherits, { ...EMPTY_ITEM_FILTER, person: "bia" }, ctx)).toBe(true);
+  });
+
+  it("me = qualquer pessoa da equipe vinculada a mim; unassigned = ninguém nem herdado", () => {
+    const own = item("x", { crew_ids: ["ana"] });
     const nobody = item("y");
-    expect(matchesItemFilter(me, { ...EMPTY_ITEM_FILTER, person: "me" }, "ana")).toBe(true);
-    expect(matchesItemFilter(me, { ...EMPTY_ITEM_FILTER, person: "me" }, "bia")).toBe(false);
-    expect(matchesItemFilter(me, { ...EMPTY_ITEM_FILTER, person: "me" }, null)).toBe(false);
-    expect(matchesItemFilter(nobody, { ...EMPTY_ITEM_FILTER, person: "unassigned" })).toBe(true);
-    expect(matchesItemFilter(me, { ...EMPTY_ITEM_FILTER, person: "unassigned" })).toBe(false);
-    expect(matchesItemFilter(me, { ...EMPTY_ITEM_FILTER, person: "ana" })).toBe(true);
-    expect(matchesItemFilter(me, { ...EMPTY_ITEM_FILTER, person: "bia" })).toBe(false);
+    expect(matchesItemFilter(own, { ...EMPTY_ITEM_FILTER, person: "me" }, { sectionCrewIds: [], myCrewIds: ["ana"] })).toBe(true);
+    expect(matchesItemFilter(own, { ...EMPTY_ITEM_FILTER, person: "me" }, { sectionCrewIds: [], myCrewIds: ["bia"] })).toBe(false);
+    expect(matchesItemFilter(nobody, { ...EMPTY_ITEM_FILTER, person: "me" }, { sectionCrewIds: ["ana"], myCrewIds: ["ana"] })).toBe(true);
+    expect(matchesItemFilter(nobody, { ...EMPTY_ITEM_FILTER, person: "unassigned" }, noCtx)).toBe(true);
+    expect(matchesItemFilter(nobody, { ...EMPTY_ITEM_FILTER, person: "unassigned" }, { sectionCrewIds: ["ana"], myCrewIds: [] })).toBe(false);
+    expect(matchesItemFilter(own, { ...EMPTY_ITEM_FILTER, person: "unassigned" }, noCtx)).toBe(false);
   });
 
   it("só pendentes esconde feitos e pulados, mantém em andamento", () => {
     const f = { ...EMPTY_ITEM_FILTER, onlyPending: true };
-    expect(matchesItemFilter(item("x", { status: "done" }), f)).toBe(false);
-    expect(matchesItemFilter(item("x", { status: "skipped" }), f)).toBe(false);
-    expect(matchesItemFilter(item("x", { status: "in_progress" }), f)).toBe(true);
-    expect(matchesItemFilter(item("x", { status: "pending" }), f)).toBe(true);
+    expect(matchesItemFilter(item("x", { status: "done" }), f, noCtx)).toBe(false);
+    expect(matchesItemFilter(item("x", { status: "skipped" }), f, noCtx)).toBe(false);
+    expect(matchesItemFilter(item("x", { status: "in_progress" }), f, noCtx)).toBe(true);
+    expect(matchesItemFilter(item("x", { status: "pending" }), f, noCtx)).toBe(true);
   });
 
   it("critérios se combinam com E", () => {
     const f = { ...EMPTY_ITEM_FILTER, types: ["photo"] as ItemType[], person: "ana", onlyPending: true };
-    expect(matchesItemFilter(item("x", { item_type: "photo", assigned_to: "ana" }), f)).toBe(true);
-    expect(matchesItemFilter(item("x", { item_type: "photo", assigned_to: "ana", status: "done" }), f)).toBe(false);
-    expect(matchesItemFilter(item("x", { item_type: "video", assigned_to: "ana" }), f)).toBe(false);
+    expect(matchesItemFilter(item("x", { item_type: "photo", crew_ids: ["ana"] }), f, noCtx)).toBe(true);
+    expect(matchesItemFilter(item("x", { item_type: "photo", crew_ids: ["ana"], status: "done" }), f, noCtx)).toBe(false);
+    expect(matchesItemFilter(item("x", { item_type: "video", crew_ids: ["ana"] }), f, noCtx)).toBe(false);
   });
 });
 
@@ -97,10 +132,16 @@ describe("filterSections", () => {
     expect(out[0].items.map((i) => i.id)).toEqual(["c"]);
   });
 
-  it("pessoa + só pendentes", () => {
+  it("pessoa + só pendentes, com herança da seção", () => {
+    // ana: item "a" (feito) e "e" (herdado da seção s2, pendente)
     const out = filterSections(sections, { ...EMPTY_ITEM_FILTER, person: "ana", onlyPending: true });
     expect(out.map((s) => s.id)).toEqual(["s2"]);
     expect(out[0].items.map((i) => i.id)).toEqual(["e"]);
+  });
+
+  it("meus itens usa os ids vinculados ao usuário", () => {
+    const out = filterSections(sections, { ...EMPTY_ITEM_FILTER, person: "me" }, ["bia"]);
+    expect(out.flatMap((s) => s.items.map((i) => i.id))).toEqual(["b", "d"]);
   });
 });
 

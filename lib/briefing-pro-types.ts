@@ -100,6 +100,24 @@ export interface BriefingMember {
   profile?: ProfileSummary | null;
 }
 
+/**
+ * Pessoa da equipe do trabalho (migration 80): nome + função (Foto, Drone,
+ * Coordenação, Auxiliar...). Pode não ter conta; `user_id` é o vínculo opcional.
+ */
+export interface BriefingCrew {
+  id: string;
+  briefing_id: string;
+  user_id: string | null;
+  name: string;
+  job_role: string;
+  phone: string | null;
+  notes: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+  profile?: ProfileSummary | null;
+}
+
 export interface BriefingSubitem {
   id: string;
   briefing_id: string;
@@ -123,7 +141,10 @@ export interface BriefingItem {
   priority: ItemPriority;
   /** Obrigatório para toda a equipe: não pode ser pulado e trava a conclusão. */
   is_required: boolean;
+  /** Legado (1 usuário). A UI usa `crew_ids` — quem faz, da equipe do trabalho. */
   assigned_to: string | null;
+  /** Pessoas da equipe neste item; vazio = herda as da seção. */
+  crew_ids: string[];
   scheduled_time: string | null;
   /** Duração no cronograma (min) — alimenta o recálculo em cascata. */
   duration_minutes: number | null;
@@ -141,6 +162,8 @@ export interface BriefingSection {
   briefing_id: string;
   title: string;
   description: string | null;
+  /** Quem cuida deste momento — vale para os itens sem atribuição própria. */
+  crew_ids: string[];
   position: number;
   created_at: string;
   updated_at: string;
@@ -239,6 +262,7 @@ export interface BriefingDetail {
   sections: BriefingSection[];
   deliverables: BriefingDeliverable[];
   links: BriefingLink[];
+  crew: BriefingCrew[];
   members: BriefingMember[];
   read_confirmations: BriefingReadConfirmation[];
   incidents: BriefingIncident[];
@@ -288,6 +312,7 @@ export interface GeneratedBriefingStructure {
 /** Visão pública (sem login) do briefing via link compartilhado. */
 export interface PublicBriefingView {
   share_role: MemberRole;
+  crew: Array<{ id: string; name: string; job_role: string }>;
   briefing: {
     title: string;
     client_name: string | null;
@@ -308,8 +333,10 @@ export interface PublicBriefingView {
     id: string;
     title: string;
     description: string | null;
+    crew_ids: string[];
     items: Array<{
       id: string;
+      crew_ids: string[];
       title: string;
       description: string | null;
       item_type: ItemType;

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -29,6 +28,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { useConfirmDialog } from "@/components/confirm-dialog";
 import { briefingProService } from "@/lib/briefing-pro-service";
 import { usePlan, usePlanUsage } from "@/lib/plans/use-plan";
 import {
@@ -78,7 +78,7 @@ function DuplicateBriefingDialog({
   }
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && !saving && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -147,6 +147,7 @@ export default function BriefingProPage() {
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [duplicateTarget, setDuplicateTarget] = useState<BriefingListRow | null>(null);
+  const { confirm: askConfirm, dialog: confirmDialog } = useConfirmDialog();
 
   // Cota de briefings/mês (GET /plans/me) — só exibe quando o plano tem limite
   const plan = usePlan();
@@ -178,14 +179,21 @@ export default function BriefingProPage() {
     }
   }
 
-  async function archiveBriefing(briefing: BriefingListRow) {
-    try {
-      await briefingProService.changeStatus(briefing.id, "archived");
-      toast.success("Briefing arquivado");
-      fetchBriefings();
-    } catch {
-      toast.error("Erro ao arquivar o briefing");
-    }
+  function archiveBriefing(briefing: BriefingListRow) {
+    askConfirm({
+      title: `Arquivar "${briefing.title}"?`,
+      description: "O briefing sai da lista para todos. Você pode restaurá-lo depois.",
+      confirmLabel: "Arquivar",
+      onConfirm: async () => {
+        try {
+          await briefingProService.changeStatus(briefing.id, "archived");
+          toast.success("Briefing arquivado");
+          await fetchBriefings();
+        } catch {
+          toast.error("Erro ao arquivar o briefing");
+        }
+      },
+    });
   }
 
   async function deleteBriefing() {
@@ -407,7 +415,7 @@ export default function BriefingProPage() {
       <Dialog
         open={!!deleteTarget}
         onOpenChange={(open) => {
-          if (!open) {
+          if (!open && !deleting) {
             setDeleteTarget(null);
             setConfirmText("");
           }
@@ -428,7 +436,7 @@ export default function BriefingProPage() {
             placeholder="excluir"
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
               Cancelar
             </Button>
             <Button
@@ -441,6 +449,7 @@ export default function BriefingProPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   );
 }

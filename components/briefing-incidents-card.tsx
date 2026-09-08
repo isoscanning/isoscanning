@@ -23,6 +23,7 @@ import {
   AlertTriangle, Ban, CheckCircle2, Loader2, Plus, RotateCcw, Wrench, X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirmDialog } from "@/components/confirm-dialog";
 import { briefingProService } from "@/lib/briefing-pro-service";
 import {
   BriefingIncident,
@@ -55,6 +56,7 @@ export function BriefingIncidentsCard({
   const [registerOpen, setRegisterOpen] = useState(false);
   const [closeTarget, setCloseTarget] = useState<BriefingIncident | null>(null);
   const [reopening, setReopening] = useState<string | null>(null);
+  const { confirm: askConfirm, dialog: confirmDialog } = useConfirmDialog();
 
   const openCount = incidents.filter((i) => !i.resolved).length;
   const unresolvedCount = incidents.filter((i) => i.resolved && i.outcome === "unresolved").length;
@@ -175,15 +177,22 @@ export function BriefingIncidentsCard({
                       size="icon"
                       className="h-7 w-7 text-destructive"
                       title="Excluir intercorrência"
-                      onClick={async () => {
-                        if (!confirm("Excluir esta intercorrência do registro?")) return;
-                        try {
-                          await briefingProService.deleteIncident(incident.id);
-                          onChanged();
-                        } catch {
-                          toast.error("Erro ao excluir a intercorrência");
-                        }
-                      }}
+                      onClick={() =>
+                        askConfirm({
+                          title: "Excluir esta intercorrência?",
+                          description: "Ela sai do registro e do relatório final. Essa ação não pode ser desfeita.",
+                          confirmLabel: "Excluir",
+                          destructive: true,
+                          onConfirm: async () => {
+                            try {
+                              await briefingProService.deleteIncident(incident.id);
+                              await onChanged();
+                            } catch {
+                              toast.error("Erro ao excluir a intercorrência");
+                            }
+                          },
+                        })
+                      }
                     >
                       <X className="h-3.5 w-3.5" />
                     </Button>
@@ -255,6 +264,7 @@ export function BriefingIncidentsCard({
           onSaved={() => { setCloseTarget(null); onChanged(); }}
         />
       )}
+      {confirmDialog}
     </Card>
   );
 }
@@ -290,7 +300,7 @@ function RegisterIncidentDialog({
   }
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && !saving && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -394,7 +404,7 @@ function CloseIncidentDialog({
   const SubmitIcon = OUTCOME_ICONS[outcome];
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && !saving && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Encerrar intercorrência</DialogTitle>

@@ -55,6 +55,7 @@ import { BriefingIncidentsCard } from "@/components/briefing-incidents-card";
 import { BriefingCompletedBy } from "@/components/briefing-completed-by";
 import { BriefingItemFilters, useBriefingItemFilter } from "@/components/briefing-item-filters";
 import { CrewAssignPopover, CrewCheckboxList } from "@/components/briefing-crew-assign";
+import { useConfirmDialog } from "@/components/confirm-dialog";
 import { CrewDraft, CrewEditor, newCrewDraft } from "@/components/briefing-crew-editor";
 import { EMPTY_ITEM_FILTER, filterSections } from "@/lib/briefing-pro-filters";
 import { jobRoleTone, myCrewIds } from "@/lib/briefing-pro-crew";
@@ -350,6 +351,10 @@ export default function BriefingDetailPage() {
   const [recalcOpen, setRecalcOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [crewDialog, setCrewDialog] = useState(false);
+  const [confirmingRead, setConfirmingRead] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<BriefingStatus | null>(null);
+  // Modal de confirmação (excluir/remover) com trava anti-clique duplo
+  const { confirm: askConfirm, dialog: confirmDialog } = useConfirmDialog();
   const [busy, setBusy] = useState(false);
 
   // Mouse: arrasta após 5px; toque: segura 200ms (não briga com a rolagem);
@@ -425,7 +430,9 @@ export default function BriefingDetailPage() {
   const visibleItemCount = visibleSections.reduce((acc, s) => acc + s.items.length, 0);
 
   async function handleStatusChange(status: BriefingStatus) {
+    if (busy) return;
     setBusy(true);
+    setPendingStatus(status);
     try {
       await briefingProService.changeStatus(briefingId, status);
       toast.success(`Status atualizado: ${BRIEFING_STATUS_CONFIG[status].label}`);
@@ -435,6 +442,7 @@ export default function BriefingDetailPage() {
       toast.error(msg || "Erro ao mudar o status");
     } finally {
       setBusy(false);
+      setPendingStatus(null);
     }
   }
 
@@ -500,12 +508,16 @@ export default function BriefingDetailPage() {
   }
 
   async function handleConfirmRead() {
+    if (confirmingRead) return;
+    setConfirmingRead(true);
     try {
       await briefingProService.confirmRead(briefingId);
       toast.success("Leitura confirmada!");
-      refresh();
+      await refresh();
     } catch {
       toast.error("Erro ao confirmar leitura");
+    } finally {
+      setConfirmingRead(false);
     }
   }
 
@@ -636,8 +648,17 @@ export default function BriefingDetailPage() {
                   Todos do briefing veem quem já leu e confirmou.
                 </p>
               </div>
-              <Button size="sm" onClick={handleConfirmRead} className="gap-2 shrink-0">
-                <ShieldCheck className="h-4 w-4" />
+              <Button
+                size="sm"
+                onClick={handleConfirmRead}
+                disabled={confirmingRead}
+                className="gap-2 shrink-0"
+              >
+                {confirmingRead ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ShieldCheck className="h-4 w-4" />
+                )}
                 Li e confirmo
               </Button>
             </CardContent>
@@ -726,7 +747,11 @@ export default function BriefingDetailPage() {
                     onClick={() => handleStatusChange(action.to)}
                     className="gap-1"
                   >
-                    {action.to === "approved" && <ShieldCheck className="h-4 w-4" />}
+                    {pendingStatus === action.to ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      action.to === "approved" && <ShieldCheck className="h-4 w-4" />
+                    )}
                     {action.label}
                   </Button>
                 ))}
@@ -875,16 +900,25 @@ export default function BriefingDetailPage() {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
-                            onClick={async () => {
-                              if (!confirm(`Excluir a seção "${section.title}" e todos os seus itens?`)) return;
-                              try {
-                                await briefingProService.deleteSection(section.id);
-                                toast.success("Seção excluída");
-                                refresh();
-                              } catch {
-                                toast.error("Erro ao excluir a seção");
-                              }
-                            }}
+                            onClick={() =>
+                              askConfirm({
+                                title: `Excluir a seção "${section.title}"?`,
+                                description: section.items.length
+                                  ? `Os ${section.items.length} ${section.items.length === 1 ? "item" : "itens"} desta seção, com subitens e links, também serão excluídos. Essa ação não pode ser desfeita.`
+                                  : "Essa ação não pode ser desfeita.",
+                                confirmLabel: "Excluir seção",
+                                destructive: true,
+                                onConfirm: async () => {
+                                  try {
+                                    await briefingProService.deleteSection(section.id);
+                                    toast.success("Seção excluída");
+                                    await refresh();
+                                  } catch {
+                                    toast.error("Erro ao excluir a seção");
+                                  }
+                                },
+                              })
+                            }
                           >
                             <Trash2 className="h-4 w-4 mr-2" />Excluir seção
                           </DropdownMenuItem>
@@ -1006,15 +1040,22 @@ export default function BriefingDetailPage() {
                             onMoveDown={() => moveItem(section.id, item.id, 1)}
                             onLink={() => setLinkDialog({ itemId: item.id })}
                             onEdit={() => setItemDialog({ sectionId: section.id, item })}
-                            onDelete={async () => {
-                              if (!confirm(`Excluir o item "${item.title}"?`)) return;
-                              try {
-                                await briefingProService.deleteItem(item.id);
-                                refresh();
-                              } catch {
-                                toast.error("Erro ao excluir o item");
-                              }
-                            }}
+                            onDelete={() =>
+                              askConfirm({
+                                title: `Excluir o item "${item.title}"?`,
+                                description: "Subitens, links e comentários ligados a ele também somem. Essa ação não pode ser desfeita.",
+                                confirmLabel: "Excluir item",
+                                destructive: true,
+                                onConfirm: async () => {
+                                  try {
+                                    await briefingProService.deleteItem(item.id);
+                                    await refresh();
+                                  } catch {
+                                    toast.error("Erro ao excluir o item");
+                                  }
+                                },
+                              })
+                            }
                           />
                         )}
                       </div>
@@ -1147,14 +1188,23 @@ export default function BriefingDetailPage() {
                                 </Button>
                                 <Button
                                   variant="ghost" size="icon" className="h-7 w-7 text-destructive"
-                                  onClick={async () => {
-                                    try {
-                                      await briefingProService.deleteDeliverable(del.id);
-                                      refresh();
-                                    } catch {
-                                      toast.error("Erro ao excluir");
-                                    }
-                                  }}
+                                  title="Excluir entregável"
+                                  onClick={() =>
+                                    askConfirm({
+                                      title: `Excluir o entregável "${del.title}"?`,
+                                      description: "Os links anexados a ele também serão removidos. Essa ação não pode ser desfeita.",
+                                      confirmLabel: "Excluir entregável",
+                                      destructive: true,
+                                      onConfirm: async () => {
+                                        try {
+                                          await briefingProService.deleteDeliverable(del.id);
+                                          await refresh();
+                                        } catch {
+                                          toast.error("Erro ao excluir o entregável");
+                                        }
+                                      },
+                                    })
+                                  }
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
@@ -1180,14 +1230,22 @@ export default function BriefingDetailPage() {
                   toast.error("Erro ao comentar");
                 }
               }}
-              onDelete={async (id) => {
-                try {
-                  await briefingProService.deleteComment(id);
-                  setComments((prev) => prev.filter((c) => c.id !== id));
-                } catch {
-                  toast.error("Erro ao remover o comentário");
-                }
-              }}
+              onDelete={(id) =>
+                askConfirm({
+                  title: "Remover este comentário?",
+                  description: "Ele some da conversa para todos do briefing.",
+                  confirmLabel: "Remover",
+                  destructive: true,
+                  onConfirm: async () => {
+                    try {
+                      await briefingProService.deleteComment(id);
+                      setComments((prev) => prev.filter((c) => c.id !== id));
+                    } catch {
+                      toast.error("Erro ao remover o comentário");
+                    }
+                  },
+                })
+              }
               userId={userProfile?.id}
               isOwner={isOwner}
             />
@@ -1303,14 +1361,23 @@ export default function BriefingDetailPage() {
                         <Button
                           variant="ghost" size="icon"
                           className="h-6 w-6 hover-reveal text-destructive"
-                          onClick={async () => {
-                            try {
-                              await briefingProService.deleteLink(link.id);
-                              refresh();
-                            } catch {
-                              toast.error("Erro ao remover o link");
-                            }
-                          }}
+                          title="Remover material"
+                          onClick={() =>
+                            askConfirm({
+                              title: `Remover o material "${link.label}"?`,
+                              description: "O link sai do briefing para todos. O arquivo em si não é apagado.",
+                              confirmLabel: "Remover",
+                              destructive: true,
+                              onConfirm: async () => {
+                                try {
+                                  await briefingProService.deleteLink(link.id);
+                                  await refresh();
+                                } catch {
+                                  toast.error("Erro ao remover o link");
+                                }
+                              },
+                            })
+                          }
                         >
                           <X className="h-3 w-3" />
                         </Button>
@@ -1568,6 +1635,7 @@ export default function BriefingDetailPage() {
         userId={userProfile?.id}
         onChanged={refresh}
       />
+      {confirmDialog}
     </div>
   );
 }
@@ -1584,6 +1652,7 @@ function SubitemChecklist({
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState<string | null>(null);
   // Estado otimista local para o toggle não esperar o refresh completo
   const [optimistic, setOptimistic] = useState<Record<string, "pending" | "done">>({});
 
@@ -1647,16 +1716,25 @@ function SubitemChecklist({
                 variant="ghost" size="icon"
                 className="h-6 w-6 hover-reveal text-destructive"
                 title="Remover subitem"
+                disabled={removing === sub.id}
                 onClick={async () => {
+                  if (removing) return;
+                  setRemoving(sub.id);
                   try {
                     await briefingProService.deleteSubitem(sub.id);
-                    onChanged();
+                    await onChanged();
                   } catch {
                     toast.error("Erro ao remover o subitem");
+                  } finally {
+                    setRemoving(null);
                   }
                 }}
               >
-                <X className="h-3 w-3" />
+                {removing === sub.id ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <X className="h-3 w-3" />
+                )}
               </Button>
             )}
           </div>
@@ -1713,7 +1791,7 @@ function CommentsCard({
 }: {
   comments: BriefingComment[];
   onAdd: (content: string) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onDelete: (id: string) => void | Promise<void>;
   userId?: string;
   isOwner: boolean;
 }) {
@@ -1843,7 +1921,7 @@ function EditInfoDialog({
   }
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && !saving && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar briefing</DialogTitle>
@@ -1928,7 +2006,7 @@ function EditInfoDialog({
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button onClick={save} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             Salvar
@@ -1970,7 +2048,7 @@ function SectionDialog({
   }
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && !saving && onClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{section ? "Editar seção" : "Nova seção"}</DialogTitle>
@@ -1995,7 +2073,7 @@ function SectionDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button onClick={save} disabled={saving || !title.trim()}>
             {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             Salvar
@@ -2066,7 +2144,7 @@ function ShareBriefingDialog({
   }
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && !busy && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -2153,7 +2231,7 @@ function ShareBriefingDialog({
           )}
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Fechar</Button>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>Fechar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -2262,7 +2340,7 @@ function RefineSectionDialog({
   }
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && !applying && !generating && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -2305,7 +2383,7 @@ function RefineSectionDialog({
               </div>
             )}
             <DialogFooter>
-              <Button variant="outline" onClick={onClose} disabled={generating}>
+              <Button variant="outline" onClick={onClose} disabled={generating || applying}>
                 Cancelar
               </Button>
               <Button onClick={generate} disabled={generating} className="gap-2">
@@ -2474,7 +2552,7 @@ function ItemDialog({
   }
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && !saving && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{item ? "Editar item" : "Novo item"}</DialogTitle>
@@ -2607,7 +2685,7 @@ function ItemDialog({
           </label>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button onClick={save} disabled={saving || !form.title.trim()}>
             {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             Salvar
@@ -2693,7 +2771,7 @@ function CrewDialog({
   }
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && !saving && onClose()}>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -2790,7 +2868,7 @@ function DeliverableDialog({
   }
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && !saving && onClose()}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{deliverable ? "Editar entregável" : "Novo entregável"}</DialogTitle>
@@ -2870,7 +2948,7 @@ function DeliverableDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button onClick={save} disabled={saving || !form.title.trim()}>
             {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             Salvar
@@ -2922,7 +3000,7 @@ function LinkDialog({
   }
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && !saving && onClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Registrar material</DialogTitle>
@@ -2975,7 +3053,7 @@ function LinkDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button onClick={save} disabled={saving || !form.label.trim()}>
             {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             Salvar
@@ -3018,7 +3096,7 @@ function ContactsDialog({
   }
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && !saving && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Contatos-chave</DialogTitle>
@@ -3078,7 +3156,7 @@ function ContactsDialog({
           </Button>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button onClick={save} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             Salvar
@@ -3121,7 +3199,7 @@ function LocationsDialog({
   }
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && !saving && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Locações</DialogTitle>
@@ -3174,7 +3252,7 @@ function LocationsDialog({
           </Button>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button onClick={save} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             Salvar
@@ -3202,6 +3280,7 @@ function TeamSheet({
   const [searching, setSearching] = useState(false);
   const [newRole, setNewRole] = useState<string>("viewer");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { confirm: askConfirm, dialog: confirmDialog } = useConfirmDialog();
 
   const ownerProfile = detail.profiles[detail.briefing.owner_id] ?? null;
   // Limite de membros por briefing (plano do dono — só o dono adiciona)
@@ -3377,15 +3456,24 @@ function TeamSheet({
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-destructive"
-                      onClick={async () => {
-                        try {
-                          await briefingProService.removeMember(m.id);
-                          toast.success("Membro removido");
-                          onChanged();
-                        } catch {
-                          toast.error("Erro ao remover");
-                        }
-                      }}
+                      title="Remover do briefing"
+                      onClick={() =>
+                        askConfirm({
+                          title: `Remover ${m.profile?.display_name ?? "este membro"} do briefing?`,
+                          description: "A pessoa perde o acesso e deixa de receber as notificações deste briefing.",
+                          confirmLabel: "Remover",
+                          destructive: true,
+                          onConfirm: async () => {
+                            try {
+                              await briefingProService.removeMember(m.id);
+                              toast.success("Membro removido");
+                              await onChanged();
+                            } catch {
+                              toast.error("Erro ao remover");
+                            }
+                          },
+                        })
+                      }
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -3394,15 +3482,23 @@ function TeamSheet({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={async () => {
-                      try {
-                        await briefingProService.removeMember(m.id);
-                        toast.success("Você saiu do briefing");
-                        window.location.href = "/dashboard/briefing-pro";
-                      } catch {
-                        toast.error("Erro ao sair");
-                      }
-                    }}
+                    onClick={() =>
+                      askConfirm({
+                        title: "Sair deste briefing?",
+                        description: "Você perde o acesso; o dono pode te adicionar de novo depois.",
+                        confirmLabel: "Sair do briefing",
+                        destructive: true,
+                        onConfirm: async () => {
+                          try {
+                            await briefingProService.removeMember(m.id);
+                            toast.success("Você saiu do briefing");
+                            window.location.href = "/dashboard/briefing-pro";
+                          } catch {
+                            toast.error("Erro ao sair");
+                          }
+                        },
+                      })
+                    }
                   >
                     Sair
                   </Button>
@@ -3412,6 +3508,7 @@ function TeamSheet({
           </div>
         </div>
       </SheetContent>
+      {confirmDialog}
     </Sheet>
   );
 }

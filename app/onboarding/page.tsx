@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { takeRedirectAfterLogin } from "@/lib/teams-invite";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -66,9 +67,10 @@ export default function OnboardingPage() {
                 description: "Seu perfil foi atualizado com sucesso.",
             });
 
-            // Add delay for effect
+            // Add delay for effect. Convite de time pendente guarda o destino
+            // em redirectAfterLogin — quem entrou pelo link vai direto ao time.
             setTimeout(() => {
-                router.push("/dashboard");
+                router.push(takeRedirectAfterLogin("/dashboard"));
             }, 500);
 
         } catch (error) {
@@ -86,7 +88,7 @@ export default function OnboardingPage() {
         // Set a flag in sessionStorage so we don't annoy the user again in this session
         // but we WILL ask again next time they open the browser or login.
         sessionStorage.setItem("onboarding_skipped", "true");
-        router.push("/dashboard");
+        router.push(takeRedirectAfterLogin("/dashboard"));
     };
 
     if (loading) {

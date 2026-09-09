@@ -6,6 +6,10 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { Users as UsersIcon } from "lucide-react";
+import { teamsService } from "@/lib/teams-service";
+import { rememberPendingTeamInvite } from "@/lib/teams-invite";
+import type { TeamInvitePreview } from "@/lib/teams-types";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
@@ -80,6 +84,21 @@ export default function CadastroPage() {
         setCoupon(normalizeCoupon(fromUrl));
         setCouponOpen(true);
       }
+    } catch {
+      /* sem window (SSR) — ignora */
+    }
+  }, []);
+
+  // Convite de time (/cadastro?time=<token>): guarda o token para o
+  // PendingTeamInviteHandler concluir a entrada assim que a conta existir e
+  // mostra para qual time a pessoa está entrando.
+  const [teamInvite, setTeamInvite] = useState<TeamInvitePreview | null>(null);
+  useEffect(() => {
+    try {
+      const token = new URLSearchParams(window.location.search).get("time");
+      if (!token) return;
+      rememberPendingTeamInvite(token);
+      teamsService.previewInvite(token).then(setTeamInvite).catch(() => setTeamInvite(null));
     } catch {
       /* sem window (SSR) — ignora */
     }
@@ -264,6 +283,17 @@ export default function CadastroPage() {
                       <Camera className="h-10 w-10 text-white relative z-10" />
                     </motion.div>
                   </div>
+                  {teamInvite && (
+                    <div className="flex items-center gap-3 rounded-xl border border-teal-500/40 bg-teal-500/5 p-3 text-left">
+                      <div className="h-10 w-10 shrink-0 rounded-xl flex items-center justify-center text-white font-semibold" style={{ backgroundColor: teamInvite.team.color }}>
+                        {teamInvite.team.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold inline-flex items-center gap-1"><UsersIcon className="h-4 w-4 text-teal-600" /> Você vai entrar no time {teamInvite.team.name}</p>
+                        <p className="text-xs text-muted-foreground">Crie a conta e pronto — você já entra no time de {teamInvite.owner?.display_name ?? "quem convidou"}.</p>
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <CardTitle className="text-3xl font-bold tracking-tight text-foreground">
                       Criar conta

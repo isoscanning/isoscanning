@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { PlanUpgradeProvider } from "@/components/plan/upgrade-modal";
+import { PendingTeamInviteHandler } from "@/components/pending-team-invite";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { Toaster as ShadcnToaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -105,6 +106,8 @@ fbq('track', 'PageView');`,
             <PlanUpgradeProvider>
               {children}
             </PlanUpgradeProvider>
+            {/* Convite de time pendente (link tipo grupo do WhatsApp): entra no time ao ganhar sessão */}
+            <PendingTeamInviteHandler />
             {/*
               Renderizadores de toast montados UMA vez para todo o app.
               Antes não existia nenhum: 26 arquivos usavam `toast()` do sonner

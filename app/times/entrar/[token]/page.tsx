@@ -1,7 +1,13 @@
 "use client";
 
-// Entrada em um time pelo link de convite (/times/entrar/<token>).
-// Exige login: sem sessão, guarda o destino e manda para /login.
+// Entrada em um time pelo link de convite (/times/entrar/<token>) — fluxo de
+// "link de grupo do WhatsApp":
+//   - a prévia (nome do time, gestor, quantos membros) é pública;
+//   - com sessão: um clique em "Entrar no time";
+//   - sem conta: "Criar conta e entrar" leva ao cadastro já sabendo do convite;
+//     ao ganhar sessão (e-mail, Google ou login) o PendingTeamInviteHandler
+//     conclui a entrada e leva a pessoa para o time.
+// Uma pessoa pode estar em quantos times quiser.
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -10,10 +16,11 @@ import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, LogIn, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Users, LogIn, Loader2, AlertTriangle, CheckCircle2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { isPlanErrorBody } from "@/lib/plans/plan-limits";
 import { teamsService, teamsApiError } from "@/lib/teams-service";
+import { clearPendingTeamInvite, rememberPendingTeamInvite } from "@/lib/teams-invite";
 import { initials, type TeamInvitePreview } from "@/lib/teams-types";
 
 export default function JoinTeamPage() {
@@ -26,26 +33,19 @@ export default function JoinTeamPage() {
   const [error, setError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
 
+  // Prévia pública — não depende de sessão
   useEffect(() => {
-    if (authLoading) return;
-    if (!userProfile) {
-      try {
-        localStorage.setItem("redirectAfterLogin", `/times/entrar/${token}`);
-      } catch {
-        /* storage indisponível */
-      }
-      return;
-    }
     teamsService
       .previewInvite(token)
       .then(setPreview)
       .catch((err) => setError(teamsApiError(err, "Este link de convite não é mais válido")));
-  }, [authLoading, userProfile, token]);
+  }, [token]);
 
   async function join() {
     setJoining(true);
     try {
       const result = await teamsService.joinByToken(token);
+      clearPendingTeamInvite();
       toast.success(result.status === "already_member" ? "Você já faz parte deste time" : `Você entrou no time ${preview?.team.name ?? ""}!`);
       router.push(`/dashboard/times/${result.team_id}`);
     } catch (err) {
@@ -53,6 +53,18 @@ export default function JoinTeamPage() {
       setJoining(false);
     }
   }
+
+  function goSignup() {
+    rememberPendingTeamInvite(token);
+    router.push(`/cadastro?time=${encodeURIComponent(token)}`);
+  }
+
+  function goLogin() {
+    rememberPendingTeamInvite(token);
+    router.push("/login");
+  }
+
+  const teamName = preview?.team.name ?? "";
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
@@ -65,38 +77,23 @@ export default function JoinTeamPage() {
                 <p className="font-medium">{error}</p>
                 <p className="text-sm text-muted-foreground mt-1">Peça um novo link a quem gerencia o time.</p>
               </div>
-              <Button asChild variant="outline"><Link href="/dashboard/times">Meus times</Link></Button>
+              <Button asChild variant="outline"><Link href={userProfile ? "/dashboard/times" : "/"}>{userProfile ? "Meus times" : "Ir para a IsoScanning"}</Link></Button>
             </>
-          ) : !userProfile ? (
-            authLoading ? (
-              <Skeleton className="h-24 w-full" />
-            ) : (
-              <>
-                <div className="h-14 w-14 mx-auto rounded-2xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400 flex items-center justify-center">
-                  <Users className="h-7 w-7" />
-                </div>
-                <div>
-                  <p className="font-semibold text-lg">Convite para um time</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Entre na sua conta (ou crie uma) para ver o convite e participar do time.
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                  <Button asChild><Link href="/login"><LogIn className="mr-2 h-4 w-4" /> Entrar</Link></Button>
-                  <Button asChild variant="outline"><Link href="/cadastro">Criar conta</Link></Button>
-                </div>
-              </>
-            )
-          ) : !preview ? (
-            <Skeleton className="h-24 w-full" />
+          ) : !preview || authLoading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-16 w-16 mx-auto rounded-2xl" />
+              <Skeleton className="h-6 w-2/3 mx-auto" />
+              <Skeleton className="h-4 w-1/2 mx-auto" />
+              <Skeleton className="h-11 w-full" />
+            </div>
           ) : (
             <>
               <div className="h-16 w-16 mx-auto rounded-2xl flex items-center justify-center text-white text-xl font-bold" style={{ backgroundColor: preview.team.color }}>
-                {initials(preview.team.name)}
+                {initials(teamName)}
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Você foi convidado para o time</p>
-                <p className="font-bold text-2xl">{preview.team.name}</p>
+                <p className="font-bold text-2xl">{teamName}</p>
                 {preview.team.description && <p className="text-sm text-muted-foreground mt-2">{preview.team.description}</p>}
                 <p className="text-xs text-muted-foreground mt-3">
                   Gestor: {preview.owner?.display_name ?? "—"} · {preview.members_count} {preview.members_count === 1 ? "membro" : "membros"}
@@ -107,10 +104,23 @@ export default function JoinTeamPage() {
                 <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" /> Seja convocado e confirme sua escalação</li>
                 <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" /> Chat e avisos do time em um só lugar</li>
               </ul>
-              <Button size="lg" className="w-full" onClick={join} disabled={joining}>
-                {joining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Users className="mr-2 h-4 w-4" />}
-                Entrar no time
-              </Button>
+
+              {userProfile ? (
+                <Button size="lg" className="w-full" onClick={join} disabled={joining}>
+                  {joining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Users className="mr-2 h-4 w-4" />}
+                  Entrar no time
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  <Button size="lg" className="w-full" onClick={goSignup}>
+                    <UserPlus className="mr-2 h-4 w-4" /> Criar conta e entrar no time
+                  </Button>
+                  <Button size="lg" variant="outline" className="w-full" onClick={goLogin}>
+                    <LogIn className="mr-2 h-4 w-4" /> Já tenho conta
+                  </Button>
+                  <p className="text-xs text-muted-foreground">Leva menos de um minuto. Você entra no time assim que a conta estiver pronta.</p>
+                </div>
+              )}
             </>
           )}
         </CardContent>

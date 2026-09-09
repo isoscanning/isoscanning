@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Crown, Shield, Star, MapPin, MessageSquare, ExternalLink, MoreVertical, UserMinus, Pencil, Search, Loader2,
-  UserPlus, Link2, Copy, RefreshCw, X, CalendarDays, UserCheck, Clock,
+  UserPlus, Link2, Copy, RefreshCw, X, CalendarDays, UserCheck, Clock, Send,
 } from "lucide-react";
 import { toast } from "sonner";
 import apiClient from "@/lib/api-service";
@@ -25,6 +25,7 @@ import { useConfirmDialog } from "@/components/confirm-dialog";
 import { usePlan } from "@/lib/plans/use-plan";
 import { isPlanErrorBody } from "@/lib/plans/plan-limits";
 import { teamsService, teamsApiError } from "@/lib/teams-service";
+import { buildInviteShareText } from "@/lib/teams-invite";
 import {
   TEAM_JOB_ROLE_SUGGESTIONS, TEAM_ROLE_LABELS, formatTeamDate, initials, isManagerRole,
   type TeamDetail, type TeamMemberView, type TeamProfileSummary,
@@ -262,12 +263,17 @@ function InviteLinkCard({ detail, onChanged }: { detail: TeamDetail; onChanged: 
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Quem abrir o link entra no time como <strong>{detail.team.invite_role === "manager" ? "gestor" : "membro"}</strong> (precisa ter conta na IsoScanning). Ideal para mandar no WhatsApp do grupo.
+          Funciona como link de grupo do WhatsApp: quem abrir entra no time como <strong>{detail.team.invite_role === "manager" ? "gestor" : "membro"}</strong>. Quem ainda não tem conta cria na hora e já entra. Uma pessoa pode estar em vários times.
         </p>
         {url ? (
           <div className="flex flex-col sm:flex-row gap-2">
             <Input readOnly value={url} className="font-mono text-xs" onFocus={(e) => e.target.select()} />
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" asChild>
+                <a href={`https://wa.me/?text=${encodeURIComponent(buildInviteShareText(detail.team.name, url))}`} target="_blank" rel="noopener noreferrer">
+                  <Send className="mr-1 h-4 w-4" /> WhatsApp
+                </a>
+              </Button>
               <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(url); toast.success("Link copiado"); }}><Copy className="mr-1 h-4 w-4" /> Copiar</Button>
               <Button variant="outline" size="sm" disabled={busy} onClick={() => run(() => teamsService.enableInviteLink(detail.team.id, { regenerate: true }), "Novo link gerado — o antigo deixou de funcionar")}><RefreshCw className="mr-1 h-4 w-4" /> Novo</Button>
               <Button variant="ghost" size="sm" disabled={busy} onClick={() => run(() => teamsService.disableInviteLink(detail.team.id), "Link desativado")}><X className="mr-1 h-4 w-4" /> Desativar</Button>

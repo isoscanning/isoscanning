@@ -72,6 +72,16 @@ export const NOTIFICATION_TYPES = [
   "finance_das_due",
   "finance_dasn_due",
   "finance_mei_threshold",
+  "team_invitation",
+  "team_joined",
+  "team_left",
+  "team_job_published",
+  "team_job_convocation",
+  "team_job_application",
+  "team_escalation_confirmed",
+  "team_escalation_cancelled",
+  "team_announcement",
+  "team_job_day_before",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -91,6 +101,13 @@ const communityUrl: Resolver = (ref) => (ref ? `/c/${ref}` : "/comunidade");
 const financeRecordUrl: Resolver = (id) => (id ? `/dashboard/financeiro?lancamento=${id}` : "/dashboard/financeiro");
 const budgetQuoteUrl: Resolver = (id) =>
   id ? `/dashboard/calculadora-orcamento/orcamentos/${id}` : "/dashboard/calculadora-orcamento";
+
+// Times: referenceId = teamId (abre o time) ou "teamId:jobOfferId" (abre o job do time)
+const teamUrl: Resolver = (ref) => {
+  if (!ref) return "/dashboard/times";
+  const [teamId, jobId] = ref.split(":");
+  return jobId ? `/dashboard/times/${teamId}/jobs/${jobId}` : `/dashboard/times/${teamId}`;
+};
 
 const CLICK_URLS: Record<NotificationType, Resolver> = {
   job_match: (id) => (id ? `/vagas/${id}` : "/vagas"),
@@ -178,6 +195,17 @@ const CLICK_URLS: Record<NotificationType, Resolver> = {
   finance_das_due: () => "/dashboard/financeiro?painel=anual",
   finance_dasn_due: () => "/dashboard/financeiro?painel=anual",
   finance_mei_threshold: () => "/dashboard/financeiro?painel=anual",
+
+  team_invitation: () => "/dashboard/times?tab=convites",
+  team_joined: (ref) => `${teamUrl(ref)}?tab=membros`,
+  team_left: (ref) => (ref ? `${teamUrl(ref)}?tab=membros` : "/dashboard/times"),
+  team_job_published: teamUrl,
+  team_job_convocation: teamUrl,
+  team_job_application: teamUrl,
+  team_escalation_confirmed: teamUrl,
+  team_escalation_cancelled: teamUrl,
+  team_announcement: (ref) => `${teamUrl(ref)}?tab=avisos`,
+  team_job_day_before: teamUrl,
 };
 
 export function notificationClickUrl(type: string, referenceId?: string | null): string {
@@ -193,7 +221,7 @@ export interface NotificationMeta {
   toast: string;
   tone: NotificationTone;
   /** Agrupador exibido como filtro na página de histórico. */
-  group: "trabalho" | "contratos" | "financeiro" | "caixa" | "social" | "briefing" | "comunidade" | "sistema";
+  group: "trabalho" | "contratos" | "financeiro" | "caixa" | "social" | "briefing" | "times" | "comunidade" | "sistema";
 }
 
 export const NOTIFICATION_META: Record<NotificationType, NotificationMeta> = {
@@ -270,6 +298,17 @@ export const NOTIFICATION_META: Record<NotificationType, NotificationMeta> = {
   finance_das_due: { toast: "DAS do MEI vence em breve", tone: "warning", group: "caixa" },
   finance_dasn_due: { toast: "Declaração anual do MEI", tone: "warning", group: "caixa" },
   finance_mei_threshold: { toast: "Atenção ao teto do MEI", tone: "warning", group: "caixa" },
+
+  team_invitation: { toast: "Convite para um time", tone: "info", group: "times" },
+  team_joined: { toast: "Novo membro no time", tone: "success", group: "times" },
+  team_left: { toast: "Mudança no time", tone: "warning", group: "times" },
+  team_job_published: { toast: "Novo job no seu time", tone: "info", group: "times" },
+  team_job_convocation: { toast: "Você foi convocado!", tone: "warning", group: "times" },
+  team_job_application: { toast: "Novidade na escalação", tone: "info", group: "times" },
+  team_escalation_confirmed: { toast: "Escalação confirmada ✓", tone: "success", group: "times" },
+  team_escalation_cancelled: { toast: "Escalação cancelada", tone: "warning", group: "times" },
+  team_announcement: { toast: "Aviso do time", tone: "info", group: "times" },
+  team_job_day_before: { toast: "Amanhã é dia de job!", tone: "warning", group: "times" },
 };
 
 export function notificationMeta(type: string): NotificationMeta {
@@ -283,6 +322,7 @@ export const NOTIFICATION_GROUP_LABELS: Record<NotificationMeta["group"], string
   caixa: "Financeiro",
   social: "Social media",
   briefing: "Briefing",
+  times: "Times",
   comunidade: "Comunidade",
   sistema: "Sistema",
 };

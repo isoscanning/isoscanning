@@ -3,6 +3,7 @@ import { getSupabaseAdmin, ADMIN_MISSING_MSG } from "@/lib/server/supabase-admin
 import { connectionsAllowedByPlan, loadActiveConnections, loadConnection, syncConnections } from "@/lib/server/calendar-sync";
 import { pushConnections } from "@/lib/server/calendar-push";
 import { runBriefingReminders } from "@/lib/server/briefing-reminders";
+import { runTeamReminders } from "@/lib/server/team-reminders";
 
 // Sincronização periódica de TODOS os calendários conectados.
 //
@@ -60,6 +61,14 @@ export async function GET(request: NextRequest) {
       console.error("cron-sync: lembretes de briefing falharam:", err);
     }
 
+    // Lembrete D-1 dos escalados em jobs de time (idempotente).
+    let teamReminders = null;
+    try {
+      teamReminders = await runTeamReminders(admin);
+    } catch (err) {
+      console.error("cron-sync: lembretes de times falharam:", err);
+    }
+
     console.log(
       "agenda/cron-sync:",
       JSON.stringify({
@@ -83,6 +92,7 @@ export async function GET(request: NextRequest) {
       })),
       pushes,
       briefingReminders,
+      teamReminders,
     });
   } catch (error) {
     console.error("Error in agenda/cron-sync route:", error);

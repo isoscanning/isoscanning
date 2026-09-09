@@ -32,7 +32,9 @@ import {
     MapPin,
     Clock,
     FileSignature,
+    Users,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -62,6 +64,12 @@ const apiErrorMessage = (error: unknown, fallback: string) => {
 /** Candidatura ainda aberta a contrapropostas (nem aceita, nem encerrada). */
 const canNegotiate = (app: JobApplication) =>
     app.status === "pending" && app.agreementStatus !== "accepted";
+
+/** Job de time (SQL 81) abre dentro do time; vaga pública abre a página pública. */
+const jobHref = (app: JobApplication) =>
+    app.jobOffer.teamId
+        ? `/dashboard/times/${app.jobOffer.teamId}/jobs/${app.jobOfferId}`
+        : `/vagas/${app.jobOfferId}`;
 
 function MinhasCandidaturasInner() {
     const { userProfile, loading: authLoading } = useAuth();
@@ -309,9 +317,14 @@ function MinhasCandidaturasInner() {
                                                 </div>
 
                                                 <div>
-                                                    <Link href={`/vagas/${app.jobOfferId}`} className="hover:underline">
+                                                    <Link href={jobHref(app)} className="hover:underline">
                                                         <h3 className="text-xl font-bold text-foreground">{app.jobOffer.title}</h3>
                                                     </Link>
+                                                    {app.jobOffer.teamId && (
+                                                        <Badge variant="outline" className="mt-1 text-[11px] border-teal-500/40 text-teal-700 dark:text-teal-300">
+                                                            <Users className="mr-1 h-3 w-3" /> Job do time
+                                                        </Badge>
+                                                    )}
                                                     <div className="flex items-center gap-2 text-muted-foreground mt-1">
                                                         <Building2 className="h-4 w-4" />
                                                         <span className="text-sm">{app.jobOffer.employerName}</span>
@@ -437,8 +450,8 @@ function MinhasCandidaturasInner() {
                                                     </span>
                                                 </div>
                                                 <Button variant="outline" size="sm" className="w-full md:w-auto" asChild>
-                                                    <Link href={`/vagas/${app.jobOfferId}`}>
-                                                        Ver Detalhes <ChevronRight className="ml-2 h-4 w-4" />
+                                                    <Link href={jobHref(app)}>
+                                                        {app.jobOffer.teamId ? "Abrir no time" : "Ver Detalhes"} <ChevronRight className="ml-2 h-4 w-4" />
                                                     </Link>
                                                 </Button>
 

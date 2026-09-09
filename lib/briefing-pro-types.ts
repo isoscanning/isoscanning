@@ -70,6 +70,9 @@ export interface Briefing {
   agenda_blocked_at: string | null;
   share_view_count: number;
   share_last_viewed_at: string | null;
+  /** Times (SQL 81): briefing criado a partir de um job do time. */
+  team_id?: string | null;
+  job_offer_id?: string | null;
   created_at: string;
   updated_at: string;
 }

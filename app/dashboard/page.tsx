@@ -23,6 +23,7 @@ import {
   Settings,
   MessageSquare,
   ArrowRight,
+  Users,
   UserPlus,
   Briefcase,
   BadgeCheck,
@@ -797,6 +798,29 @@ export default function DashboardPage() {
                 </Link>
               </ScrollReveal>
               {/* END: Briefing Pro Card */}
+
+              {/* START: Times Card */}
+              <ScrollReveal delay={0.65} duration={0.4}>
+                <Link href="/dashboard/times" className="block h-full group" id="quick-times">
+                  <Card className="h-full border-border hover:border-teal-500/50 transition-all duration-300 hover:shadow-lg bg-card">
+                    <CardHeader>
+                      <div className="w-12 h-12 rounded-2xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                        <Users className="h-6 w-6" />
+                      </div>
+                      <CardTitle className="group-hover:text-teal-500 transition-colors">Times</CardTitle>
+                      <CardDescription>
+                        Monte sua equipe, veja a disponibilidade de cada um, publique jobs só para o time e confirme a escalação.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-end">
+                      <div className="w-8 h-8 rounded-full bg-background border flex items-center justify-center group-hover:bg-teal-500 group-hover:text-white group-hover:border-teal-500 transition-colors">
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </ScrollReveal>
+              {/* END: Times Card */}
             </div>
           </div>
         </div>

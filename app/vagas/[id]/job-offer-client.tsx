@@ -123,6 +123,14 @@ export default function DetalhesVagaPage() {
             if (!params.id) return;
             try {
                 const vagaData = await fetchJobOfferById(params.id as string);
+
+                // Job restrito a um time (SQL 81): a escalação acontece dentro
+                // do time — a página pública só redireciona quem tem acesso.
+                if (vagaData?.teamId) {
+                    router.replace(`/dashboard/times/${vagaData.teamId}/jobs/${vagaData.id}`);
+                    return;
+                }
+
                 setVaga(vagaData);
 
                 // Fetch employer review stats

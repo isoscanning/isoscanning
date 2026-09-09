@@ -84,13 +84,26 @@ export function JobCard({
     const editHref = `/dashboard/vagas/editar/${vaga.id}`;
 
     const statusBadge = (
-        <Badge
-            variant={isOpen ? "default" : "secondary"}
-            className={`text-xs ${BADGE_CLASS[status.status]}`}
-            title={status.hint}
-        >
-            {status.label}
-        </Badge>
+        <>
+            <Badge
+                variant={isOpen ? "default" : "secondary"}
+                className={`text-xs ${BADGE_CLASS[status.status]}`}
+                title={status.hint}
+            >
+                {status.label}
+            </Badge>
+            {vaga.teamId && (
+                <Link
+                    href={`/dashboard/times/${vaga.teamId}/jobs/${vaga.id}`}
+                    title="Job restrito ao time — abrir a escalação"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <Badge variant="outline" className="text-xs border-teal-500/40 text-teal-700 dark:text-teal-300">
+                        Job do time
+                    </Badge>
+                </Link>
+            )}
+        </>
     );
 
     /** Item de reativação: expirada precisa de novas datas → vai para a edição. */

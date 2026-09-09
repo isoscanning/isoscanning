@@ -67,6 +67,13 @@ export interface PlanLimits {
   /** Sincronização com Google/iCloud/Outlook + feed .ics de exportação */
   calendarSync: boolean;
 
+  /** Times criados (ativos) como gestor — ser membro é sempre livre */
+  teams: number | null;
+  /** Membros por time (ativos + convidados), além do dono — perk do plano do DONO */
+  teamMembers: number | null;
+  /** Jobs restritos ao time publicados por mês (todos os times do dono) */
+  teamJobsPerMonth: number | null;
+
   supportChannel: SupportChannel;
 }
 
@@ -114,6 +121,10 @@ const FREE_LIMITS: PlanLimits = {
   personalAgenda: false,
   calendarSync: false,
 
+  teams: 1,
+  teamMembers: 5,
+  teamJobsPerMonth: 2,
+
   supportChannel: "community",
 };
 
@@ -153,6 +164,10 @@ const PRO_LIMITS: PlanLimits = {
   personalAgenda: true,
   calendarSync: true,
 
+  teams: 3,
+  teamMembers: 20,
+  teamJobsPerMonth: 15,
+
   supportChannel: "email",
 };
 
@@ -191,6 +206,10 @@ const ULTRA_LIMITS: PlanLimits = {
   financeExport: true,
   personalAgenda: true,
   calendarSync: true,
+
+  teams: null,
+  teamMembers: null,
+  teamJobsPerMonth: null,
 
   supportChannel: "whatsapp",
 };
@@ -234,6 +253,9 @@ export const FEATURE_LABELS: Record<keyof PlanLimits, string> = {
   financeExport: "exportação do financeiro",
   personalAgenda: "agenda privada de compromissos",
   calendarSync: "sincronização com Google Agenda, iCloud e Outlook",
+  teams: "times criados",
+  teamMembers: "membros por time",
+  teamJobsPerMonth: "jobs de time publicados por mês",
   supportChannel: "canal de suporte",
 };
 

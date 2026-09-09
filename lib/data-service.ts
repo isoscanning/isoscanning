@@ -122,6 +122,10 @@ export interface JobOffer {
   paymentTerms?: string | null;
   specialtyId?: string | null;
   requiresInvoice?: boolean | null;
+  // ─── Times (SQL 81) ──────────────────────────────────────────────────
+  /** Job restrito a um time: só os membros veem e se candidatam. */
+  teamId?: string | null;
+  visibility?: "public" | "team";
 }
 
 export interface Specialty {
@@ -887,7 +891,9 @@ const JOB_APPLICATION_SELECT = `
     end_time,
     venue,
     positions,
-    status
+    status,
+    team_id,
+    visibility
   )
 `;
 
@@ -928,6 +934,7 @@ function mapJobApplicationRow(app: any): JobApplication {
       venue: app.job_offers.venue ?? undefined,
       positions: app.job_offers.positions ?? 1,
       status: app.job_offers.status ?? undefined,
+      teamId: app.job_offers.team_id ?? null,
     },
   };
 }
@@ -1020,6 +1027,8 @@ export interface JobApplication {
     venue?: string;
     positions?: number;
     status?: string;
+    /** Job de time (SQL 81): a candidatura é gerida dentro do time. */
+    teamId?: string | null;
   };
 }
 

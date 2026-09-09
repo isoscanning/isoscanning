@@ -11,6 +11,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import { sanitizeSearchTerm } from "@/lib/utils";
@@ -691,6 +692,14 @@ export default function BriefingDetailPage() {
             <CardTitle className="text-2xl">{briefing.title}</CardTitle>
             <CardDescription className="flex flex-wrap gap-x-4 gap-y-1">
               {briefing.client_name && <span>Cliente: {briefing.client_name}</span>}
+              {briefing.team_id && briefing.job_offer_id && (
+                <Link
+                  href={`/dashboard/times/${briefing.team_id}/jobs/${briefing.job_offer_id}?tab=entregas`}
+                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                >
+                  <Users className="h-3.5 w-3.5" /> Job do time
+                </Link>
+              )}
               {briefing.event_date && (
                 <span className="flex items-center gap-1">
                   <Clock className="h-3.5 w-3.5" />

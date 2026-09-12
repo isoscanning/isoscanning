@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
@@ -41,9 +42,15 @@ import {
   fetchFinancialRecord,
   fetchFinancialRecords,
   fetchNfFileUrl,
+  companiesService,
+  readSavedFinanceScope,
+  saveFinanceScope,
   updateFinanceSettings,
   type BulkAction,
   type FinanceDashboard,
+  type FinanceProject,
+  type CompanyDetail,
+  type CompanyListRow,
   type FinancialRecord,
   type FinancialRecordInput,
   type TaxRegime,
@@ -51,10 +58,12 @@ import {
 import { formatBRL, MONTHS_PT } from "@/lib/finances/money";
 import {
   BarChart3,
+  Building2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
+  Eye,
   FileText,
   Plus,
   Search,
@@ -64,6 +73,9 @@ import {
 import { FinanceModal } from "./components/finance-modal";
 import { ReceiveDialog } from "./components/receive-dialog";
 import { SettingsDialog } from "./components/settings-dialog";
+import { CompanySettingsDialog } from "./components/company-settings-dialog";
+import { ScopeSwitcher } from "./components/scope-switcher";
+import { ProjectsPanel } from "./components/projects-panel";
 import { AnnualPanel } from "./components/annual-panel";
 import { KpiCards } from "./components/kpi-cards";
 import { RecordsTable, type SortKey } from "./components/records-table";
@@ -128,6 +140,15 @@ function FinancesPageInner() {
     return isFilterKey(f) ? f : "todos";
   });
 
+  // ── Escopo: pessoal (null) ou empresa (SQL 82) ──────────
+  const [companies, setCompanies] = useState<CompanyListRow[]>([]);
+  const [companiesLoaded, setCompaniesLoaded] = useState(false);
+  const [scope, setScope] = useState<string | null>(() => initialParams.current.get("empresa") || readSavedFinanceScope());
+  const [projectId, setProjectId] = useState<string | null>(() => initialParams.current.get("projeto") || null);
+  const [companyDetail, setCompanyDetail] = useState<CompanyDetail | null>(null);
+  const [projects, setProjects] = useState<FinanceProject[]>([]);
+  const [companySettingsOpen, setCompanySettingsOpen] = useState(false);
+
   const [dashboard, setDashboard] = useState<FinanceDashboard | null>(null);
   const [records, setRecords] = useState<FinancialRecord[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -147,14 +168,72 @@ function FinancesPageInner() {
   const reqRef = useRef(0);
   const deepLinkHandled = useRef(false);
 
+  const isCompany = !!scope;
+  const currentCompany = scope ? companies.find((w) => w.company.id === scope) ?? null : null;
+  const canEdit = dashboard ? dashboard.canEdit : !isCompany;
+  const isAdmin = !isCompany || companyDetail?.isAdmin === true;
+  const scopeParams = useMemo(() => ({ companyId: scope, projectId }), [scope, projectId]);
+
+  // ── Empresas disponíveis ──────────────────────────────────────────
+  const loadCompanies = useCallback(async () => {
+    try {
+      const rows = await companiesService.listMine();
+      setCompanies(rows);
+      // Empresa lembrada que não existe mais (ou sem acesso): volta ao pessoal
+      setScope((s) => (s && !rows.some((r) => r.company.id === s) ? null : s));
+    } catch {
+      setCompanies([]);
+    } finally {
+      setCompaniesLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (userProfile) void loadCompanies();
+  }, [userProfile, loadCompanies]);
+
+  const loadCompanyExtras = useCallback(async () => {
+    if (!scope) {
+      setCompanyDetail(null);
+      setProjects([]);
+      return;
+    }
+    const [detail, list] = await Promise.allSettled([
+      companiesService.getDetail(scope),
+      companiesService.listProjects(scope),
+    ]);
+    setCompanyDetail(detail.status === "fulfilled" ? detail.value : null);
+    setProjects(list.status === "fulfilled" ? list.value : []);
+  }, [scope]);
+
+  useEffect(() => {
+    if (userProfile && companiesLoaded) void loadCompanyExtras();
+  }, [userProfile, companiesLoaded, loadCompanyExtras]);
+
+  // Projeto do filtro precisa pertencer à empresa atual
+  useEffect(() => {
+    if (projectId && !projects.some((p) => p.id === projectId) && projects.length > 0) setProjectId(null);
+  }, [projects, projectId]);
+
+  const changeScope = (next: string | null) => {
+    setScope(next);
+    setProjectId(null);
+    setFilter("todos");
+    setSelected(new Set());
+    saveFinanceScope(next);
+  };
+
   // ── Carga (com guarda contra resposta atrasada — A10) ─────────────
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
-      if (!userProfile) return;
+      if (!userProfile || !companiesLoaded) return;
       const id = ++reqRef.current;
       if (!opts?.silent) setLoadingData(true);
       try {
-        const [d, r] = await Promise.all([fetchFinanceDashboard(year, month), fetchFinancialRecords({ year, month })]);
+        const [d, r] = await Promise.all([
+          fetchFinanceDashboard(year, month, scopeParams),
+          fetchFinancialRecords({ year, month, companyId: scope ?? undefined, projectId: projectId ?? undefined }),
+        ]);
         if (id !== reqRef.current) return;
         setDashboard(d);
         setRecords(r);
@@ -166,7 +245,7 @@ function FinancesPageInner() {
         if (id === reqRef.current) setLoadingData(false);
       }
     },
-    [userProfile, year, month, toast]
+    [userProfile, companiesLoaded, year, month, scope, projectId, scopeParams, toast]
   );
 
   useEffect(() => {
@@ -178,15 +257,21 @@ function FinancesPageInner() {
   }, [userProfile, load]);
 
   const refreshClients = useCallback(() => {
-    fetchFinanceClients().then(setClients).catch(() => undefined);
-  }, []);
+    fetchFinanceClients({ companyId: scope }).then(setClients).catch(() => undefined);
+  }, [scope]);
   useEffect(() => {
-    if (userProfile) refreshClients();
-  }, [userProfile, refreshClients]);
+    if (userProfile && companiesLoaded) refreshClients();
+  }, [userProfile, companiesLoaded, refreshClients]);
+
+  const refreshProjects = useCallback(() => {
+    if (!scope) return;
+    companiesService.listProjects(scope).then(setProjects).catch(() => undefined);
+    void load({ silent: true });
+  }, [scope, load]);
 
   // ── Deep links: ?lancamento=id · ?novo=1&titulo&valor&cliente · ?painel=anual ──
   useEffect(() => {
-    if (!userProfile || deepLinkHandled.current) return;
+    if (!userProfile || !companiesLoaded || deepLinkHandled.current) return;
     deepLinkHandled.current = true;
     const p = initialParams.current;
     const lanc = p.get("lancamento");
@@ -194,12 +279,18 @@ function FinancesPageInner() {
       fetchFinancialRecord(lanc)
         .then((r) => {
           const [y, m] = r.date.split("-").map(Number);
+          // Lançamento de outra empresa: troca o escopo antes de destacar
+          if ((r.companyId ?? null) !== scope) {
+            setScope(r.companyId ?? null);
+            setProjectId(null);
+            saveFinanceScope(r.companyId ?? null);
+          }
           setYear(y);
           setMonth(m);
           setFilter(r.status === "cancelled" ? "cancelados" : "todos");
           setHighlightId(r.id);
         })
-        .catch(() => toast({ variant: "destructive", title: "Lançamento não encontrado", description: "Ele pode ter sido excluído." }));
+        .catch(() => toast({ variant: "destructive", title: "Lançamento não encontrado", description: "Ele pode ter sido excluído ou você não tem acesso." }));
     }
     if (p.get("novo") === "1") {
       const valor = parseFloat(p.get("valor") ?? "");
@@ -217,17 +308,19 @@ function FinancesPageInner() {
     if (p.get("painel") === "anual") {
       setTimeout(() => document.getElementById("painel-anual")?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
     }
-  }, [userProfile, toast]);
+  }, [userProfile, companiesLoaded, scope, toast]);
 
-  // URL espelha mês/ano/filtro (para voltar/compartilhar) — só depois da primeira carga
+  // URL espelha escopo/mês/ano/filtro (para voltar/compartilhar) — só depois da primeira carga
   useEffect(() => {
     if (!dashboard) return;
     const params = new URLSearchParams();
+    if (scope) params.set("empresa", scope);
+    if (projectId) params.set("projeto", projectId);
     params.set("mes", String(month));
     params.set("ano", String(year));
     if (filter !== "todos") params.set("filtro", filter);
     router.replace(`/dashboard/financeiro?${params.toString()}`, { scroll: false });
-  }, [dashboard, month, year, filter, router]);
+  }, [dashboard, month, year, filter, scope, projectId, router]);
 
   // Rola até a linha destacada e apaga o destaque depois
   useEffect(() => {
@@ -257,6 +350,8 @@ function FinancesPageInner() {
   }, [dashboard?.firstYear, year, now]);
 
   const isCurrentMonth = month === now.getMonth() + 1 && year === now.getFullYear();
+  const activeProject = projectId ? projects.find((p) => p.id === projectId) ?? null : null;
+  const scopeQuery = `${scope ? `&empresa=${scope}` : ""}${projectId ? `&projeto=${projectId}` : ""}`;
 
   // ── Ações ──────────────────────────────────────────────────────────
   const shiftMonth = (delta: number) => {
@@ -279,6 +374,7 @@ function FinancesPageInner() {
     } else {
       void load({ silent: true });
     }
+    if (scope) companiesService.listProjects(scope).then(setProjects).catch(() => undefined);
     setHighlightId(record.id);
     if (record.clientName && !clients.includes(record.clientName)) refreshClients();
   };
@@ -301,7 +397,7 @@ function FinancesPageInner() {
     const action = bulkConfirm;
     setBulkBusy(true);
     try {
-      const result = await bulkUpdateFinancialRecords([...selected], action);
+      const result = await bulkUpdateFinancialRecords([...selected], action, { companyId: scope });
       toast({
         title: `${result.updated} lançamento${result.updated === 1 ? "" : "s"} ${action === "delete" ? "excluído" : "atualizado"}${result.updated === 1 ? "" : "s"}`,
         description: result.skipped > 0 ? `${result.skipped} não se aplicava${result.skipped === 1 ? "" : "m"} e foi ignorado.` : undefined,
@@ -320,7 +416,7 @@ function FinancesPageInner() {
     if (!dashboard) return;
     setSavingRegime(true);
     try {
-      const settings = await updateFinanceSettings({ taxRegime: regime });
+      const settings = await updateFinanceSettings({ taxRegime: regime }, { companyId: scope });
       setDashboard({ ...dashboard, settings });
     } catch (error) {
       toast({ variant: "destructive", title: "Não foi possível trocar o regime", description: errorMessage(error, "Tente novamente.") });
@@ -329,26 +425,27 @@ function FinancesPageInner() {
     }
   };
 
-  const exportCsv = async (scope: "month" | "year") => {
+  const exportCsv = async (scopeKind: "month" | "year") => {
     if (!canExport) {
       notifyPlanLimit(buildPlanFeatureBody("financeExport", plan.tier));
       return;
     }
     try {
       let rows = records;
-      if (scope === "year") {
+      if (scopeKind === "year") {
         rows = [];
         for (let offset = 0; ; offset += 500) {
-          const page = await fetchFinancialRecords({ year, limit: 500, offset });
+          const page = await fetchFinancialRecords({ year, limit: 500, offset, companyId: scope ?? undefined, projectId: projectId ?? undefined });
           rows.push(...page);
           if (page.length < 500) break;
         }
       }
       if (rows.length === 0) {
-        toast({ title: "Nada para exportar", description: scope === "year" ? `Sem lançamentos em ${year}.` : "Sem lançamentos neste mês." });
+        toast({ title: "Nada para exportar", description: scopeKind === "year" ? `Sem lançamentos em ${year}.` : "Sem lançamentos neste mês." });
         return;
       }
-      const name = scope === "year" ? `financeiro-${year}.csv` : `financeiro-${year}-${String(month).padStart(2, "0")}.csv`;
+      const prefix = currentCompany ? `financeiro-${currentCompany.company.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}` : "financeiro";
+      const name = scopeKind === "year" ? `${prefix}-${year}.csv` : `${prefix}-${year}-${String(month).padStart(2, "0")}.csv`;
       downloadTextFile(name, buildFinanceCsv(rows));
     } catch (error) {
       toast({ variant: "destructive", title: "Exportação falhou", description: errorMessage(error, "Tente novamente.") });
@@ -381,6 +478,7 @@ function FinancesPageInner() {
   if (loading || !userProfile) return <PageSkeleton />;
 
   const monthLabel = `${MONTHS_PT[month - 1]} de ${year}`;
+  const scopeTitle = currentCompany ? currentCompany.company.name : "Gestão Financeira";
 
   return (
     <div className="min-h-screen flex flex-col bg-background/50">
@@ -390,9 +488,16 @@ function FinancesPageInner() {
         <div className="container mx-auto max-w-6xl space-y-8">
           {/* Cabeçalho */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-emerald-500 to-teal-500">Gestão Financeira</h1>
-              <p className="text-muted-foreground mt-1">Receitas, despesas, notas fiscais e o teto do seu regime, num lugar só.</p>
+            <div className="min-w-0">
+              <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-emerald-500 to-teal-500 flex items-center gap-2">
+                {isCompany && <Building2 className="h-7 w-7 text-teal-500" />}
+                {scopeTitle}
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                {isCompany
+                  ? `Financeiro da empresa, separado do seu pessoal${currentCompany?.teams_count ? ` · ${currentCompany.teams_count} ${currentCompany.teams_count === 1 ? "time ligado" : "times ligados"}` : ""}.${!canEdit ? " Você está em modo de visualização." : ""}`
+                  : "Receitas, despesas, notas fiscais e o teto do seu regime, num lugar só."}
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <DropdownMenu>
@@ -409,31 +514,61 @@ function FinancesPageInner() {
                   <DropdownMenuItem onClick={() => exportCsv("year")}>Ano de {year} inteiro</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel>Relatório para imprimir / PDF</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => window.open(`/dashboard/financeiro/imprimir?mes=${month}&ano=${year}`, "_blank", "noopener")}>
+                  <DropdownMenuItem onClick={() => window.open(`/dashboard/financeiro/imprimir?mes=${month}&ano=${year}${scopeQuery}`, "_blank", "noopener")}>
                     <FileText className="mr-2 h-4 w-4" /> Extrato de {monthLabel}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => window.open(`/dashboard/financeiro/imprimir?ano=${year}`, "_blank", "noopener")}>
+                  <DropdownMenuItem onClick={() => window.open(`/dashboard/financeiro/imprimir?ano=${year}${scopeQuery}`, "_blank", "noopener")}>
                     <BarChart3 className="mr-2 h-4 w-4" /> Resumo anual de {year}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button variant="outline" onClick={() => setSettingsOpen(true)} aria-label="Ajustes fiscais" title="Regime e lembretes fiscais" className="border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-500">
-                <Settings2 className="h-4 w-4" />
-              </Button>
-              <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => setModal({ open: true })}>
-                <Plus className="mr-2 h-4 w-4" /> Novo lançamento
-              </Button>
+              {isCompany && companyDetail?.isAdmin && (
+                <Button variant="outline" onClick={() => setCompanySettingsOpen(true)} title="Quem acessa e dados da empresa" className="border-teal-500/30 hover:bg-teal-500/10 hover:text-teal-600">
+                  <Building2 className="mr-2 h-4 w-4" /> Empresa
+                </Button>
+              )}
+              {isAdmin && (
+                <Button variant="outline" onClick={() => setSettingsOpen(true)} aria-label="Ajustes fiscais" title="Regime e lembretes fiscais" className="border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-500">
+                  <Settings2 className="h-4 w-4" />
+                </Button>
+              )}
+              {canEdit ? (
+                <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => setModal({ open: true })}>
+                  <Plus className="mr-2 h-4 w-4" /> Novo lançamento
+                </Button>
+              ) : (
+                <Badge variant="outline" className="self-center"><Eye className="mr-1 h-3.5 w-3.5" /> Só visualização</Badge>
+              )}
             </div>
           </div>
+
+          {/* Pessoal | Empresa */}
+          {(companies.length > 0 || isCompany) && (
+            <ScopeSwitcher companies={companies} value={scope} onChange={changeScope} loading={!companiesLoaded} />
+          )}
 
           {/* Painel anual */}
           <section id="painel-anual" className="scroll-mt-24">
             {dashboard ? (
-              <AnnualPanel dashboard={dashboard} onRegimeChange={changeRegime} onOpenSettings={() => setSettingsOpen(true)} busy={savingRegime} />
+              <AnnualPanel dashboard={dashboard} onRegimeChange={changeRegime} onOpenSettings={() => setSettingsOpen(true)} busy={savingRegime || !isAdmin} />
             ) : (
               <Skeleton className="h-52 w-full rounded-2xl" />
             )}
           </section>
+
+          {/* Projetos da empresa */}
+          {isCompany && scope && (
+            <ProjectsPanel
+              companyId={scope}
+              projects={projects}
+              activeProjectId={projectId}
+              canEdit={canEdit}
+              isAdmin={companyDetail?.isAdmin === true}
+              people={companyDetail?.members.map((m) => m.profile).filter((p): p is NonNullable<typeof p> => !!p) ?? []}
+              onSelect={(id) => { setProjectId(id); setSelected(new Set()); }}
+              onChanged={refreshProjects}
+            />
+          )}
 
           {/* Período */}
           <div className="flex flex-wrap items-center gap-2">
@@ -457,6 +592,12 @@ function FinancesPageInner() {
             <Button variant="outline" size="icon" onClick={() => shiftMonth(1)} aria-label="Próximo mês"><ChevronRight className="h-4 w-4" /></Button>
             {!isCurrentMonth && (
               <Button variant="ghost" size="sm" onClick={() => { setMonth(now.getMonth() + 1); setYear(now.getFullYear()); }}>Hoje</Button>
+            )}
+            {activeProject && (
+              <Badge variant="outline" className="ml-auto border-emerald-500/40">
+                <span className="h-2 w-2 rounded-full mr-1.5" style={{ backgroundColor: activeProject.color }} /> Projeto: {activeProject.name}
+                <button type="button" onClick={() => setProjectId(null)} className="ml-1.5 hover:text-foreground" aria-label="Limpar projeto"><X className="h-3 w-3" /></button>
+              </Badge>
             )}
           </div>
 
@@ -483,7 +624,7 @@ function FinancesPageInner() {
             <CardHeader className="border-b pb-4 mb-4 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <CardTitle>Lançamentos de {monthLabel}</CardTitle>
+                  <CardTitle>Lançamentos de {monthLabel}{activeProject ? ` · ${activeProject.name}` : ""}</CardTitle>
                   <CardDescription>
                     {records.length === 0 ? "Nenhum registro neste mês." : `${visible.length} de ${records.length} lançamento${records.length === 1 ? "" : "s"}${filter !== "todos" || search ? " com o filtro atual" : ""}.`}
                   </CardDescription>
@@ -516,7 +657,7 @@ function FinancesPageInner() {
                 })}
               </div>
 
-              {selected.size > 0 && (
+              {selected.size > 0 && canEdit && (
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm">
                   <span className="font-medium">{selected.size} selecionado{selected.size === 1 ? "" : "s"}</span>
                   <span className="text-muted-foreground">·</span>
@@ -563,6 +704,9 @@ function FinancesPageInner() {
         duplicateOf={modal.duplicateOf ?? null}
         prefill={modal.prefill ?? null}
         clients={clients}
+        companyId={scope}
+        projects={projects.map((p) => ({ id: p.id, name: p.name, status: p.status, can_edit: p.can_edit }))}
+        defaultProjectId={projectId}
       />
 
       <ReceiveDialog
@@ -581,6 +725,17 @@ function FinancesPageInner() {
           settings={dashboard.settings}
           limits={dashboard.limits}
           onSaved={(settings) => setDashboard({ ...dashboard, settings })}
+          companyId={scope}
+          companyName={currentCompany?.company.name ?? null}
+        />
+      )}
+
+      {companyDetail && (
+        <CompanySettingsDialog
+          detail={companyDetail}
+          open={companySettingsOpen}
+          onOpenChange={setCompanySettingsOpen}
+          onChanged={() => { void loadCompanyExtras(); void loadCompanies(); void load({ silent: true }); }}
         />
       )}
 

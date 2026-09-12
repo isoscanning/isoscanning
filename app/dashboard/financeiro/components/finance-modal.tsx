@@ -52,9 +52,16 @@ export interface FinanceModalProps {
   /** Novo lançamento pré-preenchido (ex.: vindo da calculadora de orçamento). */
   prefill?: Partial<FinancialRecordInput> | null;
   clients: string[];
+  /** Empresa (SQL 82); ausente = financeiro pessoal. */
+  companyId?: string | null;
+  /** Projetos da empresa para escolher (só na empresa). */
+  projects?: Array<{ id: string; name: string; status: string; can_edit: boolean }>;
+  /** Projeto pré-selecionado para lançamentos novos. */
+  defaultProjectId?: string | null;
 }
 
 interface FormState {
+  projectId: string;
   type: FinancialRecordType;
   title: string;
   amount: number | null;
@@ -75,6 +82,7 @@ interface FormState {
 
 function emptyForm(): FormState {
   return {
+    projectId: "",
     type: "income",
     title: "",
     amount: null,
@@ -96,6 +104,7 @@ function emptyForm(): FormState {
 
 function fromRecord(r: FinancialRecord): FormState {
   return {
+    projectId: r.projectId ?? "",
     type: r.type,
     title: r.title,
     amount: r.amount,
@@ -115,7 +124,7 @@ function fromRecord(r: FinancialRecord): FormState {
   };
 }
 
-export function FinanceModal({ isOpen, onClose, onSaved, initialData, duplicateOf, prefill, clients }: FinanceModalProps) {
+export function FinanceModal({ isOpen, onClose, onSaved, initialData, duplicateOf, prefill, clients, companyId, projects, defaultProjectId }: FinanceModalProps) {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -146,10 +155,11 @@ export function FinanceModal({ isOpen, onClose, onSaved, initialData, duplicateO
       });
       return;
     }
-    const base = emptyForm();
+    const base = { ...emptyForm(), projectId: defaultProjectId ?? "" };
     if (prefill) {
       setForm({
         ...base,
+        projectId: prefill.projectId ?? base.projectId,
         type: prefill.type ?? base.type,
         title: prefill.title ?? "",
         amount: prefill.amount ?? null,
@@ -162,7 +172,7 @@ export function FinanceModal({ isOpen, onClose, onSaved, initialData, duplicateO
       return;
     }
     setForm(base);
-  }, [initialData, duplicateOf, prefill, isOpen]);
+  }, [initialData, duplicateOf, prefill, isOpen, defaultProjectId]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -213,6 +223,9 @@ export function FinanceModal({ isOpen, onClose, onSaved, initialData, duplicateO
       nfNumber: form.nfNumber.trim() || null,
       nfIssuedAt: form.nfIssuedAt || null,
       recurring: form.recurring,
+      // Empresa: só na criação (o lançamento não muda de empresa); projeto pode mudar
+      ...(companyId && !isEdit ? { companyId } : {}),
+      ...(companyId ? { projectId: form.projectId || null } : {}),
     };
 
     setIsSaving(true);
@@ -273,12 +286,27 @@ export function FinanceModal({ isOpen, onClose, onSaved, initialData, duplicateO
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            {isExpense ? "Um gasto do seu negócio." : "Um trabalho, mensalidade ou venda que gera receita."}
+            {companyId ? "No financeiro da empresa. " : ""}
+            {isExpense ? "Um gasto do negócio." : "Um trabalho, mensalidade ou venda que gera receita."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
           <form id="finance-form" onSubmit={handleSubmit} className="space-y-5">
+            {companyId && projects && projects.length > 0 && (
+              <div className="space-y-2">
+                <Label>Projeto</Label>
+                <Select value={form.projectId || "none"} onValueChange={(v) => set("projectId", v === "none" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Sem projeto" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem projeto (geral da empresa)</SelectItem>
+                    {projects.filter((p) => p.can_edit || p.id === form.projectId).map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}{p.status !== "active" ? " (encerrado)" : ""}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             {/* Tipo */}
             <div className="grid grid-cols-2 gap-2 p-1 rounded-lg bg-muted/60">
               <button

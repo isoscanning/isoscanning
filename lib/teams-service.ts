@@ -26,6 +26,8 @@ export interface CreateTeamPayload {
   name: string;
   description?: string;
   color?: string;
+  /** Empresa dona do time (precisa administrar a empresa); ausente = time pessoal. */
+  company_id?: string | null;
 }
 
 export interface UpdateTeamPayload {
@@ -33,6 +35,8 @@ export interface UpdateTeamPayload {
   description?: string;
   color?: string;
   invite_role?: "member" | "manager";
+  /** Liga (id) ou desliga (null) o time de uma empresa. Só o dono do time. */
+  company_id?: string | null;
 }
 
 export const teamsService = {

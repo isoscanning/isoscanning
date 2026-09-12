@@ -39,6 +39,7 @@ import {
 } from "@/lib/teams-types";
 import { formatJobBudget, formatJobTimeRange, hasJobBudget, jobStatusInfo, jobTypeLabel, positionsLabel } from "@/lib/jobs/job-offer-display";
 import { TeamChat } from "../../components/team-chat";
+import { JobFinanceCard } from "../../components/job-finance-card";
 import { BRIEFING_STATUS_CONFIG, BRIEFING_TYPE_LABELS, DELIVERABLE_STATUS_CONFIG, type BriefingStatus, type DeliverableStatus } from "@/lib/briefing-pro-types";
 
 type TabKey = "escalacao" | "entregas" | "conversa" | "detalhes";
@@ -407,6 +408,8 @@ function JobDetailInner() {
                       <Button onClick={() => { setBriefingTitle(job.title); setBriefingOpen(true); }}><Plus className="mr-2 h-4 w-4" /> Criar briefing deste job</Button>
                     )}
                   </div>
+
+                  <JobFinanceCard teamId={teamId} jobId={jobId} jobTitle={job.title} isManager={isManager} />
 
                   {job.deliverables && (
                     <Card className="bg-muted/30">

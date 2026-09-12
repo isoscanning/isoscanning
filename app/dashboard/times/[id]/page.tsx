@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Archive, Crown, Shield, Users, Briefcase, MessageSquare, Megaphone, Settings, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, Archive, Crown, Shield, Users, Briefcase, MessageSquare, Megaphone, Settings, LayoutDashboard, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { teamsService, teamsApiError } from "@/lib/teams-service";
 import { TEAM_ROLE_LABELS, initials, isManagerRole, type TeamDetail } from "@/lib/teams-types";
@@ -20,9 +20,10 @@ import { JobsTab } from "./components/jobs-tab";
 import { TeamChat } from "./components/team-chat";
 import { AnnouncementsTab } from "./components/announcements-tab";
 import { SettingsTab } from "./components/settings-tab";
+import { FinanceTab } from "./components/finance-tab";
 
-type TabKey = "visao" | "membros" | "jobs" | "chat" | "avisos" | "config";
-const TABS: TabKey[] = ["visao", "membros", "jobs", "chat", "avisos", "config"];
+type TabKey = "visao" | "membros" | "jobs" | "financeiro" | "chat" | "avisos" | "config";
+const TABS: TabKey[] = ["visao", "membros", "jobs", "financeiro", "chat", "avisos", "config"];
 
 function TeamHubInner() {
   const params = useParams();
@@ -101,6 +102,13 @@ function TeamHubInner() {
                       {detail.my_role === "owner" ? <Crown className="mr-1 h-3 w-3" /> : detail.my_role === "manager" ? <Shield className="mr-1 h-3 w-3" /> : null}
                       {TEAM_ROLE_LABELS[detail.my_role]}
                     </Badge>
+                    {detail.company && (
+                      <Link href={`/dashboard/empresas?empresa=${detail.company.id}`}>
+                        <Badge variant="outline" className="border-teal-500/40 text-teal-700 dark:text-teal-300">
+                          <span className="h-2.5 w-2.5 rounded-full mr-1.5" style={{ backgroundColor: detail.company.color }} /> {detail.company.name}
+                        </Badge>
+                      </Link>
+                    )}
                     {detail.team.archived_at && (
                       <Badge variant="outline"><Archive className="mr-1 h-3 w-3" /> Arquivado</Badge>
                     )}
@@ -121,6 +129,7 @@ function TeamHubInner() {
                       <Briefcase className="mr-1.5 h-4 w-4" /> Jobs
                       {detail.stats.jobs_open > 0 && <span className="ml-1.5 text-xs text-muted-foreground">{detail.stats.jobs_open}</span>}
                     </TabsTrigger>
+                    <TabsTrigger value="financeiro"><Wallet className="mr-1.5 h-4 w-4" /> Financeiro</TabsTrigger>
                     <TabsTrigger value="chat">
                       <MessageSquare className="mr-1.5 h-4 w-4" /> Chat
                       {detail.unread.team > 0 && (
@@ -140,6 +149,9 @@ function TeamHubInner() {
                 </TabsContent>
                 <TabsContent value="jobs">
                   <JobsTab teamId={teamId} isManager={isManager} archived={!!detail.team.archived_at} />
+                </TabsContent>
+                <TabsContent value="financeiro">
+                  <FinanceTab teamId={teamId} teamName={detail.team.name} isOwner={detail.my_role === "owner"} onChanged={load} />
                 </TabsContent>
                 <TabsContent value="chat">
                   <TeamChat

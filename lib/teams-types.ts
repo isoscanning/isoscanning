@@ -7,9 +7,18 @@ export type TeamRole = "owner" | "manager" | "member";
 export type TeamMemberStatus = "invited" | "active" | "declined" | "removed" | "left";
 export type TeamInviteRole = "member" | "manager";
 
+/** Empresa dona do time, resumida (SQL 82). */
+export interface TeamCompanySummary {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface Team {
   id: string;
   owner_id: string;
+  /** Empresa dona do time; null = time do profissional autônomo. */
+  company_id: string | null;
   name: string;
   description: string | null;
   color: string;
@@ -62,6 +71,7 @@ export interface TeamListRow {
   members_count: number;
   open_jobs_count: number;
   unread_count: number;
+  company: TeamCompanySummary | null;
 }
 
 export interface TeamInvitationRow {
@@ -100,6 +110,7 @@ export interface TeamAnnouncement {
 export interface TeamDetail {
   team: Team;
   my_role: TeamRole;
+  company: TeamCompanySummary | null;
   members: TeamMemberView[];
   invited: TeamMemberView[];
   upcoming_jobs: TeamJobSummary[];

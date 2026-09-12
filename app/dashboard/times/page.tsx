@@ -17,8 +17,10 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Users, Plus, Briefcase, MessageSquare, ChevronRight, Loader2, Mail, Archive, Crown, Shield, Link2,
+  Users, Plus, Briefcase, MessageSquare, ChevronRight, Loader2, Mail, Archive, Crown, Shield, Link2, Building2,
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { companiesService, type Company } from "@/lib/finances-service";
 import { toast } from "sonner";
 import { usePlan } from "@/lib/plans/use-plan";
 import { UpgradeButton } from "@/components/plan/plan-gate";
@@ -40,6 +42,13 @@ function CreateTeamDialog({
   const [description, setDescription] = useState("");
   const [color, setColor] = useState(TEAM_COLORS[0]);
   const [saving, setSaving] = useState(false);
+  // Empresa dona do time (SQL 82): só empresas que o usuário administra
+  const [companies, setCompanies] = useState<Company[] | null>(null);
+  const [companyId, setCompanyId] = useState("");
+  useEffect(() => {
+    if (!open) return;
+    companiesService.listAdministered().then(setCompanies).catch(() => setCompanies([]));
+  }, [open]);
 
   async function submit() {
     if (name.trim().length < 2) {
@@ -48,7 +57,7 @@ function CreateTeamDialog({
     }
     setSaving(true);
     try {
-      const team = await teamsService.create({ name: name.trim(), description: description.trim() || undefined, color });
+      const team = await teamsService.create({ name: name.trim(), description: description.trim() || undefined, color, company_id: companyId || null });
       toast.success("Time criado! Agora convide as pessoas.");
       onCreated(team.id);
     } catch (err) {
@@ -77,6 +86,19 @@ function CreateTeamDialog({
             <Label htmlFor="team-desc">Descrição (opcional)</Label>
             <Textarea id="team-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Para que serve este time, região, tipo de trabalho..." rows={3} maxLength={1000} />
           </div>
+          {companies && companies.length > 0 && (
+            <div className="space-y-2">
+              <Label>Este time pertence a</Label>
+              <Select value={companyId || "personal"} onValueChange={(v) => setCompanyId(v === "personal" ? "" : v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="personal">Mim (time pessoal, autônomo)</SelectItem>
+                  {companies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Time de empresa: os jobs caem no financeiro da empresa. Dá para mudar depois nas configurações do time.</p>
+            </div>
+          )}
           <div className="space-y-2">
             <Label>Cor</Label>
             <div className="flex flex-wrap gap-2">
@@ -177,6 +199,11 @@ function TeamCard({ row }: { row: TeamListRow }) {
               {row.my_role === "owner" ? <Crown className="mr-1 h-3 w-3" /> : row.my_role === "manager" ? <Shield className="mr-1 h-3 w-3" /> : null}
               {TEAM_ROLE_LABELS[row.my_role]}
             </Badge>
+            {row.company && (
+              <Badge variant="outline" className="text-[11px] border-teal-500/40 text-teal-700 dark:text-teal-300" title="Empresa dona do time">
+                <Building2 className="mr-1 h-3 w-3" /> {row.company.name}
+              </Badge>
+            )}
             <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" /> {row.members_count}</span>
             <span className="inline-flex items-center gap-1"><Briefcase className="h-3.5 w-3.5" /> {row.open_jobs_count} {row.open_jobs_count === 1 ? "job aberto" : "jobs abertos"}</span>
             {row.unread_count > 0 && <span className="inline-flex items-center gap-1"><MessageSquare className="h-3.5 w-3.5" /> novas mensagens</span>}

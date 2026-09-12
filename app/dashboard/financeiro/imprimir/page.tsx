@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   fetchFinanceDashboard,
+  companiesService,
   fetchFinancialRecords,
   type FinanceDashboard,
   type FinancialRecord,
@@ -39,6 +40,10 @@ function Inner() {
   const month = mesParam >= 1 && mesParam <= 12 ? mesParam : null;
   const year = anoParam >= 2000 && anoParam <= 2100 ? anoParam : now.getFullYear();
   const annual = month === null;
+  // Empresa (SQL 82): ?empresa=<companyId>; ausente = pessoal
+  const companyId = searchParams.get("empresa") || null;
+  const projectId = searchParams.get("projeto") || null;
+  const [companyName, setCompanyName] = useState<string | null>(null);
 
   const [dashboard, setDashboard] = useState<FinanceDashboard | null>(null);
   const [records, setRecords] = useState<FinancialRecord[]>([]);
@@ -54,10 +59,15 @@ function Inner() {
     let alive = true;
     (async () => {
       try {
-        const d = await fetchFinanceDashboard(year, month ?? 1);
+        const scope = { companyId, projectId };
+        const d = await fetchFinanceDashboard(year, month ?? 1, scope);
+        if (companyId) {
+          companiesService.getDetail(companyId).then((w) => alive && setCompanyName(w.company.legal_name || w.company.name)).catch(() => undefined);
+        }
         const rows: FinancialRecord[] = [];
         for (let offset = 0; ; offset += 500) {
-          const page = await fetchFinancialRecords(annual ? { year, limit: 500, offset } : { year, month: month ?? undefined, limit: 500, offset });
+          const scoped = { companyId: companyId ?? undefined, projectId: projectId ?? undefined };
+          const page = await fetchFinancialRecords(annual ? { ...scoped, year, limit: 500, offset } : { ...scoped, year, month: month ?? undefined, limit: 500, offset });
           rows.push(...page);
           if (page.length < 500) break;
         }
@@ -73,7 +83,7 @@ function Inner() {
     return () => {
       alive = false;
     };
-  }, [userProfile, year, month, annual]);
+  }, [userProfile, year, month, annual, companyId, projectId]);
 
   const period = annual ? `Ano de ${year}` : `${MONTHS_PT[(month ?? 1) - 1]} de ${year}`;
   const totals = totalsOf(records);
@@ -133,7 +143,11 @@ function Inner() {
         <header className="border-b-2 border-foreground/80 pb-4 mb-6">
           <p className="text-xs uppercase tracking-widest text-muted-foreground">Relatório financeiro</p>
           <h1 className="text-2xl font-bold mt-1">{period}</h1>
-          <p className="text-sm mt-1">{userProfile.displayName}{userProfile.artisticName ? ` (${userProfile.artisticName})` : ""}{userProfile.cpf ? ` · CPF ${userProfile.cpf}` : ""}</p>
+          {companyId ? (
+            <p className="text-sm mt-1">{companyName ?? "Financeiro da empresa"} · emitido por {userProfile.displayName}</p>
+          ) : (
+            <p className="text-sm mt-1">{userProfile.displayName}{userProfile.artisticName ? ` (${userProfile.artisticName})` : ""}{userProfile.cpf ? ` · CPF ${userProfile.cpf}` : ""}</p>
+          )}
           <p className="text-xs text-muted-foreground mt-1">Gerado em {now.toLocaleDateString("pt-BR")} às {now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} pelo IsoScanning.</p>
         </header>
 

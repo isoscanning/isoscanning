@@ -12,6 +12,8 @@ import { useConfirmDialog } from "@/components/confirm-dialog";
 import { isPlanErrorBody } from "@/lib/plans/plan-limits";
 import { teamsService, teamsApiError } from "@/lib/teams-service";
 import { TEAM_COLORS, isManagerRole, type TeamDetail } from "@/lib/teams-types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { companiesService, type Company } from "@/lib/finances-service";
 
 export function SettingsTab({ detail, currentUserId, onChanged, onLeftOrDeleted }: { detail: TeamDetail; currentUserId: string; onChanged: () => void; onLeftOrDeleted: () => void }) {
   const isManager = isManagerRole(detail.my_role);
@@ -23,6 +25,13 @@ export function SettingsTab({ detail, currentUserId, onChanged, onLeftOrDeleted 
   const [description, setDescription] = useState(detail.team.description ?? "");
   const [color, setColor] = useState(detail.team.color);
   const [inviteRole, setInviteRole] = useState<"member" | "manager">(detail.team.invite_role);
+  // Empresa dona do time (SQL 82): só o dono liga/desliga, entre empresas que administra
+  const [companyId, setCompanyId] = useState<string>(detail.team.company_id ?? "");
+  const [companies, setCompanies] = useState<Company[] | null>(null);
+  useEffect(() => {
+    if (!isOwner) return;
+    companiesService.listAdministered().then(setCompanies).catch(() => setCompanies([]));
+  }, [isOwner]);
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -40,7 +49,13 @@ export function SettingsTab({ detail, currentUserId, onChanged, onLeftOrDeleted 
     }
     setSaving(true);
     try {
-      await teamsService.update(detail.team.id, { name: name.trim(), description: description.trim(), color, invite_role: inviteRole });
+      await teamsService.update(detail.team.id, {
+        name: name.trim(),
+        description: description.trim(),
+        color,
+        invite_role: inviteRole,
+        ...(isOwner ? { company_id: companyId || null } : {}),
+      });
       toast.success("Time atualizado");
       onChanged();
     } catch (err) {
@@ -123,6 +138,22 @@ export function SettingsTab({ detail, currentUserId, onChanged, onLeftOrDeleted 
                 ))}
               </div>
             </div>
+            {isOwner && (
+              <div className="space-y-2">
+                <Label>Este time pertence a</Label>
+                <Select value={companyId || "personal"} onValueChange={(v) => setCompanyId(v === "personal" ? "" : v)} disabled={archived || companies === null}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="personal">Mim (time pessoal, autônomo)</SelectItem>
+                    {(companies ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Time de empresa: contratos e projetos dos jobs caem no financeiro da empresa e os membros podem receber acesso a ele.
+                  {companies !== null && companies.length === 0 ? " Você ainda não cadastrou nenhuma empresa — faça isso em Empresas, no painel." : ""}
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Quem entra pelo link de convite vira</Label>
               <div className="flex gap-2">

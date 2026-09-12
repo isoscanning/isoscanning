@@ -73,6 +73,10 @@ export interface PlanLimits {
   teamMembers: number | null;
   /** Jobs restritos ao time publicados por mês (todos os times do dono) */
   teamJobsPerMonth: number | null;
+  /** Empresas cadastradas (ativas) pelo usuário */
+  companies: number | null;
+  /** Pessoas com acesso nomeado por empresa (além do dono e do acesso pelos times) */
+  companyMembers: number | null;
 
   supportChannel: SupportChannel;
 }
@@ -124,6 +128,8 @@ const FREE_LIMITS: PlanLimits = {
   teams: 1,
   teamMembers: 5,
   teamJobsPerMonth: 2,
+  companies: 0,
+  companyMembers: 0,
 
   supportChannel: "community",
 };
@@ -167,6 +173,8 @@ const PRO_LIMITS: PlanLimits = {
   teams: 3,
   teamMembers: 20,
   teamJobsPerMonth: 15,
+  companies: 1,
+  companyMembers: 3,
 
   supportChannel: "email",
 };
@@ -210,6 +218,8 @@ const ULTRA_LIMITS: PlanLimits = {
   teams: null,
   teamMembers: null,
   teamJobsPerMonth: null,
+  companies: null,
+  companyMembers: null,
 
   supportChannel: "whatsapp",
 };
@@ -256,6 +266,8 @@ export const FEATURE_LABELS: Record<keyof PlanLimits, string> = {
   teams: "times criados",
   teamMembers: "membros por time",
   teamJobsPerMonth: "jobs de time publicados por mês",
+  companies: "empresas cadastradas",
+  companyMembers: "pessoas com acesso ao financeiro da empresa",
   supportChannel: "canal de suporte",
 };
 

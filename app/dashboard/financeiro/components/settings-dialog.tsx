@@ -25,6 +25,9 @@ interface SettingsDialogProps {
   settings: FinanceSettings;
   limits: FinanceLimits;
   onSaved: (settings: FinanceSettings) => void;
+  /** Empresa: altera o regime da EMPRESA (só admin). */
+  companyId?: string | null;
+  companyName?: string | null;
 }
 
 const REGIMES: Array<{ value: TaxRegime; label: string; hint: string }> = [
@@ -33,7 +36,7 @@ const REGIMES: Array<{ value: TaxRegime; label: string; hint: string }> = [
   { value: "other", label: "Outro / não sei", hint: "Só o resumo de receitas e despesas, sem cálculo de imposto." },
 ];
 
-export function SettingsDialog({ open, onOpenChange, settings, limits, onSaved }: SettingsDialogProps) {
+export function SettingsDialog({ open, onOpenChange, settings, limits, onSaved, companyId, companyName }: SettingsDialogProps) {
   const { toast } = useToast();
   const [regime, setRegime] = useState<TaxRegime>(settings.taxRegime);
   const [simplesRate, setSimplesRate] = useState(String(settings.simplesRate));
@@ -58,12 +61,15 @@ export function SettingsDialog({ open, onOpenChange, settings, limits, onSaved }
     }
     setSaving(true);
     try {
-      const saved = await updateFinanceSettings({
-        taxRegime: regime,
-        simplesRate: Number.isNaN(rate) ? settings.simplesRate : rate,
-        meiOpenedAt: meiOpenedAt || null,
-        dasReminder,
-      });
+      const saved = await updateFinanceSettings(
+        {
+          taxRegime: regime,
+          simplesRate: Number.isNaN(rate) ? settings.simplesRate : rate,
+          meiOpenedAt: meiOpenedAt || null,
+          dasReminder,
+        },
+        { companyId: companyId ?? null }
+      );
       onSaved(saved);
       onOpenChange(false);
       toast({ title: "Configurações salvas" });
@@ -78,8 +84,12 @@ export function SettingsDialog({ open, onOpenChange, settings, limits, onSaved }
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
-          <DialogTitle>Regime e lembretes fiscais</DialogTitle>
-          <DialogDescription>Define como o painel anual calcula teto e imposto. Fica salvo na sua conta.</DialogDescription>
+          <DialogTitle>{companyId ? `Regime fiscal de ${companyName ?? "empresa"}` : "Regime e lembretes fiscais"}</DialogTitle>
+          <DialogDescription>
+            {companyId
+              ? "Define como o painel anual da empresa calcula teto e imposto. Independente do seu regime pessoal."
+              : "Define como o painel anual calcula teto e imposto. Fica salvo na sua conta."}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">

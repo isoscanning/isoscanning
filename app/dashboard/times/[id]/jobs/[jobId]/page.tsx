@@ -63,7 +63,10 @@ function PersonRow({ app, children }: { app: TeamJobApplicationView; children?: 
   const p = app.profile;
   const role = app.team_role || app.member_job_role;
   return (
-    <div className="flex items-center gap-3 rounded-lg border p-3">
+    // `flex-wrap` + largura mínima do bloco de texto: no celular os botões
+    // ("Recusar", "Confirmar") desciam para a segunda linha em vez de espremer
+    // o nome do escalado a poucos pixels.
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border p-3">
       <Link href={`/profissionais/${app.candidate_id}`} className="shrink-0">
         {p?.avatar_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -72,7 +75,7 @@ function PersonRow({ app, children }: { app: TeamJobApplicationView; children?: 
           <span className="h-10 w-10 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center">{initials(p?.display_name)}</span>
         )}
       </Link>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-[9rem] flex-1">
         <p className="text-sm font-medium truncate">{p?.display_name ?? "Membro"}{role ? <span className="text-primary font-normal"> · {role}</span> : null}</p>
         <p className="text-xs text-muted-foreground truncate">
           {app.origin === "convocation" ? "Convocado pelo gestor" : "Candidatou-se"}
@@ -80,7 +83,7 @@ function PersonRow({ app, children }: { app: TeamJobApplicationView; children?: 
           {app.contract_id ? " · contrato gerado" : ""}
         </p>
       </div>
-      <div className="flex items-center gap-1 shrink-0">{children}</div>
+      <div className="flex items-center gap-1 shrink-0 ml-auto">{children}</div>
     </div>
   );
 }
@@ -521,7 +524,7 @@ function JobDetailInner() {
 
       {/* Candidatar-se */}
       <Dialog open={applyOpen} onOpenChange={(o) => !o && setApplyOpen(false)}>
-        <DialogContent>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Candidatar-se ao job</DialogTitle>
             <DialogDescription>Informe com que função você quer participar. O gestor confirma a escalação.</DialogDescription>
@@ -544,7 +547,7 @@ function JobDetailInner() {
 
       {/* Convocar */}
       <Dialog open={convokeOpen} onOpenChange={(o) => !o && setConvokeOpen(false)}>
-        <DialogContent>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Convocar membro</DialogTitle>
             <DialogDescription>O membro recebe a convocação e confirma a escalação ao aceitar. Convocar a si mesmo escala na hora.</DialogDescription>
@@ -586,7 +589,7 @@ function JobDetailInner() {
 
       {/* Criar briefing */}
       <Dialog open={briefingOpen} onOpenChange={(o) => !o && setBriefingOpen(false)}>
-        <DialogContent>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Criar briefing deste job</DialogTitle>
             <DialogDescription>Título, data, horário, local, objetivo e entregáveis vêm do job. Você edita tudo no Briefing Pro depois.</DialogDescription>

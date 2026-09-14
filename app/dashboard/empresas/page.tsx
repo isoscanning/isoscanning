@@ -85,7 +85,7 @@ function CreateCompanyDialog({ open, onClose, onCreated }: { open: boolean; onCl
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && !saving && onClose()}>
-      <DialogContent className="sm:max-w-[560px]">
+      <DialogContent className="sm:max-w-[560px] max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nova empresa</DialogTitle>
           <DialogDescription>
@@ -313,7 +313,7 @@ function EmpresasInner() {
                         <span>{c.tax_regime === "mei" ? "MEI" : c.tax_regime === "simples" ? "Simples Nacional" : "Outro regime"}</span>
                         {c.archived_at && <Badge variant="outline" className="text-[11px]"><Archive className="mr-1 h-3 w-3" /> Arquivada</Badge>}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button asChild size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => saveFinanceScope(c.id)}>
                           <Link href={`/dashboard/financeiro?empresa=${c.id}`}><ExternalLink className="mr-1 h-4 w-4" /> Financeiro</Link>
                         </Button>

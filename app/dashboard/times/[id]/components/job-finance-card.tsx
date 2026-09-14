@@ -74,7 +74,9 @@ export function JobFinanceCard({ teamId, jobId, jobTitle, isManager }: { teamId:
       </CardHeader>
       <CardContent className="text-sm">
         {project ? (
-          <div className="grid grid-cols-3 gap-3">
+          // Valores em reais não cabem em três colunas de ~96px: no celular a
+          // fonte encolhe para o número não quebrar em duas linhas.
+          <div className="grid grid-cols-3 gap-2 text-[13px] sm:gap-3 sm:text-sm">
             <div><p className="text-xs text-muted-foreground">Receita</p><p className="font-semibold text-emerald-600">{formatBRL(project.totals.received + project.totals.pending)}</p>{project.budget_amount ? <p className="text-[11px] text-muted-foreground">orçado {formatBRL(project.budget_amount)}</p> : null}</div>
             <div><p className="text-xs text-muted-foreground">Despesas</p><p className="font-semibold text-rose-600">{formatBRL(project.totals.expensesPaid + project.totals.expensesPending)}</p></div>
             <div><p className="text-xs text-muted-foreground">Margem</p><p className="font-semibold">{formatBRL(project.totals.received - project.totals.expensesPaid)}</p></div>
@@ -90,7 +92,7 @@ export function JobFinanceCard({ teamId, jobId, jobTitle, isManager }: { teamId:
       </CardContent>
 
       <Dialog open={open} onOpenChange={(o) => !o && !saving && setOpen(false)}>
-        <DialogContent>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Projeto financeiro do job</DialogTitle>
             <DialogDescription>Título, datas e orçamento vêm do job. O contrato assinado de cada escalado cai como receita neste projeto.</DialogDescription>

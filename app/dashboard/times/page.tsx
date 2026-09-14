@@ -69,7 +69,7 @@ function CreateTeamDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && !saving && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Novo time</DialogTitle>
           <DialogDescription>

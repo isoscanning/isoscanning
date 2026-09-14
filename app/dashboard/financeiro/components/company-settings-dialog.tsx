@@ -159,7 +159,7 @@ export function CompanySettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {dialog}
-      <DialogContent className="sm:max-w-[640px] max-h-[92vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[640px] max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Financeiro da empresa · {ws.name}</DialogTitle>
           <DialogDescription>
@@ -201,18 +201,22 @@ export function CompanySettingsDialog({
                   <span className="text-xs text-muted-foreground">Administrador</span>
                 </div>
                 {detail.members.map((m) => (
-                  <div key={m.id} className="flex items-center gap-2 rounded-lg border p-2.5">
-                    <span className="h-8 w-8 rounded-full bg-muted text-xs font-semibold flex items-center justify-center">{(m.profile?.display_name ?? "?").slice(0, 2).toUpperCase()}</span>
-                    <p className="text-sm flex-1 truncate">{m.profile?.display_name ?? "—"}</p>
-                    <Select value={m.role} onValueChange={(v) => changeRole(m.user_id, v as CompanyRole)} disabled={m.role === "admin" && !detail.isOwner}>
-                      <SelectTrigger className="w-[160px] h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {(Object.keys(COMPANY_ROLE_LABELS) as CompanyRole[]).map((r) => (
-                          <SelectItem key={r} value={r} disabled={r === "admin" && !detail.isOwner}>{COMPANY_ROLE_LABELS[r]}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => remove(m.user_id, m.profile?.display_name ?? "esta pessoa")} aria-label="Remover"><X className="h-4 w-4" /></Button>
+                  // No celular o seletor de papel desce para a segunda linha:
+                  // lado a lado ele espremia o nome a poucos pixels.
+                  <div key={m.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-2.5">
+                    <span className="h-8 w-8 shrink-0 rounded-full bg-muted text-xs font-semibold flex items-center justify-center">{(m.profile?.display_name ?? "?").slice(0, 2).toUpperCase()}</span>
+                    <p className="text-sm min-w-0 flex-1 truncate">{m.profile?.display_name ?? "—"}</p>
+                    <div className="flex w-full items-center gap-2 sm:w-auto">
+                      <Select value={m.role} onValueChange={(v) => changeRole(m.user_id, v as CompanyRole)} disabled={m.role === "admin" && !detail.isOwner}>
+                        <SelectTrigger className="h-8 flex-1 text-xs sm:w-[160px] sm:flex-none"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(COMPANY_ROLE_LABELS) as CompanyRole[]).map((r) => (
+                            <SelectItem key={r} value={r} disabled={r === "admin" && !detail.isOwner}>{COMPANY_ROLE_LABELS[r]}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => remove(m.user_id, m.profile?.display_name ?? "esta pessoa")} aria-label="Remover"><X className="h-4 w-4" /></Button>
+                    </div>
                   </div>
                 ))}
               </div>

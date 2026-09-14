@@ -104,7 +104,7 @@ function ProjectDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && !saving && onClose()}>
-      <DialogContent className="sm:max-w-[560px] max-h-[92vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[560px] max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? "Editar projeto" : "Novo projeto"}</DialogTitle>
           <DialogDescription>Agrupa receitas e despesas de um trabalho, cliente ou evento da empresa e compara com o previsto.</DialogDescription>
@@ -215,7 +215,7 @@ function ProjectAccessDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Quem acessa "{project.name}"</DialogTitle>
           <DialogDescription>
@@ -230,22 +230,24 @@ function ProjectAccessDialog({
             {people.map((p) => {
               const member = project.members.find((m) => m.user_id === p.id);
               return (
-                <div key={p.id} className="flex items-center gap-3 rounded-lg border p-2.5">
-                  <span className="h-8 w-8 rounded-full bg-muted text-xs font-semibold flex items-center justify-center">{p.display_name.slice(0, 2).toUpperCase()}</span>
-                  <p className="text-sm font-medium flex-1 truncate">{p.display_name}</p>
+                // No celular o seletor desce para a segunda linha: lado a lado
+                // ele espremia o nome a poucos pixels.
+                <div key={p.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-2.5">
+                  <span className="h-8 w-8 shrink-0 rounded-full bg-muted text-xs font-semibold flex items-center justify-center">{p.display_name.slice(0, 2).toUpperCase()}</span>
+                  <p className="text-sm font-medium min-w-0 flex-1 truncate">{p.display_name}</p>
                   {member ? (
-                    <>
+                    <div className="flex w-full items-center gap-2 sm:w-auto">
                       <Select value={member.can_edit ? "edit" : "view"} onValueChange={(v) => toggle(p.id, v === "edit")} disabled={busy === p.id}>
-                        <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-8 flex-1 text-xs sm:w-[130px] sm:flex-none"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="view">Só vê</SelectItem>
                           <SelectItem value="edit">Vê e edita</SelectItem>
                         </SelectContent>
                       </Select>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" disabled={busy === p.id} onClick={() => toggle(p.id, false, true)} aria-label="Remover"><X className="h-4 w-4" /></Button>
-                    </>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" disabled={busy === p.id} onClick={() => toggle(p.id, false, true)} aria-label="Remover"><X className="h-4 w-4" /></Button>
+                    </div>
                   ) : (
-                    <Button size="sm" variant="outline" disabled={busy === p.id} onClick={() => toggle(p.id, false)}>{busy === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Liberar"}</Button>
+                    <Button size="sm" variant="outline" className="shrink-0" disabled={busy === p.id} onClick={() => toggle(p.id, false)}>{busy === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Liberar"}</Button>
                   )}
                 </div>
               );

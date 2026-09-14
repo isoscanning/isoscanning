@@ -79,11 +79,15 @@ export function AvailabilityGrid({ teamId, members }: { teamId: string; members:
         </div>
       </div>
 
+      {/* No celular a coluna fixa do nome é mais estreita: com 160px sobrava
+          espaço para poucos dias numa tela de 360px. */}
+      <p className="text-[11px] text-muted-foreground sm:hidden">Arraste a tabela para o lado para ver os demais dias.</p>
+
       <div className="overflow-x-auto rounded-xl border">
         <table className="min-w-full border-collapse text-xs">
           <thead>
             <tr className="bg-muted/40">
-              <th className="sticky left-0 z-10 bg-muted/40 text-left font-medium px-3 py-2 min-w-[160px]">Membro</th>
+              <th className="sticky left-0 z-10 bg-muted/40 text-left font-medium px-2 py-2 min-w-[112px] sm:px-3 sm:min-w-[160px]">Membro</th>
               {days.map((d) => {
                 const wd = weekdayOf(d);
                 return (
@@ -100,15 +104,15 @@ export function AvailabilityGrid({ teamId, members }: { teamId: string; members:
               const row = byMember.get(m.user_id);
               return (
                 <tr key={m.user_id} className="border-t">
-                  <td className="sticky left-0 z-10 bg-background px-3 py-1.5">
+                  <td className="sticky left-0 z-10 bg-background px-2 py-1.5 sm:px-3">
                     <div className="flex items-center gap-2 min-w-0">
                       {m.profile?.avatar_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={m.profile.avatar_url} alt="" className="h-6 w-6 rounded-full object-cover" />
+                        <img src={m.profile.avatar_url} alt="" className="h-6 w-6 shrink-0 rounded-full object-cover" />
                       ) : (
-                        <span className="h-6 w-6 rounded-full bg-primary/10 text-primary text-[10px] font-semibold flex items-center justify-center">{initials(m.profile?.display_name)}</span>
+                        <span className="h-6 w-6 shrink-0 rounded-full bg-primary/10 text-primary text-[10px] font-semibold flex items-center justify-center">{initials(m.profile?.display_name)}</span>
                       )}
-                      <span className="truncate max-w-[120px]">{m.profile?.display_name ?? "Membro"}</span>
+                      <span className="truncate max-w-[72px] sm:max-w-[120px]">{m.profile?.display_name ?? "Membro"}</span>
                     </div>
                   </td>
                   {days.map((d) => {

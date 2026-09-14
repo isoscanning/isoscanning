@@ -57,7 +57,7 @@ function AnnouncementDialog({ teamId, editing, open, onClose, onSaved }: { teamI
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && !saving && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? "Editar aviso" : "Novo aviso"}</DialogTitle>
           <DialogDescription>{editing ? "Alterações não geram nova notificação." : "Todos os membros ativos recebem uma notificação."}</DialogDescription>

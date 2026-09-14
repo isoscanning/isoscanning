@@ -23,7 +23,7 @@ export function ScopeSwitcher({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Select value={value ?? "personal"} onValueChange={(v) => onChange(v === "personal" ? null : v)} disabled={loading}>
-        <SelectTrigger className="w-[260px] bg-background border-emerald-500/30" aria-label="Financeiro pessoal ou da empresa">
+        <SelectTrigger className="w-full sm:w-[260px] bg-background border-emerald-500/30" aria-label="Financeiro pessoal ou da empresa">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

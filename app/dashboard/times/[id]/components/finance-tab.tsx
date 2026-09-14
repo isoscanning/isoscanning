@@ -94,11 +94,11 @@ export function FinanceTab({ teamId, onChanged }: { teamId: string; teamName: st
           </div>
           {view.can_link && (
             administered === null ? (
-              <Skeleton className="h-10 w-72 mx-auto" />
+              <Skeleton className="h-10 w-full max-w-sm mx-auto" />
             ) : administered.length > 0 ? (
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+              <div className="mx-auto flex w-full max-w-sm flex-col items-stretch justify-center gap-2 sm:max-w-none sm:flex-row sm:items-center">
                 <Select value={selected} onValueChange={setSelected}>
-                  <SelectTrigger className="w-[260px]"><SelectValue placeholder="Escolha a empresa" /></SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-[260px]"><SelectValue placeholder="Escolha a empresa" /></SelectTrigger>
                   <SelectContent>
                     {administered.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
@@ -128,16 +128,17 @@ export function FinanceTab({ teamId, onChanged }: { teamId: string; teamName: st
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="pb-3 flex flex-row items-start justify-between gap-3">
-          <div>
+        {/* No celular os dois botões descem para baixo do nome da empresa. */}
+        <CardHeader className="pb-3 flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <CardTitle className="text-base flex items-center gap-2">
-              <span className="h-4 w-4 rounded" style={{ backgroundColor: company.color }} /> {company.name}
+              <span className="h-4 w-4 shrink-0 rounded" style={{ backgroundColor: company.color }} /> <span className="truncate">{company.name}</span>
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
               {company.legal_name ? `${company.legal_name} · ` : ""}Você: {COMPANY_ROLE_LABELS[view.role]}{company.archived_at ? " · arquivada (somente leitura)" : ""}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex shrink-0 flex-wrap gap-2">
             <Button asChild variant="outline"><Link href={`/dashboard/empresas?empresa=${company.id}`}><Building2 className="mr-2 h-4 w-4" /> Empresa</Link></Button>
             <Button asChild className="bg-emerald-600 hover:bg-emerald-700" onClick={() => saveFinanceScope(company.id)}>
               <Link href={financeUrl}><ExternalLink className="mr-2 h-4 w-4" /> Abrir financeiro</Link>
@@ -178,7 +179,7 @@ export function FinanceTab({ teamId, onChanged }: { teamId: string; teamName: st
                     <p className="text-sm font-medium truncate flex items-center gap-1">{p.name}{p.job_offer_id && <Briefcase className="h-3 w-3 text-teal-600" />}{p.visibility === "restricted" && <Lock className="h-3 w-3 text-muted-foreground" />}</p>
                     <p className="text-xs text-muted-foreground">{[p.client_name, PROJECT_STATUS_LABELS[p.status]].filter(Boolean).join(" · ")}</p>
                   </div>
-                  <div className="text-right text-xs">
+                  <div className="shrink-0 text-right text-xs">
                     <p className="text-emerald-600 font-medium">{formatBRL(income)}</p>
                     <p className="text-rose-600">{formatBRL(expenses)}</p>
                   </div>

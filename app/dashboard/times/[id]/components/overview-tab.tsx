@@ -14,7 +14,9 @@ function StatTile({ icon: Icon, label, value, hint }: { icon: React.ComponentTyp
         <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0"><Icon className="h-5 w-5" /></div>
         <div className="min-w-0">
           <p className="text-2xl font-bold leading-tight">{value}</p>
-          <p className="text-xs text-muted-foreground truncate">{label}{hint ? ` · ${hint}` : ""}</p>
+          {/* Em duas colunas no celular o rótulo cortado viraria "Candidatur…";
+              melhor deixar quebrar em duas linhas. */}
+          <p className="text-xs text-muted-foreground leading-snug line-clamp-2">{label}{hint ? ` · ${hint}` : ""}</p>
         </div>
       </CardContent>
     </Card>

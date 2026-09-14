@@ -99,7 +99,7 @@ function InviteDialog({ teamId, open, onClose, onInvited, isOwner }: { teamId: s
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && !saving && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Convidar para o time</DialogTitle>
           <DialogDescription>Busque um profissional da plataforma pelo nome. Ele recebe o convite e entra ao aceitar.</DialogDescription>
@@ -204,7 +204,7 @@ function EditMemberDialog({ teamId, member, isOwner, onClose, onSaved }: { teamI
 
   return (
     <Dialog open={!!member} onOpenChange={(o) => !o && !saving && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{member?.profile?.display_name ?? "Membro"}</DialogTitle>
           <DialogDescription>Função no time e observações internas (só gestores veem).</DialogDescription>

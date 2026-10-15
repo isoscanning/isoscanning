@@ -316,7 +316,7 @@ export default function BriefingProPage() {
                           </Badge>
                         )}
                       </div>
-                      <DropdownMenu>
+                      <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                           <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
                             <MoreVertical className="h-4 w-4" />

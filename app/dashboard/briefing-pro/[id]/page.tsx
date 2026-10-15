@@ -194,7 +194,7 @@ function ItemRowActions({
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
       </div>
-      <DropdownMenu>
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost" size="icon"
@@ -362,7 +362,7 @@ export default function BriefingDetailPage() {
   // teclado: espaço + setas no handle. As setas ↑↓ nas ações cobrem o resto.
   const dndSensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
@@ -860,7 +860,7 @@ export default function BriefingDetailPage() {
                       {canEdit && !filterActive && (
                         <button
                           {...sectionHandle}
-                          className="mt-0.5 text-muted-foreground/50 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none shrink-0"
+                          className="-mt-1 -mx-1.5 -mb-1.5 p-1.5 rounded text-muted-foreground/50 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none select-none shrink-0"
                           title="Arrastar para reordenar a seção"
                         >
                           <GripVertical className="h-4 w-4" />
@@ -887,7 +887,7 @@ export default function BriefingDetailPage() {
                       </div>
                     </div>
                     {canEdit && (
-                      <DropdownMenu>
+                      <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-7 w-7">
                             <MoreVertical className="h-4 w-4" />
@@ -959,7 +959,7 @@ export default function BriefingDetailPage() {
                         {canEdit && !filterActive && (
                           <button
                             {...itemHandle}
-                            className="mt-0.5 -ml-0.5 p-0.5 rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted cursor-grab active:cursor-grabbing touch-none shrink-0"
+                            className="-mt-0.5 -ml-1.5 p-1.5 rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted cursor-grab active:cursor-grabbing touch-none select-none shrink-0"
                             title="Arrastar para reordenar (ou use as setas ↑↓ nas ações)"
                             aria-label={`Reordenar item ${item.title}`}
                           >
@@ -2525,6 +2525,8 @@ function ItemDialog({
   async function save() {
     if (!form.title.trim()) return;
     setSaving(true);
+    const nextDuration = form.duration_minutes ? parseInt(form.duration_minutes, 10) : null;
+    const durationChanged = item ? nextDuration !== (item.duration_minutes ?? null) : nextDuration !== null;
     const payload = {
       title: form.title.trim(),
       description: form.description || undefined,
@@ -2532,9 +2534,9 @@ function ItemDialog({
       priority: form.priority,
       is_required: isRequired,
       scheduled_time: form.scheduled_time || undefined,
-      duration_minutes: form.duration_minutes
-        ? parseInt(form.duration_minutes, 10)
-        : (item ? null : undefined),
+      // Só envia a duração quando mudou: `null` em toda edição falhava em bancos
+      // sem a coluna (SQL 72) e, de todo modo, não há por que gravar um no-op.
+      ...(durationChanged ? { duration_minutes: nextDuration } : {}),
       ...(itemClosed
         ? { completed_by: form.completed_by === "none" ? null : form.completed_by }
         : {}),

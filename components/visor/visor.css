@@ -1,0 +1,224 @@
+/* Padrão visual "Visor" — paleta única grafite + um acento. Nada de seções com
+   cores diferentes: o ritmo vem de espaço, linhas finas e do foco. */
+
+.visor {
+  --visor-bg: #08090b;
+  --visor-surface: #0e0f12;
+  --visor-line: rgba(255, 255, 255, 0.08);
+  --visor-line-strong: rgba(255, 255, 255, 0.16);
+  --visor-text: #f3f4f6;
+  --visor-muted: rgba(243, 244, 246, 0.56);
+  --visor-faint: rgba(243, 244, 246, 0.32);
+  --visor-accent: #8fb3ff;
+  --visor-accent-soft: rgba(143, 179, 255, 0.14);
+
+  /* Reaproveita os componentes shadcn (Header, Button) no mesmo tom. */
+  --background: var(--visor-bg);
+  --foreground: var(--visor-text);
+  --card: var(--visor-surface);
+  --card-foreground: var(--visor-text);
+  --popover: var(--visor-surface);
+  --popover-foreground: var(--visor-text);
+  --muted: #15161a;
+  --muted-foreground: var(--visor-muted);
+  --border: var(--visor-line);
+  --input: var(--visor-line-strong);
+  --primary: var(--visor-text);
+  --primary-foreground: var(--visor-bg);
+  --accent: #15161a;
+  --accent-foreground: var(--visor-text);
+
+  background: var(--visor-bg);
+  color: var(--visor-text);
+}
+
+/* Grão de filme bem leve por cima de tudo. */
+.visor .visor-grain {
+  position: fixed;
+  inset: -50%;
+  z-index: 70;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation: visor-grain 1.2s steps(6) infinite;
+}
+
+@keyframes visor-grain {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-4%, 3%); }
+  40% { transform: translate(3%, -2%); }
+  60% { transform: translate(-2%, -4%); }
+  80% { transform: translate(4%, 2%); }
+  100% { transform: translate(0, 0); }
+}
+
+/* ---------- Foco automático (AF) ----------
+   Títulos com data-af começam fora de foco e entram em foco quando o
+   retículo trava neles. Só liga com JS + movimento permitido (classe no root). */
+.visor.af-ready [data-af] {
+  filter: blur(7px);
+  opacity: 0.35;
+  transition: filter 0.9s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.visor.af-ready [data-af][data-af-focused] {
+  filter: none;
+  opacity: 1;
+}
+
+.visor-af {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.visor-af[data-visible="1"] { opacity: 1; }
+
+.visor-af-corner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  border-color: rgba(255, 255, 255, 0.55);
+  border-style: solid;
+  border-width: 0;
+  will-change: transform;
+  transition: border-color 0.25s ease, filter 0.25s ease;
+}
+.visor-af-corner[data-c="tl"] { border-top-width: 1.5px; border-left-width: 1.5px; }
+.visor-af-corner[data-c="tr"] { border-top-width: 1.5px; border-right-width: 1.5px; }
+.visor-af-corner[data-c="bl"] { border-bottom-width: 1.5px; border-left-width: 1.5px; }
+.visor-af-corner[data-c="br"] { border-bottom-width: 1.5px; border-right-width: 1.5px; }
+
+.visor-af[data-locked="1"] .visor-af-corner {
+  border-color: var(--visor-accent);
+  filter: drop-shadow(0 0 6px rgba(143, 179, 255, 0.6));
+}
+
+.visor-af-center {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  will-change: transform;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+.visor-af-center::before,
+.visor-af-center::after {
+  content: "";
+  position: absolute;
+  background: rgba(255, 255, 255, 0.7);
+}
+.visor-af-center::before { left: 4.5px; top: 0; width: 1px; height: 10px; }
+.visor-af-center::after { top: 4.5px; left: 0; height: 1px; width: 10px; }
+.visor-af[data-locked="1"] .visor-af-center { opacity: 0; }
+
+.visor-af-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  white-space: nowrap;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--visor-accent);
+  will-change: transform;
+  opacity: 0;
+  transform-origin: left top;
+  transition: opacity 0.35s ease;
+}
+.visor-af[data-locked="1"] .visor-af-label { opacity: 1; }
+.visor-af-label .dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 8px;
+  border-radius: 999px;
+  background: var(--visor-accent);
+  box-shadow: 0 0 10px var(--visor-accent);
+  vertical-align: 1px;
+}
+
+/* Pulso de confirmação ao travar o foco. */
+.visor-af-box {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1px solid var(--visor-accent);
+  border-radius: 4px;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.visor-af[data-pulse="1"] .visor-af-box { animation: visor-af-pulse 0.7s ease-out; }
+@keyframes visor-af-pulse {
+  0% { opacity: 0.55; }
+  100% { opacity: 0; }
+}
+
+/* ---------- HUD do visor ---------- */
+.visor-hud {
+  position: fixed;
+  inset: 18px;
+  z-index: 55;
+  pointer-events: none;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--visor-faint);
+}
+.visor-hud-tick {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+/* ---------- Bento: holofote que segue o mouse ---------- */
+.visor-cell {
+  position: relative;
+  isolation: isolate;
+}
+.visor-cell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(143, 179, 255, 0.09), transparent 60%);
+}
+.visor-cell:hover::before { opacity: 1; }
+.visor-cell .visor-cell-af {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-color: var(--visor-accent);
+  border-style: solid;
+  border-width: 0;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.visor-cell:hover .visor-cell-af { opacity: 1; transform: translate(0, 0) !important; }
+
+/* ---------- Tira de filme ---------- */
+.visor-sprockets {
+  height: 14px;
+  background-image: radial-gradient(circle at center, transparent 0, transparent 0),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.16) 0 9px, transparent 9px 22px);
+  background-size: 22px 7px;
+  background-repeat: repeat-x;
+  background-position: 6px center;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visor .visor-grain { animation: none; }
+}

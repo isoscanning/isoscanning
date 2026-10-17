@@ -30,7 +30,7 @@ import {
   condenseDocument,
   normalizeSections,
 } from "@/lib/server/briefing-ai";
-import { MAX_EXTRACTED_CHARS, MIN_USEFUL_CHARS } from "@/lib/briefing-pro-file";
+import { MAX_BASE_FILES, MAX_EXTRACTED_CHARS, MIN_USEFUL_CHARS } from "@/lib/briefing-pro-file";
 
 export const maxDuration = 60;
 
@@ -72,10 +72,38 @@ interface GeneratedBriefing {
 interface GenerateRequestBody {
   text?: string;
   briefing_type?: string;
-  /** Texto extraído do arquivo base (vem de /extract-file). */
+  /** Texto extraído do arquivo base (vem de /extract-file). Legado: um arquivo só. */
   file_text?: string;
   file_name?: string;
+  /** Vários arquivos base, cada um já lido por /extract-file. */
+  files?: Array<{ name?: string; text?: string }>;
 }
+
+/** Lista de arquivos do corpo (aceita o formato legado de arquivo único). */
+function readFiles(body: GenerateRequestBody): Array<{ name?: string; text: string }> {
+  const raw = Array.isArray(body.files)
+    ? body.files
+    : body.file_text !== undefined
+      ? [{ name: body.file_name, text: body.file_text }]
+      : [];
+  return raw
+    .slice(0, MAX_BASE_FILES)
+    .map((f) => ({
+      name: cleanString(f?.name, 200),
+      text: (typeof f?.text === "string" ? f.text : "").trim().slice(0, MAX_EXTRACTED_CHARS),
+    }))
+    .filter((f) => f.text.length > 0);
+}
+
+/** Junta vários documentos num só texto-fonte, com cabeçalho por arquivo. */
+function joinFiles(files: Array<{ name?: string; text: string }>): string {
+  if (files.length === 1) return files[0].text;
+  return files
+    .map((f, i) => `=== ARQUIVO ${i + 1}${f.name ? `: ${f.name}` : ""} ===\n${f.text}`)
+    .join("\n\n");
+}
+
+const MULTI_DOCUMENT_RULES = `HÁ MAIS DE UM DOCUMENTO BASE (separados por "=== ARQUIVO N ==="): leia todos e combine-os num ÚNICO briefing. Não duplique informação repetida entre eles; se dois documentos se contradizem, use o mais específico/recente e registre a divergência em "notes".`;
 
 const SYSTEM_PROMPT = `Você é um produtor executivo sênior especializado em transformar briefings bagunçados em planos de trabalho impecáveis. Você já produziu casamentos, campanhas de marketing, produções audiovisuais, ensaios fotográficos e gestão de social media, e conhece as dores de quem executa no dia: informação faltando, horário indefinido, material perdido e checklist inexistente.
 
@@ -90,10 +118,14 @@ Regras:
 - Entregáveis devem ter specs técnicas concretas (formato, resolução, quantidade, prazo) quando o tipo de trabalho permitir inferir.
 - Quando houver um DOCUMENTO BASE, siga à risca as instruções "COMO USAR O DOCUMENTO BASE".`;
 
-function buildUserPrompt(sourceBlock: string, hasDocument: boolean, hintType?: string): string {
+function buildUserPrompt(
+  sourceBlock: string,
+  documentCount: number,
+  hintType?: string
+): string {
   return `${sourceBlock}
 ${hintType ? `\nTipo de trabalho indicado pelo usuário: ${hintType}` : ""}
-${hasDocument ? `\n${DOCUMENT_RULES}\n` : ""}
+${documentCount > 0 ? `\n${DOCUMENT_RULES}\n` : ""}${documentCount > 1 ? `${MULTI_DOCUMENT_RULES}\n` : ""}
 Devolva o JSON EXATAMENTE neste formato:
 {
   "title": "título curto do trabalho",
@@ -252,15 +284,19 @@ export async function POST(request: NextRequest) {
   }
 
   const notesRaw = (typeof body.text === "string" ? body.text : "").trim();
-  const fileTextRaw = (typeof body.file_text === "string" ? body.file_text : "")
-    .trim()
-    .slice(0, MAX_EXTRACTED_CHARS);
-  const fileName = cleanString(body.file_name, 200);
+  const files = readFiles(body);
+  const fileTextRaw = joinFiles(files);
+  const fileName =
+    files.length === 1
+      ? files[0].name
+      : files.length > 1
+        ? cleanString(files.map((f, i) => f.name || `arquivo ${i + 1}`).join(", "), 600)
+        : undefined;
   const hasFile = fileTextRaw.length > 0;
 
-  if (hasFile && fileTextRaw.length < MIN_USEFUL_CHARS) {
+  if (hasFile && files.some((f) => f.text.length < MIN_USEFUL_CHARS)) {
     return NextResponse.json(
-      { error: "O texto lido do arquivo está vazio. Envie o arquivo de novo ou cole o conteúdo." },
+      { error: "O texto lido de um dos arquivos está vazio. Remova-o, envie de novo ou cole o conteúdo." },
       { status: 400 }
     );
   }
@@ -304,7 +340,7 @@ export async function POST(request: NextRequest) {
   try {
     const parsed = await callGroqJson<GeneratedBriefing>({
       systemPrompt: SYSTEM_PROMPT,
-      userPrompt: buildUserPrompt(sourceBlock, hasFile, body.briefing_type),
+      userPrompt: buildUserPrompt(sourceBlock, files.length, body.briefing_type),
       temperature: 0.6,
       maxTokens: 8192,
       retries: 1,

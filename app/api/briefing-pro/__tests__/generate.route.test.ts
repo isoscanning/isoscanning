@@ -93,6 +93,42 @@ describe("validações", () => {
   });
 });
 
+describe("vários arquivos base", () => {
+  it("junta os documentos com cabeçalho por arquivo e a regra de combinação", async () => {
+    const { status, body } = await post({
+      text: "",
+      files: [
+        { name: "briefing.pdf", text: DOC },
+        { name: "cronograma.docx", text: "Cronograma: 08h montagem, 09h abertura dos portões." },
+      ],
+    });
+    expect(status).toBe(200);
+    const prompt = lastUserPrompt();
+    expect(prompt).toContain("=== ARQUIVO 1: briefing.pdf ===");
+    expect(prompt).toContain("=== ARQUIVO 2: cronograma.docx ===");
+    expect(prompt).toContain("09h abertura dos portões");
+    expect(prompt).toContain("HÁ MAIS DE UM DOCUMENTO BASE");
+    expect(mockedConsume).toHaveBeenCalledTimes(1);
+    expect((body.briefing as Record<string, unknown>).source_text).toContain(
+      "[Arquivo base: briefing.pdf, cronograma.docx]"
+    );
+  });
+
+  it("um arquivo só não recebe a regra de combinação", async () => {
+    await post({ text: "", files: [{ name: "briefing.pdf", text: DOC }] });
+    expect(lastUserPrompt()).not.toContain("HÁ MAIS DE UM DOCUMENTO BASE");
+  });
+
+  it("400 se um dos arquivos veio sem texto", async () => {
+    const { status } = await post({
+      text: "",
+      files: [{ name: "a.pdf", text: DOC }, { name: "b.pdf", text: "abc" }],
+    });
+    expect(status).toBe(400);
+    expect(mockedConsume).not.toHaveBeenCalled();
+  });
+});
+
 describe("prompt com documento base", () => {
   it("inclui o documento, as observações e as regras de estrutura semelhante", async () => {
     const { status, body } = await post({

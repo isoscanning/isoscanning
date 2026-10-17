@@ -12,6 +12,8 @@ export const MAX_FILE_LABEL = "4 MB";
 
 /** Teto do texto extraído devolvido ao front (o excedente é descartado, com aviso). */
 export const MAX_EXTRACTED_CHARS = 40_000;
+/** Máximo de arquivos base anexados numa mesma geração com IA. */
+export const MAX_BASE_FILES = 5;
 /** Abaixo disso o arquivo não tem texto útil (PDF digitalizado, foto ilegível). */
 export const MIN_USEFUL_CHARS = 20;
 

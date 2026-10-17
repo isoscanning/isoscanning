@@ -30,6 +30,7 @@ import {
   ACCEPT_ATTRIBUTE,
   BriefingFileKind,
   FILE_KIND_LABELS,
+  MAX_BASE_FILES,
   MAX_FILE_BYTES,
   MAX_FILE_LABEL,
   detectFileKind,
@@ -66,6 +67,7 @@ function isPlanApiError(err: unknown): boolean {
 
 /** Arquivo base já lido pelo servidor (/api/briefing-pro/extract-file). */
 interface AttachedFile {
+  id: string;
   name: string;
   size: number;
   kind: BriefingFileKind;
@@ -173,10 +175,14 @@ export default function NewBriefingPage() {
   const [preview, setPreview] = useState<GeneratedBriefingStructure | null>(null);
 
   // Arquivo base (briefing que o cliente mandou)
-  const [attached, setAttached] = useState<AttachedFile | null>(null);
+  // Arquivos base (briefing, roteiro, cronograma... que o cliente mandou)
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [extracting, setExtracting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [showExtracted, setShowExtracted] = useState(false);
+  /** id do arquivo com o texto lido expandido. */
+  const [expandedFileId, setExpandedFileId] = useState<string | null>(null);
+  const hasFiles = attachedFiles.length > 0;
+  const canAttachMore = attachedFiles.length < MAX_BASE_FILES;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -213,7 +219,7 @@ export default function NewBriefingPage() {
 
   async function generateWithAi() {
     const notes = aiText.trim();
-    if (!attached && notes.length < 40) {
+    if (!hasFiles && notes.length < 40) {
       toast.error("Descreva o trabalho com mais detalhes (ou anexe o briefing do cliente) para a IA estruturar");
       return;
     }
@@ -226,8 +232,7 @@ export default function NewBriefingPage() {
         body: JSON.stringify({
           text: notes,
           briefing_type: aiType === "auto" ? undefined : aiType,
-          file_text: attached?.text,
-          file_name: attached?.name,
+          files: hasFiles ? attachedFiles.map((f) => ({ name: f.name, text: f.text })) : undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -246,23 +251,47 @@ export default function NewBriefingPage() {
     }
   }
 
-  /** Lê o arquivo base no servidor e guarda o texto extraído para a geração. */
-  async function handleFile(file: File) {
-    const kind = detectFileKind(file.name, file.type);
-    if (!kind) {
-      toast.error(unsupportedFileMessage(file.name));
+  /** Lê os arquivos base um a um (o OCR tem teto de tokens/min) e adiciona à lista. */
+  async function handleFiles(list: FileList | File[] | null | undefined) {
+    const picked = Array.from(list ?? []);
+    if (picked.length === 0 || extracting) return;
+    const room = MAX_BASE_FILES - attachedFiles.length;
+    if (room <= 0) {
+      toast.error(`Máximo de ${MAX_BASE_FILES} arquivos por briefing.`);
       return;
     }
-    if (kind !== "image" && file.size > MAX_FILE_BYTES) {
-      toast.error(`Arquivo muito grande (máximo ${MAX_FILE_LABEL}). Reduza o arquivo ou cole o texto.`);
-      return;
+    if (picked.length > room) {
+      toast.warning(`Só ${room === 1 ? "mais 1 arquivo cabe" : `mais ${room} arquivos cabem`} (máximo ${MAX_BASE_FILES}).`);
     }
     setExtracting(true);
     try {
+      for (const file of picked.slice(0, room)) {
+        // eslint-disable-next-line no-await-in-loop -- sequencial de propósito
+        const read = await extractFile(file);
+        if (read) setAttachedFiles((prev) => [...prev, read]);
+      }
+    } finally {
+      setExtracting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  /** Lê um arquivo no servidor; devolve null (com toast) se falhar. */
+  async function extractFile(file: File): Promise<AttachedFile | null> {
+    const kind = detectFileKind(file.name, file.type);
+    if (!kind) {
+      toast.error(unsupportedFileMessage(file.name));
+      return null;
+    }
+    if (kind !== "image" && file.size > MAX_FILE_BYTES) {
+      toast.error(`${file.name}: arquivo muito grande (máximo ${MAX_FILE_LABEL}). Reduza o arquivo ou cole o texto.`);
+      return null;
+    }
+    try {
       const payload: Blob = kind === "image" ? await prepareImageForOcr(file) : file;
       if (payload.size > MAX_FILE_BYTES) {
-        toast.error(`Imagem muito grande mesmo depois de reduzida (máximo ${MAX_FILE_LABEL}).`);
-        return;
+        toast.error(`${file.name}: imagem muito grande mesmo depois de reduzida (máximo ${MAX_FILE_LABEL}).`);
+        return null;
       }
       const form = new FormData();
       form.append("file", payload, file.name);
@@ -273,10 +302,15 @@ export default function NewBriefingPage() {
         body: form,
       });
       const data = await res.json().catch(() => ({}));
-      if (res.status === 403 && notifyPlanLimit(data)) return;
+      if (res.status === 403 && notifyPlanLimit(data)) return null;
       if (!res.ok) throw new Error(data?.error || "Não foi possível ler o arquivo");
       const pages = typeof data.pages === "number" ? data.pages : null;
-      setAttached({
+      toast.success(
+        `${file.name} lido: ${Number(data.chars ?? 0).toLocaleString("pt-BR")} caracteres` +
+          (pages ? ` em ${pages} página${pages > 1 ? "s" : ""}` : "")
+      );
+      return {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         name: file.name,
         size: file.size,
         kind,
@@ -285,23 +319,17 @@ export default function NewBriefingPage() {
         pages,
         method: String(data.method ?? ""),
         note: typeof data.note === "string" ? data.note : null,
-      });
-      setShowExtracted(false);
-      toast.success(
-        `Arquivo lido: ${Number(data.chars ?? 0).toLocaleString("pt-BR")} caracteres` +
-          (pages ? ` em ${pages} página${pages > 1 ? "s" : ""}` : "")
-      );
+      };
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível ler o arquivo");
-    } finally {
-      setExtracting(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      const message = err instanceof Error ? err.message : "Não foi possível ler o arquivo";
+      toast.error(`${file.name}: ${message}`);
+      return null;
     }
   }
 
-  function removeAttached() {
-    setAttached(null);
-    setShowExtracted(false);
+  function removeAttached(id: string) {
+    setAttachedFiles((prev) => prev.filter((f) => f.id !== id));
+    if (expandedFileId === id) setExpandedFileId(null);
   }
 
   async function saveGenerated() {
@@ -520,12 +548,77 @@ export default function NewBriefingPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Arquivo base (opcional)</Label>
-                {!attached ? (
+                <Label>
+                  Arquivos base (opcional)
+                  {hasFiles && (
+                    <span className="ml-1 font-normal text-muted-foreground">
+                      · {attachedFiles.length}/{MAX_BASE_FILES}
+                    </span>
+                  )}
+                </Label>
+                {attachedFiles.map((file) => (
+                  <div key={file.id} className="rounded-lg border p-3 space-y-2">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 flex items-center justify-center shrink-0">
+                        {file.kind === "image" ? (
+                          <FileImage className="h-4 w-4" />
+                        ) : (
+                          <FileText className="h-4 w-4" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{file.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {FILE_KIND_LABELS[file.kind]}
+                          {file.pages ? ` · ${file.pages} página${file.pages > 1 ? "s" : ""}` : ""}
+                          {` · ${formatFileSize(file.size)}`}
+                          {` · ${file.chars.toLocaleString("pt-BR")} caracteres lidos`}
+                          {file.method === "ocr" ? " (OCR)" : ""}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        onClick={() => removeAttached(file.id)}
+                        disabled={extracting}
+                        aria-label={`Remover ${file.name}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {file.note && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">{file.note}</p>
+                    )}
+                    <Collapsible
+                      open={expandedFileId === file.id}
+                      onOpenChange={(open) => setExpandedFileId(open ? file.id : null)}
+                    >
+                      <CollapsibleTrigger asChild>
+                        <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs">
+                          <ChevronDown
+                            className={cn(
+                              "h-3.5 w-3.5 transition-transform",
+                              expandedFileId === file.id && "rotate-180"
+                            )}
+                          />
+                          {expandedFileId === file.id ? "Ocultar texto lido" : "Ver texto lido"}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <pre className="mt-2 max-h-56 overflow-auto rounded-md bg-muted/50 p-3 text-xs whitespace-pre-wrap font-sans">
+                          {file.text}
+                        </pre>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </div>
+                ))}
+                {canAttachMore && (
                   <div
                     role="button"
                     tabIndex={0}
-                    aria-label="Anexar arquivo base"
+                    aria-label={hasFiles ? "Anexar mais arquivos" : "Anexar arquivos base"}
                     onClick={() => !extracting && fileInputRef.current?.click()}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
@@ -538,11 +631,11 @@ export default function NewBriefingPage() {
                     onDrop={(e) => {
                       e.preventDefault();
                       setDragOver(false);
-                      const file = e.dataTransfer.files?.[0];
-                      if (file && !extracting) void handleFile(file);
+                      void handleFiles(e.dataTransfer.files);
                     }}
                     className={cn(
-                      "rounded-lg border-2 border-dashed p-5 text-center transition-colors",
+                      "rounded-lg border-2 border-dashed text-center transition-colors",
+                      hasFiles ? "p-3" : "p-5",
                       extracting ? "cursor-wait opacity-70" : "cursor-pointer",
                       dragOver
                         ? "border-rose-500 bg-rose-50 dark:bg-rose-950/20"
@@ -552,91 +645,44 @@ export default function NewBriefingPage() {
                     <input
                       ref={fileInputRef}
                       type="file"
+                      multiple
                       accept={ACCEPT_ATTRIBUTE}
                       className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) void handleFile(file);
-                      }}
+                      onChange={(e) => void handleFiles(e.target.files)}
                     />
                     {extracting ? (
                       <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Lendo o arquivo...
+                        Lendo os arquivos...
+                      </div>
+                    ) : hasFiles ? (
+                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                        <FileUp className="h-4 w-4 text-rose-500" />
+                        Anexar mais arquivos (até {MAX_BASE_FILES})
                       </div>
                     ) : (
                       <>
                         <FileUp className="h-6 w-6 mx-auto mb-2 text-rose-500" />
                         <p className="text-sm font-medium">Anexar o briefing que o cliente mandou</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          PDF, Word (.docx), texto ou foto/print (PNG, JPG) · até {MAX_FILE_LABEL}.
-                          Arraste aqui ou clique para escolher.
+                          PDF, Word (.docx), texto ou foto/print (PNG, JPG) · até {MAX_FILE_LABEL} cada,
+                          até {MAX_BASE_FILES} arquivos. Arraste aqui ou clique para escolher.
                         </p>
                       </>
                     )}
-                  </div>
-                ) : (
-                  <div className="rounded-lg border p-3 space-y-2">
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 flex items-center justify-center shrink-0">
-                        {attached.kind === "image" ? (
-                          <FileImage className="h-4 w-4" />
-                        ) : (
-                          <FileText className="h-4 w-4" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{attached.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {FILE_KIND_LABELS[attached.kind]}
-                          {attached.pages ? ` · ${attached.pages} página${attached.pages > 1 ? "s" : ""}` : ""}
-                          {` · ${formatFileSize(attached.size)}`}
-                          {` · ${attached.chars.toLocaleString("pt-BR")} caracteres lidos`}
-                          {attached.method === "ocr" ? " (OCR)" : ""}
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 shrink-0"
-                        onClick={removeAttached}
-                        aria-label="Remover arquivo"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {attached.note && (
-                      <p className="text-xs text-amber-600 dark:text-amber-400">{attached.note}</p>
-                    )}
-                    <Collapsible open={showExtracted} onOpenChange={setShowExtracted}>
-                      <CollapsibleTrigger asChild>
-                        <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs">
-                          <ChevronDown
-                            className={cn("h-3.5 w-3.5 transition-transform", showExtracted && "rotate-180")}
-                          />
-                          {showExtracted ? "Ocultar texto lido" : "Ver texto lido"}
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <pre className="mt-2 max-h-56 overflow-auto rounded-md bg-muted/50 p-3 text-xs whitespace-pre-wrap font-sans">
-                          {attached.text}
-                        </pre>
-                      </CollapsibleContent>
-                    </Collapsible>
                   </div>
                 )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ai-text">
-                  {attached ? "Observações e ajustes (opcional)" : "Descrição do trabalho *"}
+                  {hasFiles ? "Observações e ajustes (opcional)" : "Descrição do trabalho *"}
                 </Label>
                 <Textarea
                   id="ai-text"
                   value={aiText}
                   onChange={(e) => setAiText(e.target.value)}
-                  placeholder={attached ? NOTES_PLACEHOLDER : DESCRIPTION_PLACEHOLDER}
-                  rows={attached ? 5 : 12}
+                  placeholder={hasFiles ? NOTES_PLACEHOLDER : DESCRIPTION_PLACEHOLDER}
+                  rows={hasFiles ? 5 : 12}
                   className="resize-y"
                 />
                 <p className="text-xs text-muted-foreground text-right">
@@ -652,7 +698,7 @@ export default function NewBriefingPage() {
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4" />
-                    {attached ? "Gerar estrutura a partir do arquivo" : "Gerar estrutura do briefing"}
+                    {hasFiles ? (attachedFiles.length > 1 ? "Gerar estrutura a partir dos arquivos" : "Gerar estrutura a partir do arquivo") : "Gerar estrutura do briefing"}
                   </>
                 )}
               </Button>
@@ -666,12 +712,12 @@ export default function NewBriefingPage() {
               <CardHeader>
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   <Badge variant="outline">{BRIEFING_TYPE_LABELS[preview.briefing_type]}</Badge>
-                  {attached && (
-                    <Badge variant="outline" className="gap-1 max-w-[240px]">
+                  {attachedFiles.map((file) => (
+                    <Badge key={file.id} variant="outline" className="gap-1 max-w-[240px]">
                       <Paperclip className="h-3 w-3 shrink-0" />
-                      <span className="truncate">{attached.name}</span>
+                      <span className="truncate">{file.name}</span>
                     </Badge>
-                  )}
+                  ))}
                   {preview.event_date && (
                     <Badge variant="secondary">
                       {preview.event_date.split("-").reverse().join("/")}

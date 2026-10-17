@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-  DndContext, DragEndEvent, KeyboardSensor, MouseSensor, TouchSensor,
-  closestCenter, useSensor, useSensors,
+  CollisionDetection, DndContext, DragEndEvent, DragOverEvent, DragOverlay,
+  DragStartEvent, KeyboardSensor, MouseSensor, TouchSensor,
+  closestCenter, pointerWithin, useDroppable, useSensor, useSensors,
 } from "@dnd-kit/core";
 import {
   SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable,
@@ -14,7 +15,7 @@ import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
-import { sanitizeSearchTerm } from "@/lib/utils";
+import { cn, sanitizeSearchTerm } from "@/lib/utils";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import {
@@ -39,8 +40,9 @@ import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent,
+  DropdownMenuSubTrigger, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   ArrowLeft, Pencil, Users, Plus, Trash2, MoreVertical, Link2,
@@ -48,7 +50,7 @@ import {
   ShieldCheck, Loader2, Search, X, ExternalLink, HardDrive,
   MessageSquare, Send, Sparkles, Eye, Lock, CornerDownRight,
   GripVertical, Timer, Printer, Share2, Link2 as LinkIcon, RefreshCw, Copy,
-  ArrowUp, ArrowDown, FilterX,
+  ArrowUp, ArrowDown, FilterX, ArrowRightLeft,
 } from "lucide-react";
 import { BriefingTimeShiftDialog } from "@/components/briefing-time-shift-dialog";
 import { BriefingRecalcDialog } from "@/components/briefing-recalc-dialog";
@@ -127,42 +129,131 @@ function Avatar({ profile, size = 8 }: { profile?: ProfileSummary | null; size?:
  * para espalhar no botão de arrastar (GripVertical).
  */
 function SortableShell({
-  id, disabled, children,
+  id, data, disabled, children,
 }: {
   id: string;
+  /** `type` separa seção de item na detecção de colisão (um DndContext só). */
+  data: DragData;
   disabled?: boolean;
   children: (handleProps: Record<string, unknown>) => React.ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id, disabled });
+    useSortable({ id, data, disabled });
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={isDragging ? "opacity-60 relative z-10" : undefined}
+      // O que segue o cursor é o DragOverlay; aqui fica só a "vaga" do item
+      className={isDragging ? "opacity-40" : undefined}
     >
       {children({ ...attributes, ...listeners })}
     </div>
   );
 }
 
+function sectionOfItem(sections: BriefingSection[], itemId: string): BriefingSection | undefined {
+  return sections.find((s) => s.items.some((i) => i.id === itemId));
+}
+
+/** Tira o item da seção atual e insere em `toSectionId` na posição `toIndex`. */
+function relocateItem(
+  sections: BriefingSection[],
+  itemId: string,
+  toSectionId: string,
+  toIndex: number
+): BriefingSection[] {
+  const from = sectionOfItem(sections, itemId);
+  const item = from?.items.find((i) => i.id === itemId);
+  if (!from || !item) return sections;
+  return sections.map((s) => {
+    let items = s.id === from.id ? s.items.filter((i) => i.id !== itemId) : s.items;
+    if (s.id === toSectionId) {
+      items = [...items];
+      items.splice(Math.max(0, Math.min(toIndex, items.length)), 0, { ...item, section_id: toSectionId });
+    }
+    return items === s.items ? s : { ...s, items };
+  });
+}
+
+type DragData =
+  | { type: "section" }
+  | { type: "item"; sectionId: string }
+  | { type: "container"; sectionId: string };
+
+/**
+ * A seção inteira é área de soltar itens — é o que permite levar um item para
+ * uma seção vazia ou para o fim de outra seção.
+ */
+function SectionDropArea({
+  sectionId, disabled, children,
+}: {
+  sectionId: string;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef } = useDroppable({
+    id: `drop:${sectionId}`,
+    data: { type: "container", sectionId } satisfies DragData,
+    disabled,
+  });
+  return <div ref={setNodeRef}>{children}</div>;
+}
+
+/**
+ * Colisão do DndContext único: seção só cai sobre seção; item procura a seção
+ * sob o ponteiro e, dentro dela, o item mais próximo (ou a própria seção, se
+ * estiver vazia).
+ */
+const briefingCollision: CollisionDetection = (args) => {
+  const ofType = (type: DragData["type"]) =>
+    args.droppableContainers.filter((c) => (c.data.current as DragData | undefined)?.type === type);
+
+  if ((args.active.data.current as DragData | undefined)?.type === "section") {
+    return closestCenter({ ...args, droppableContainers: ofType("section") });
+  }
+
+  const containers = ofType("container");
+  const under = pointerWithin({ ...args, droppableContainers: containers });
+  if (under.length > 0) {
+    const hit = containers.find((c) => c.id === under[0].id);
+    const sectionId = (hit?.data.current as { sectionId?: string } | undefined)?.sectionId;
+    const items = ofType("item").filter(
+      (c) => (c.data.current as { sectionId?: string } | undefined)?.sectionId === sectionId
+    );
+    return items.length > 0
+      ? closestCenter({ ...args, droppableContainers: items })
+      : [under[0]];
+  }
+  return closestCenter({ ...args, droppableContainers: ofType("item") });
+};
+
 /**
  * Ações de um item. No desktop (lg+) são ícones revelados no hover da linha;
  * em telas menores um menu ⋮ sempre visível — no toque não existe hover, e o
- * Tailwind v4 nem aplica `hover:` nesses dispositivos. As setas ↑↓ são a
- * alternativa ao arrastar para reordenar.
+ * Tailwind v4 nem aplica `hover:` nesses dispositivos. As setas ↑↓ e o "Mover
+ * para seção" são a alternativa ao arrastar (as setas atravessam para a seção
+ * vizinha quando o item está na ponta).
  */
 function ItemRowActions({
-  canMoveUp, canMoveDown, onMoveUp, onMoveDown, onLink, onEdit, onDelete,
+  canMoveUp, canMoveDown, onMoveUp, onMoveDown, moveTargets, onMoveTo,
+  onLink, onEdit, onDelete,
 }: {
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  /** Outras seções do briefing (destinos do "Mover para seção"). */
+  moveTargets: Array<{ id: string; title: string }>;
+  onMoveTo: (sectionId: string) => void;
   onLink: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const targetItems = moveTargets.map((s) => (
+    <DropdownMenuItem key={s.id} onClick={() => onMoveTo(s.id)}>
+      <span className="truncate max-w-[220px]">{s.title}</span>
+    </DropdownMenuItem>
+  ));
   return (
     <>
       <div className="hidden lg:flex gap-0.5 shrink-0 hover-reveal">
@@ -178,6 +269,21 @@ function ItemRowActions({
         >
           <ArrowDown className="h-3.5 w-3.5" />
         </Button>
+        {moveTargets.length > 0 && (
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7" title="Mover para outra seção">
+                <ArrowRightLeft className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                Mover para a seção
+              </DropdownMenuLabel>
+              {targetItems}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         <Button
           variant="ghost" size="icon" className="h-7 w-7"
           title="Anexar link de material" onClick={onLink}
@@ -211,6 +317,14 @@ function ItemRowActions({
           <DropdownMenuItem disabled={!canMoveDown} onClick={onMoveDown}>
             <ArrowDown className="h-4 w-4 mr-2" />Mover para baixo
           </DropdownMenuItem>
+          {moveTargets.length > 0 && (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <ArrowRightLeft className="h-4 w-4 mr-2" />Mover para seção
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>{targetItems}</DropdownMenuSubContent>
+            </DropdownMenuSub>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={onLink}>
             <Link2 className="h-4 w-4 mr-2" />Anexar link
@@ -447,66 +561,160 @@ export default function BriefingDetailPage() {
     }
   }
 
-  async function handleSectionDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id || !detail) return;
-    const oldIndex = detail.sections.findIndex((s) => s.id === active.id);
-    const newIndex = detail.sections.findIndex((s) => s.id === over.id);
-    if (oldIndex < 0 || newIndex < 0) return;
-    const reordered = arrayMove(detail.sections, oldIndex, newIndex);
-    setDetail({ ...detail, sections: reordered });
+  // ─── Arrastar e soltar (seções e itens num DndContext só) ────────────────
+  //
+  // Durante o arraste o item muda de seção ao vivo (onDragOver), para o
+  // usuário ver onde vai cair; no soltar a ordem final é gravada de uma vez.
+  // sectionsRef evita ler um `detail` velho nos handlers entre renders.
+
+  const sectionsRef = useRef<BriefingSection[]>([]);
+  sectionsRef.current = detail?.sections ?? [];
+  const dragSnapshot = useRef<BriefingSection[] | null>(null);
+  const [activeDrag, setActiveDrag] = useState<
+    { type: "section"; id: string } | { type: "item"; id: string; fromSectionId: string } | null
+  >(null);
+
+  function setSections(sections: BriefingSection[]) {
+    sectionsRef.current = sections;
+    setDetail((prev) => (prev ? { ...prev, sections } : prev));
+  }
+
+  async function persistItemPositions(sections: BriefingSection[], sectionIds: string[]) {
+    const entries = sections
+      .filter((s) => sectionIds.includes(s.id))
+      .flatMap((s) => s.items.map((item, index) => ({ id: item.id, section_id: s.id, position: index })));
     try {
-      await briefingProService.reorderSections(briefingId, reordered.map((s) => s.id));
+      await briefingProService.reorderItems(briefingId, entries);
     } catch {
-      toast.error("Erro ao reordenar as seções");
+      toast.error("Erro ao mover o item");
       refresh();
     }
   }
 
-  /** Aplica uma nova ordem de itens na seção (otimista) e persiste. */
-  async function applyItemOrder(sectionId: string, reordered: BriefingItem[]) {
-    setDetail((prev) =>
-      prev
-        ? {
-            ...prev,
-            sections: prev.sections.map((s) =>
-              s.id === sectionId ? { ...s, items: reordered } : s
-            ),
-          }
-        : prev
-    );
-    try {
-      await briefingProService.reorderItems(
-        briefingId,
-        reordered.map((item, index) => ({ id: item.id, section_id: sectionId, position: index }))
-      );
-    } catch {
-      toast.error("Erro ao reordenar os itens");
-      refresh();
-    }
+  /** Move um item para outra seção, na posição `toIndex` (padrão: no fim). */
+  async function moveItemToSection(itemId: string, toSectionId: string, toIndex?: number) {
+    const sections = sectionsRef.current;
+    const from = sectionOfItem(sections, itemId);
+    const to = sections.find((s) => s.id === toSectionId);
+    if (!from || !to || from.id === to.id) return;
+    const next = relocateItem(sections, itemId, to.id, toIndex ?? to.items.length);
+    setSections(next);
+    toast.success(`Item movido para "${to.title}"`);
+    await persistItemPositions(next, [from.id, to.id]);
   }
 
-  async function handleItemDragEnd(sectionId: string, event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id || !detail) return;
-    const section = detail.sections.find((s) => s.id === sectionId);
-    if (!section) return;
-    const oldIndex = section.items.findIndex((i) => i.id === active.id);
-    const newIndex = section.items.findIndex((i) => i.id === over.id);
-    if (oldIndex < 0 || newIndex < 0) return;
-    await applyItemOrder(sectionId, arrayMove(section.items, oldIndex, newIndex));
-  }
-
-  /** Move um item uma posição para cima (-1) ou para baixo (+1) — alternativa ao arrastar. */
+  /**
+   * Move um item uma posição para cima (-1) ou para baixo (+1) — alternativa
+   * ao arrastar. Na ponta da seção, passa para o fim/início da seção vizinha.
+   */
   async function moveItem(sectionId: string, itemId: string, direction: -1 | 1) {
-    if (!detail) return;
-    const section = detail.sections.find((s) => s.id === sectionId);
+    const sections = sectionsRef.current;
+    const sectionIndex = sections.findIndex((s) => s.id === sectionId);
+    const section = sections[sectionIndex];
     if (!section) return;
     const index = section.items.findIndex((i) => i.id === itemId);
+    if (index < 0) return;
     const target = index + direction;
-    if (index < 0 || target < 0 || target >= section.items.length) return;
-    await applyItemOrder(sectionId, arrayMove(section.items, index, target));
+    if (target >= 0 && target < section.items.length) {
+      const next = sections.map((s) =>
+        s.id === sectionId ? { ...s, items: arrayMove(s.items, index, target) } : s
+      );
+      setSections(next);
+      await persistItemPositions(next, [sectionId]);
+      return;
+    }
+    const neighbor = sections[sectionIndex + direction];
+    if (!neighbor) return;
+    await moveItemToSection(itemId, neighbor.id, direction === -1 ? neighbor.items.length : 0);
   }
+
+  function handleDragStart({ active }: DragStartEvent) {
+    dragSnapshot.current = sectionsRef.current;
+    const id = String(active.id);
+    if ((active.data.current as DragData | undefined)?.type === "section") {
+      setActiveDrag({ type: "section", id });
+      return;
+    }
+    const from = sectionOfItem(sectionsRef.current, id);
+    if (from) setActiveDrag({ type: "item", id, fromSectionId: from.id });
+  }
+
+  function handleDragOver({ active, over }: DragOverEvent) {
+    if (!over || (active.data.current as DragData | undefined)?.type !== "item") return;
+    const sections = sectionsRef.current;
+    const activeId = String(active.id);
+    const from = sectionOfItem(sections, activeId);
+    const overData = over.data.current as DragData | undefined;
+    const to =
+      overData?.type === "container"
+        ? sections.find((s) => s.id === overData.sectionId)
+        : overData?.type === "item"
+          ? sectionOfItem(sections, String(over.id))
+          : undefined;
+    if (!from || !to || from.id === to.id) return;
+
+    let index = to.items.length;
+    if (overData?.type === "item") {
+      const overIndex = to.items.findIndex((i) => i.id === over.id);
+      const dragged = active.rect.current.translated;
+      const below = dragged ? dragged.top > over.rect.top + over.rect.height / 2 : false;
+      index = overIndex + (below ? 1 : 0);
+    }
+    setSections(relocateItem(sections, activeId, to.id, index));
+  }
+
+  async function handleDragEnd({ active, over }: DragEndEvent) {
+    const drag = activeDrag;
+    setActiveDrag(null);
+    dragSnapshot.current = null;
+    const sections = sectionsRef.current;
+    const activeId = String(active.id);
+
+    if ((active.data.current as DragData | undefined)?.type === "section") {
+      if (!over || active.id === over.id) return;
+      const oldIndex = sections.findIndex((s) => s.id === active.id);
+      const newIndex = sections.findIndex((s) => s.id === over.id);
+      if (oldIndex < 0 || newIndex < 0) return;
+      const reordered = arrayMove(sections, oldIndex, newIndex);
+      setSections(reordered);
+      try {
+        await briefingProService.reorderSections(briefingId, reordered.map((s) => s.id));
+      } catch {
+        toast.error("Erro ao reordenar as seções");
+        refresh();
+      }
+      return;
+    }
+
+    const current = sectionOfItem(sections, activeId);
+    if (!current) return;
+    let next = sections;
+    if (over && over.id !== active.id && (over.data.current as DragData | undefined)?.type === "item") {
+      const oldIndex = current.items.findIndex((i) => i.id === activeId);
+      const newIndex = current.items.findIndex((i) => i.id === over.id);
+      if (oldIndex >= 0 && newIndex >= 0 && oldIndex !== newIndex) {
+        next = sections.map((s) =>
+          s.id === current.id ? { ...s, items: arrayMove(s.items, oldIndex, newIndex) } : s
+        );
+      }
+    }
+    const fromSectionId = drag?.type === "item" ? drag.fromSectionId : current.id;
+    const crossed = fromSectionId !== current.id;
+    if (next === sections && !crossed) return;
+    setSections(next);
+    if (crossed) toast.success(`Item movido para "${current.title}"`);
+    await persistItemPositions(next, crossed ? [fromSectionId, current.id] : [current.id]);
+  }
+
+  function handleDragCancel() {
+    if (dragSnapshot.current) setSections(dragSnapshot.current);
+    dragSnapshot.current = null;
+    setActiveDrag(null);
+  }
+
+  // Seção onde o item arrastado está agora (destaque visual do destino)
+  const dragTargetSectionId =
+    activeDrag?.type === "item" ? sectionOfItem(detail?.sections ?? [], activeDrag.id)?.id : undefined;
 
   async function handleConfirmRead() {
     if (confirmingRead) return;
@@ -709,7 +917,7 @@ export default function BriefingDetailPage() {
               )}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm">
+          <CardContent className="space-y-3 text-sm [&>p]:whitespace-pre-line">
             {briefing.objective && (
               <p><span className="font-medium">Objetivo: </span>{briefing.objective}</p>
             )}
@@ -842,18 +1050,35 @@ export default function BriefingDetailPage() {
 
             <DndContext
               sensors={dndSensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleSectionDragEnd}
+              collisionDetection={briefingCollision}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDragEnd={handleDragEnd}
+              onDragCancel={handleDragCancel}
             >
             <SortableContext
               items={visibleSections.map((s) => s.id)}
               strategy={verticalListSortingStrategy}
             >
             <div className="space-y-4">
-            {visibleSections.map((section) => (
-              <SortableShell key={section.id} id={section.id} disabled={!canEdit || filterActive}>
+            {visibleSections.map((section, sectionIndex) => (
+              <SortableShell
+                key={section.id}
+                id={section.id}
+                data={{ type: "section" }}
+                disabled={!canEdit || filterActive}
+              >
               {(sectionHandle) => (
-              <Card>
+              <SectionDropArea sectionId={section.id} disabled={!canEdit || filterActive}>
+              <Card
+                className={cn(
+                  "transition-shadow",
+                  activeDrag?.type === "item" &&
+                    (dragTargetSectionId === section.id && dragTargetSectionId !== activeDrag.fromSectionId
+                      ? "ring-2 ring-rose-500/60"
+                      : "outline-1 outline-dashed outline-muted-foreground/25")
+                )}
+              >
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-1 min-w-0">
@@ -938,13 +1163,15 @@ export default function BriefingDetailPage() {
                 </CardHeader>
                 <CardContent className="space-y-1">
                   {section.items.length === 0 && (
-                    <p className="text-sm text-muted-foreground py-2">Sem itens nesta seção.</p>
+                    <p
+                      className={cn(
+                        "text-sm text-muted-foreground py-2",
+                        activeDrag?.type === "item" && "rounded-lg border-2 border-dashed text-center py-4"
+                      )}
+                    >
+                      {activeDrag?.type === "item" ? "Solte aqui para mover para esta seção" : "Sem itens nesta seção."}
+                    </p>
                   )}
-                  <DndContext
-                    sensors={dndSensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={(event) => handleItemDragEnd(section.id, event)}
-                  >
                   <SortableContext
                     items={section.items.map((i) => i.id)}
                     strategy={verticalListSortingStrategy}
@@ -953,15 +1180,20 @@ export default function BriefingDetailPage() {
                     const itemLinks = detail.links.filter((l) => l.item_id === item.id);
                     const isDone = item.status === "done" || item.status === "skipped";
                     return (
-                      <SortableShell key={item.id} id={item.id} disabled={!canEdit || filterActive}>
+                      <SortableShell
+                        key={item.id}
+                        id={item.id}
+                        data={{ type: "item", sectionId: section.id }}
+                        disabled={!canEdit || filterActive}
+                      >
                       {(itemHandle) => (
                       <div className="flex items-start gap-1.5 sm:gap-2 rounded-lg px-1 sm:px-2 py-2 hover:bg-muted/50 hover-reveal-parent">
                         {canEdit && !filterActive && (
                           <button
                             {...itemHandle}
                             className="-mt-0.5 -ml-1.5 p-1.5 rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted cursor-grab active:cursor-grabbing touch-none select-none shrink-0"
-                            title="Arrastar para reordenar (ou use as setas ↑↓ nas ações)"
-                            aria-label={`Reordenar item ${item.title}`}
+                            title="Arraste para reordenar ou levar para outra seção"
+                            aria-label={`Mover item ${item.title}`}
                           >
                             <GripVertical className="h-4 w-4" />
                           </button>
@@ -1043,10 +1275,22 @@ export default function BriefingDetailPage() {
                         </div>
                         {canEdit && (
                           <ItemRowActions
-                            canMoveUp={!filterActive && itemIndex > 0}
-                            canMoveDown={!filterActive && itemIndex < section.items.length - 1}
+                            canMoveUp={!filterActive && (itemIndex > 0 || sectionIndex > 0)}
+                            canMoveDown={
+                              !filterActive &&
+                              (itemIndex < section.items.length - 1 ||
+                                sectionIndex < visibleSections.length - 1)
+                            }
                             onMoveUp={() => moveItem(section.id, item.id, -1)}
                             onMoveDown={() => moveItem(section.id, item.id, 1)}
+                            moveTargets={
+                              filterActive
+                                ? []
+                                : detail.sections
+                                    .filter((s) => s.id !== section.id)
+                                    .map((s) => ({ id: s.id, title: s.title }))
+                            }
+                            onMoveTo={(toSectionId) => moveItemToSection(item.id, toSectionId)}
                             onLink={() => setLinkDialog({ itemId: item.id })}
                             onEdit={() => setItemDialog({ sectionId: section.id, item })}
                             onDelete={() =>
@@ -1073,7 +1317,6 @@ export default function BriefingDetailPage() {
                     );
                   })}
                   </SortableContext>
-                  </DndContext>
                   {canEdit && (
                     <Button
                       variant="ghost"
@@ -1087,11 +1330,24 @@ export default function BriefingDetailPage() {
                   )}
                 </CardContent>
               </Card>
+              </SectionDropArea>
               )}
               </SortableShell>
             ))}
             </div>
             </SortableContext>
+            <DragOverlay dropAnimation={null}>
+              {activeDrag && (
+                <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 shadow-lg cursor-grabbing max-w-md">
+                  <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm font-medium truncate">
+                    {activeDrag.type === "section"
+                      ? detail.sections.find((s) => s.id === activeDrag.id)?.title
+                      : allItems.find((i) => i.id === activeDrag.id)?.title}
+                  </span>
+                </div>
+              )}
+            </DragOverlay>
             </DndContext>
 
             {/* Entregáveis */}
@@ -1975,7 +2231,7 @@ function EditInfoDialog({
           </div>
           <div className="space-y-2">
             <Label>Objetivo</Label>
-            <Textarea rows={2} value={form.objective} onChange={(e) => set("objective", e.target.value)} />
+            <Textarea rows={3} className="resize-y" value={form.objective} onChange={(e) => set("objective", e.target.value)} />
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -1989,11 +2245,11 @@ function EditInfoDialog({
           </div>
           <div className="space-y-2">
             <Label>Restrições (o que NÃO pode acontecer)</Label>
-            <Textarea rows={2} value={form.restrictions} onChange={(e) => set("restrictions", e.target.value)} />
+            <Textarea rows={3} className="resize-y" value={form.restrictions} onChange={(e) => set("restrictions", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Observações gerais</Label>
-            <Textarea rows={2} value={form.notes} onChange={(e) => set("notes", e.target.value)} />
+            <Textarea rows={5} className="resize-y" value={form.notes} onChange={(e) => set("notes", e.target.value)} />
           </div>
           {isOwner && (
             <div className="space-y-2">

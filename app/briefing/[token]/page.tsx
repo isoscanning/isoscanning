@@ -187,7 +187,7 @@ export default function PublicBriefingPage() {
               )}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm">
+          <CardContent className="space-y-3 text-sm [&>p]:whitespace-pre-line">
             {briefing.objective && <p><span className="font-medium">Objetivo: </span>{briefing.objective}</p>}
             {briefing.target_audience && <p><span className="font-medium">Público-alvo: </span>{briefing.target_audience}</p>}
             {briefing.tone && <p><span className="font-medium">Tom / estilo: </span>{briefing.tone}</p>}

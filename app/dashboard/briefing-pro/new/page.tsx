@@ -738,7 +738,7 @@ export default function NewBriefingPage() {
                   </p>
                 )}
                 {preview.restrictions && (
-                  <p className="text-red-600 dark:text-red-400">
+                  <p className="text-red-600 dark:text-red-400 whitespace-pre-line">
                     <span className="font-medium">Restrições: </span>
                     {preview.restrictions}
                   </p>

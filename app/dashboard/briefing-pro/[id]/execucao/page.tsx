@@ -416,7 +416,7 @@ export default function ExecutionModePage() {
 
         {briefing.restrictions && (
           <Card className="mb-4 border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-900/10">
-            <CardContent className="py-3 text-sm text-red-700 dark:text-red-400">
+            <CardContent className="py-3 text-sm whitespace-pre-line text-red-700 dark:text-red-400">
               <span className="font-semibold">⚠ Restrições: </span>
               {briefing.restrictions}
             </CardContent>

@@ -1,6 +1,16 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* As classes dark: seguem a classe .dark no <html> (tema forçado escuro),
+   nunca na impressão e nunca dentro de .paper (documentos). */
+@custom-variant dark {
+  @media not print {
+    &:where(.dark, .dark *):not(:where(.paper, .paper *)) {
+      @slot;
+    }
+  }
+}
+
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -64,151 +74,291 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-:root {
-  /* 
-     Base Palette: Professional Slate (Cool Neutrals)
-     Using OKLCH for consistent perceptual lightness.
-  */
+/* ── Paleta "Visor" ──────────────────────────────────────────────────────
+   O site é só escuro, grafite, com um acento azul-claro (#8fb3ff ≈ 400).
+   As famílias de marca antigas (blue, indigo, sky, cyan, violet, purple, pink, fuchsia)
+   viram tons dessa mesma família, para que classes fixas espalhadas pelo
+   app (bg-blue-600, from-indigo-500…) sigam a identidade sem editar página.
+   Ciano puxa para azul-gelo, violeta/roxo para lavanda e rosa/fúcsia para orquídea: continuam
+   distinguíveis onde marcam categoria. Cinzas azulados viram grafite neutro.
+   Verde, vermelho (red/rose), âmbar, laranja etc. ficam: são cores de status. */
+@theme {
+  /* blue */
+  --color-blue-50: oklch(0.975 0.012 265);
+  --color-blue-100: oklch(0.95 0.025 265);
+  --color-blue-200: oklch(0.905 0.050 265);
+  --color-blue-300: oklch(0.845 0.075 265);
+  --color-blue-400: oklch(0.78 0.100 265);
+  --color-blue-500: oklch(0.69 0.120 265);
+  --color-blue-600: oklch(0.55 0.130 265);
+  --color-blue-700: oklch(0.47 0.120 265);
+  --color-blue-800: oklch(0.39 0.100 265);
+  --color-blue-900: oklch(0.31 0.080 265);
+  --color-blue-950: oklch(0.23 0.055 265);
+  /* indigo */
+  --color-indigo-50: oklch(0.975 0.012 265);
+  --color-indigo-100: oklch(0.95 0.025 265);
+  --color-indigo-200: oklch(0.905 0.050 265);
+  --color-indigo-300: oklch(0.845 0.075 265);
+  --color-indigo-400: oklch(0.78 0.100 265);
+  --color-indigo-500: oklch(0.69 0.120 265);
+  --color-indigo-600: oklch(0.55 0.130 265);
+  --color-indigo-700: oklch(0.47 0.120 265);
+  --color-indigo-800: oklch(0.39 0.100 265);
+  --color-indigo-900: oklch(0.31 0.080 265);
+  --color-indigo-950: oklch(0.23 0.055 265);
+  /* sky */
+  --color-sky-50: oklch(0.975 0.012 265);
+  --color-sky-100: oklch(0.95 0.025 265);
+  --color-sky-200: oklch(0.905 0.050 265);
+  --color-sky-300: oklch(0.845 0.075 265);
+  --color-sky-400: oklch(0.78 0.100 265);
+  --color-sky-500: oklch(0.69 0.120 265);
+  --color-sky-600: oklch(0.55 0.130 265);
+  --color-sky-700: oklch(0.47 0.120 265);
+  --color-sky-800: oklch(0.39 0.100 265);
+  --color-sky-900: oklch(0.31 0.080 265);
+  --color-sky-950: oklch(0.23 0.055 265);
+  /* cyan */
+  --color-cyan-50: oklch(0.975 0.011 228);
+  --color-cyan-100: oklch(0.95 0.023 228);
+  --color-cyan-200: oklch(0.905 0.045 228);
+  --color-cyan-300: oklch(0.845 0.068 228);
+  --color-cyan-400: oklch(0.78 0.090 228);
+  --color-cyan-500: oklch(0.69 0.108 228);
+  --color-cyan-600: oklch(0.55 0.117 228);
+  --color-cyan-700: oklch(0.47 0.108 228);
+  --color-cyan-800: oklch(0.39 0.090 228);
+  --color-cyan-900: oklch(0.31 0.072 228);
+  --color-cyan-950: oklch(0.23 0.050 228);
+  /* violet */
+  --color-violet-50: oklch(0.975 0.012 292);
+  --color-violet-100: oklch(0.95 0.025 292);
+  --color-violet-200: oklch(0.905 0.050 292);
+  --color-violet-300: oklch(0.845 0.075 292);
+  --color-violet-400: oklch(0.78 0.100 292);
+  --color-violet-500: oklch(0.69 0.120 292);
+  --color-violet-600: oklch(0.55 0.130 292);
+  --color-violet-700: oklch(0.47 0.120 292);
+  --color-violet-800: oklch(0.39 0.100 292);
+  --color-violet-900: oklch(0.31 0.080 292);
+  --color-violet-950: oklch(0.23 0.055 292);
+  /* purple */
+  --color-purple-50: oklch(0.975 0.012 292);
+  --color-purple-100: oklch(0.95 0.025 292);
+  --color-purple-200: oklch(0.905 0.050 292);
+  --color-purple-300: oklch(0.845 0.075 292);
+  --color-purple-400: oklch(0.78 0.100 292);
+  --color-purple-500: oklch(0.69 0.120 292);
+  --color-purple-600: oklch(0.55 0.130 292);
+  --color-purple-700: oklch(0.47 0.120 292);
+  --color-purple-800: oklch(0.39 0.100 292);
+  --color-purple-900: oklch(0.31 0.080 292);
+  --color-purple-950: oklch(0.23 0.055 292);
+  /* pink → orquídea */
+  --color-pink-50: oklch(0.975 0.011 318);
+  --color-pink-100: oklch(0.95 0.023 318);
+  --color-pink-200: oklch(0.905 0.045 318);
+  --color-pink-300: oklch(0.845 0.068 318);
+  --color-pink-400: oklch(0.78 0.090 318);
+  --color-pink-500: oklch(0.69 0.108 318);
+  --color-pink-600: oklch(0.55 0.117 318);
+  --color-pink-700: oklch(0.47 0.108 318);
+  --color-pink-800: oklch(0.39 0.090 318);
+  --color-pink-900: oklch(0.31 0.072 318);
+  --color-pink-950: oklch(0.23 0.050 318);
+  /* fuchsia → orquídea */
+  --color-fuchsia-50: oklch(0.975 0.011 318);
+  --color-fuchsia-100: oklch(0.95 0.023 318);
+  --color-fuchsia-200: oklch(0.905 0.045 318);
+  --color-fuchsia-300: oklch(0.845 0.068 318);
+  --color-fuchsia-400: oklch(0.78 0.090 318);
+  --color-fuchsia-500: oklch(0.69 0.108 318);
+  --color-fuchsia-600: oklch(0.55 0.117 318);
+  --color-fuchsia-700: oklch(0.47 0.108 318);
+  --color-fuchsia-800: oklch(0.39 0.090 318);
+  --color-fuchsia-900: oklch(0.31 0.072 318);
+  --color-fuchsia-950: oklch(0.23 0.050 318);
+  /* slate */
+  --color-slate-50: oklch(0.985 0.002 265);
+  --color-slate-100: oklch(0.965 0.003 265);
+  --color-slate-200: oklch(0.92 0.004 265);
+  --color-slate-300: oklch(0.87 0.005 265);
+  --color-slate-400: oklch(0.71 0.007 265);
+  --color-slate-500: oklch(0.555 0.008 265);
+  --color-slate-600: oklch(0.445 0.008 265);
+  --color-slate-700: oklch(0.37 0.007 265);
+  --color-slate-800: oklch(0.27 0.006 265);
+  --color-slate-900: oklch(0.205 0.005 265);
+  --color-slate-950: oklch(0.15 0.004 265);
+  /* gray */
+  --color-gray-50: oklch(0.985 0.002 265);
+  --color-gray-100: oklch(0.965 0.003 265);
+  --color-gray-200: oklch(0.92 0.004 265);
+  --color-gray-300: oklch(0.87 0.005 265);
+  --color-gray-400: oklch(0.71 0.007 265);
+  --color-gray-500: oklch(0.555 0.008 265);
+  --color-gray-600: oklch(0.445 0.008 265);
+  --color-gray-700: oklch(0.37 0.007 265);
+  --color-gray-800: oklch(0.27 0.006 265);
+  --color-gray-900: oklch(0.205 0.005 265);
+  --color-gray-950: oklch(0.15 0.004 265);
+  /* zinc */
+  --color-zinc-50: oklch(0.985 0.002 265);
+  --color-zinc-100: oklch(0.965 0.003 265);
+  --color-zinc-200: oklch(0.92 0.004 265);
+  --color-zinc-300: oklch(0.87 0.005 265);
+  --color-zinc-400: oklch(0.71 0.007 265);
+  --color-zinc-500: oklch(0.555 0.008 265);
+  --color-zinc-600: oklch(0.445 0.008 265);
+  --color-zinc-700: oklch(0.37 0.007 265);
+  --color-zinc-800: oklch(0.27 0.006 265);
+  --color-zinc-900: oklch(0.205 0.005 265);
+  --color-zinc-950: oklch(0.15 0.004 265);
+  /* neutral */
+  --color-neutral-50: oklch(0.985 0.002 265);
+  --color-neutral-100: oklch(0.965 0.003 265);
+  --color-neutral-200: oklch(0.92 0.004 265);
+  --color-neutral-300: oklch(0.87 0.005 265);
+  --color-neutral-400: oklch(0.71 0.007 265);
+  --color-neutral-500: oklch(0.555 0.008 265);
+  --color-neutral-600: oklch(0.445 0.008 265);
+  --color-neutral-700: oklch(0.37 0.007 265);
+  --color-neutral-800: oklch(0.27 0.006 265);
+  --color-neutral-900: oklch(0.205 0.005 265);
+  --color-neutral-950: oklch(0.15 0.004 265);
+  /* stone */
+  --color-stone-50: oklch(0.985 0.002 265);
+  --color-stone-100: oklch(0.965 0.003 265);
+  --color-stone-200: oklch(0.92 0.004 265);
+  --color-stone-300: oklch(0.87 0.005 265);
+  --color-stone-400: oklch(0.71 0.007 265);
+  --color-stone-500: oklch(0.555 0.008 265);
+  --color-stone-600: oklch(0.445 0.008 265);
+  --color-stone-700: oklch(0.37 0.007 265);
+  --color-stone-800: oklch(0.27 0.006 265);
+  --color-stone-900: oklch(0.205 0.005 265);
+  --color-stone-950: oklch(0.15 0.004 265);
+}
 
-  /* Backgrounds: Clean, slight cool tint, not pure white for less eye strain */
-  --background: oklch(0.985 0.005 240);
-  --foreground: oklch(0.14 0.02 240);
-  /* Deep Slate */
+/* Tokens Visor (ver components/visor/README.md). */
+:root,
+.dark {
+  color-scheme: dark;
 
-  /* Surface: Distinct from background */
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.14 0.02 240);
+  --background: #08090b;
+  --foreground: #f3f4f6;
+  --card: #0e0f12;
+  --card-foreground: #f3f4f6;
+  --popover: #111215;
+  --popover-foreground: #f3f4f6;
 
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.14 0.02 240);
+  /* Acento: links, ícones, estados ativos. O botão padrão é branco. */
+  --primary: #8fb3ff;
+  --primary-foreground: #08090b;
 
-  /* Primary: Professional Blue */
-  --primary: oklch(0.55 0.20 260);
-  --primary-foreground: oklch(0.985 0 0);
+  --secondary: #17181c;
+  --secondary-foreground: #f3f4f6;
+  --muted: #15161a;
+  --muted-foreground: #8e9097;
+  --accent: #1a1b20;
+  --accent-foreground: #f3f4f6;
 
-  /* Secondary: Subtle Slate */
-  --secondary: oklch(0.95 0.01 240);
-  --secondary-foreground: oklch(0.20 0.03 240);
-
-  /* Muted: For subtext and disabled states */
-  --muted: oklch(0.96 0.01 240);
-  --muted-foreground: oklch(0.55 0.03 240);
-
-  /* Accent: For hover states and highlights */
-  --accent: oklch(0.94 0.02 240);
-  --accent-foreground: oklch(0.20 0.03 240);
-
-  /* Semantic Colors */
-  --destructive: oklch(0.57 0.20 25);
-  /* Red */
+  --destructive: oklch(0.6 0.2 25);
   --destructive-foreground: oklch(0.985 0 0);
+  --success: oklch(0.68 0.15 155);
+  --success-foreground: #08090b;
+  --warning: oklch(0.78 0.14 80);
+  --warning-foreground: #08090b;
+  --info: #8fb3ff;
+  --info-foreground: #08090b;
 
-  --success: oklch(0.65 0.18 145);
-  /* Green */
-  --success-foreground: oklch(0.985 0 0);
+  --border: #1f2024;
+  --input: #26272c;
+  --ring: #8fb3ff;
 
-  --warning: oklch(0.75 0.15 85);
-  /* Amber */
-  --warning-foreground: oklch(0.14 0.02 240);
-
-  --info: oklch(0.60 0.15 240);
-  /* Blue */
-  --info-foreground: oklch(0.985 0 0);
-
-  /* Borders & Inputs */
-  --border: oklch(0.88 0.01 240);
-  --input: oklch(0.88 0.01 240);
-  --ring: oklch(0.55 0.20 260);
-  /* Match Primary */
-
-  /* Charts: Harmonious Palette */
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  --chart-1: #8fb3ff;
+  --chart-2: oklch(0.75 0.12 175);
+  --chart-3: oklch(0.8 0.13 80);
+  --chart-4: oklch(0.72 0.1 300);
+  --chart-5: oklch(0.7 0.15 20);
 
   --radius: 0.625rem;
 
-  /* Sidebar */
-  --sidebar: oklch(0.985 0.005 240);
-  --sidebar-foreground: oklch(0.14 0.03 240);
-  --sidebar-primary: oklch(0.55 0.20 260);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.95 0.01 240);
-  --sidebar-accent-foreground: oklch(0.20 0.03 240);
-  --sidebar-border: oklch(0.88 0.02 240);
-  --sidebar-ring: oklch(0.55 0.20 260);
+  --sidebar: #0b0c0e;
+  --sidebar-foreground: #f3f4f6;
+  --sidebar-primary: #8fb3ff;
+  --sidebar-primary-foreground: #08090b;
+  --sidebar-accent: #17181c;
+  --sidebar-accent-foreground: #f3f4f6;
+  --sidebar-border: #1f2024;
+  --sidebar-ring: #8fb3ff;
 }
 
-.dark {
-  /* 
-     Dark Mode: Deep Navy/Slate (Not Pitch Black)
-     Provides better depth perception and reduces eye fatigue.
-  */
-
-  /* Background: Deep Rich Navy */
-  --background: oklch(0.15 0.04 260);
-  --foreground: oklch(0.98 0.01 240);
-
-  /* Surface: Slightly lighter for hierarchy */
-  --card: oklch(0.18 0.04 260);
-  --card-foreground: oklch(0.98 0.01 240);
-
-  --popover: oklch(0.18 0.04 260);
-  --popover-foreground: oklch(0.98 0.01 240);
-
-  /* Primary: Slightly lighter blue for dark mode visibility */
-  --primary: oklch(0.62 0.18 260);
+/* Documentos (contrato, briefing, relatório para imprimir/PDF) continuam
+   em papel branco: envolver a raiz da tela com className="paper". */
+.paper {
+  color-scheme: light;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.16 0.004 265);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.16 0.004 265);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.16 0.004 265);
+  --primary: oklch(0.47 0.12 265);
   --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.965 0.003 265);
+  --secondary-foreground: oklch(0.2 0.005 265);
+  --muted: oklch(0.965 0.003 265);
+  --muted-foreground: oklch(0.45 0.008 265);
+  --accent: oklch(0.95 0.004 265);
+  --accent-foreground: oklch(0.2 0.005 265);
+  --destructive: oklch(0.55 0.2 25);
+  --destructive-foreground: oklch(0.985 0 0);
+  --success: oklch(0.55 0.15 150);
+  --success-foreground: oklch(0.985 0 0);
+  --warning: oklch(0.7 0.15 75);
+  --warning-foreground: oklch(0.16 0.004 265);
+  --info: oklch(0.47 0.12 265);
+  --info-foreground: oklch(0.985 0 0);
+  --border: oklch(0.9 0.004 265);
+  --input: oklch(0.88 0.004 265);
+  --ring: oklch(0.47 0.12 265);
+  background-color: var(--background);
+  color: var(--foreground);
+}
 
-  /* Secondary: Deep muted slate */
-  --secondary: oklch(0.25 0.04 260);
-  --secondary-foreground: oklch(0.98 0.01 240);
-
-  /* Muted */
-  --muted: oklch(0.22 0.03 260);
-  --muted-foreground: oklch(0.70 0.03 240);
-
-  /* Accent */
-  --accent: oklch(0.25 0.04 260);
-  --accent-foreground: oklch(0.98 0.01 240);
-
-  /* Semantic Colors - Adjusted for Dark Mode */
-  --destructive: oklch(0.45 0.15 25);
-  --destructive-foreground: oklch(0.98 0 0);
-
-  --success: oklch(0.55 0.15 145);
-  --success-foreground: oklch(0.98 0 0);
-
-  --warning: oklch(0.65 0.15 85);
-  --warning-foreground: oklch(0.15 0.04 260);
-
-  --info: oklch(0.55 0.15 240);
-  --info-foreground: oklch(0.98 0 0);
-
-  /* Borders & Inputs */
-  --border: oklch(0.28 0.04 260);
-  --input: oklch(0.28 0.04 260);
-  --ring: oklch(0.50 0.15 260);
-  /* More subtle ring */
-
-  /* Charts */
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-
-  /* Sidebar */
-  --sidebar: oklch(0.18 0.04 260);
-  --sidebar-foreground: oklch(0.98 0.01 240);
-  --sidebar-primary: oklch(0.62 0.18 260);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.25 0.04 260);
-  --sidebar-accent-foreground: oklch(0.98 0.01 240);
-  --sidebar-border: oklch(0.28 0.04 260);
-  --sidebar-ring: oklch(0.50 0.15 260);
+/* Qualquer tela impressa sai em papel claro, mesmo sem .paper. */
+@media print {
+  :root,
+  .dark {
+    color-scheme: light;
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.16 0.004 265);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.16 0.004 265);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.16 0.004 265);
+    --primary: oklch(0.47 0.12 265);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.965 0.003 265);
+    --secondary-foreground: oklch(0.2 0.005 265);
+    --muted: oklch(0.965 0.003 265);
+    --muted-foreground: oklch(0.45 0.008 265);
+    --accent: oklch(0.95 0.004 265);
+    --accent-foreground: oklch(0.2 0.005 265);
+    --destructive: oklch(0.55 0.2 25);
+    --destructive-foreground: oklch(0.985 0 0);
+    --success: oklch(0.55 0.15 150);
+    --success-foreground: oklch(0.985 0 0);
+    --warning: oklch(0.7 0.15 75);
+    --warning-foreground: oklch(0.16 0.004 265);
+    --info: oklch(0.47 0.12 265);
+    --info-foreground: oklch(0.985 0 0);
+    --border: oklch(0.9 0.004 265);
+    --input: oklch(0.88 0.004 265);
+    --ring: oklch(0.47 0.12 265);
+  }
 }
 
 @layer base {
@@ -220,99 +370,6 @@
     @apply bg-background text-foreground;
     /* Impede zoom por duplo toque em todo o app */
     touch-action: manipulation;
-  }
-}
-/* ── GSAP ────────────────────────────────────────────────────────────
-   Elementos animados pelo GSAP começam invisíveis para não piscarem
-   entre o HTML do servidor e a hidratação. O próprio GSAP os revela.
-   Se o usuário pediu menos movimento, nada é escondido — a animação
-   também não roda (ver components/gsap/hero-scene.tsx). */
-[data-hero-heading],
-[data-hero-item],
-[data-step],
-[data-steps-line] {
-  opacity: 0;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [data-hero-heading],
-  [data-hero-item],
-  [data-step],
-  [data-steps-line] {
-    opacity: 1;
-  }
-}
-
-/* Títulos que acendem no hover. O GSAP anima só a custom property --glow;
-   as sombras são derivadas dela, então uma única tween controla brilho e
-   difusão ao mesmo tempo.
-
-   É text-shadow, e não filter: drop-shadow, por um motivo medido: o filtro
-   obriga o compositor a rasterizar a caixa inteira do título com desfoque a
-   cada quadro, e isso derrubou a página de 58 para 21 FPS. O text-shadow
-   desenha a partir da geometria do glifo e sai bem mais barato — inclusive
-   nos trechos com bg-clip-text, onde o texto é transparente. */
-[data-glow] {
-  --glow: 0;
-  text-shadow:
-    0 0 calc(var(--glow) * 18px) rgb(99 102 241 / calc(var(--glow) * 0.55)),
-    0 0 calc(var(--glow) * 6px) rgb(56 189 248 / calc(var(--glow) * 0.4));
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [data-glow] {
-    text-shadow: none;
-  }
-}
-
-/* Título digitado. Os caracteres já ocupam o espaço final desde o começo —
-   ficam apenas invisíveis — então nada reflui enquanto o texto é escrito.
-   Antes do SplitText rodar o título fica oculto, senão ele apareceria
-   inteiro por um quadro e depois seria apagado para ser digitado. */
-[data-typed]:not(.typed-ready):not(.typed-done) {
-  visibility: hidden;
-}
-
-[data-typed] .typed-char {
-  visibility: hidden;
-  position: relative;
-}
-
-[data-typed] .typed-char.is-on {
-  visibility: visible;
-}
-
-/* O cursor é um pseudo-elemento no caractere recém-escrito, então ele
-   acompanha a digitação sem precisar de nenhum nó extra no DOM. */
-[data-typed] .typed-char.is-caret::after {
-  content: "";
-  position: absolute;
-  right: -0.09em;
-  top: 0.1em;
-  bottom: 0.12em;
-  width: 0.055em;
-  background: currentColor;
-  animation: typed-caret-blink 0.9s steps(1, end) infinite;
-}
-
-@keyframes typed-caret-blink {
-  0%,
-  50% {
-    opacity: 1;
-  }
-  50.01%,
-  100% {
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [data-typed] .typed-char {
-    visibility: visible;
-  }
-
-  [data-typed] .typed-char.is-caret::after {
-    display: none;
   }
 }
 

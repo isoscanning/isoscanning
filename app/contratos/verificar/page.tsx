@@ -171,7 +171,7 @@ function VerificarInner() {
             </span>
           </p>
           {error && (
-            <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 flex items-center gap-2">
+            <div className="rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm px-4 py-3 flex items-center gap-2">
               <AlertCircle className="h-4 w-4 flex-shrink-0" /> {error}
             </div>
           )}

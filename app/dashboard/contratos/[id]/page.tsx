@@ -443,7 +443,7 @@ function ContratoDetailInner() {
                 )}
                 {contract.signedPdfUrl && (
                   <a href={contract.signedPdfUrl} target="_blank" rel="noopener noreferrer">
-                    <Button variant="outline" size="sm" className="gap-2 text-green-600 border-green-300 hover:bg-green-50">
+                    <Button variant="outline" size="sm" className="gap-2 text-green-400 border-green-500/30 hover:bg-green-500/10">
                       <Download className="h-3.5 w-3.5" /> PDF Assinado
                     </Button>
                   </a>
@@ -452,7 +452,7 @@ function ContratoDetailInner() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-slate-600 border-slate-300 hover:bg-slate-50 gap-2"
+                    className="text-muted-foreground border-border hover:bg-muted gap-2"
                     onClick={() => setShowTerminate(true)}
                   >
                     <FileX2 className="h-3.5 w-3.5" /> Distrato
@@ -462,7 +462,7 @@ function ContratoDetailInner() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-red-500 border-red-200 hover:bg-red-50 gap-2"
+                    className="text-red-500 border-red-500/30 hover:bg-red-500/10 gap-2"
                     onClick={() => setShowCancelConfirm(true)}
                   >
                     <Trash2 className="h-3.5 w-3.5" /> Cancelar

@@ -42,7 +42,7 @@ export function ParticleBackground() {
         const isDark = resolvedTheme === "dark";
         // Brighter colors for dark mode, darker/richer for light mode
         const colors = isDark
-            ? ["#60a5fa", "#818cf8", "#a78bfa", "#f472b6"] // Lighter Blue, Indigo, Violet, Pink
+            ? ["#8fb3ff", "#8fb3ff", "#c9d6ff", "#f3f4f6"] // Visor: acento + branco
             : ["#3b82f6", "#6366f1", "#8b5cf6", "#ec4899"];
 
         const initParticles = () => {

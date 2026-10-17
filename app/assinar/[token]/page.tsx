@@ -280,7 +280,7 @@ export default function AssinarContratoPage() {
     return (
       <SigningLayout whiteLabel={whiteLabel}>
         <div className="text-center space-y-5 py-12">
-          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+          <div className="w-16 h-16 rounded-full bg-red-500/15 flex items-center justify-center mx-auto">
             <AlertCircle className="h-8 w-8 text-red-500" />
           </div>
           <h1 className="text-2xl font-bold text-red-700">Link inválido</h1>
@@ -294,7 +294,7 @@ export default function AssinarContratoPage() {
     return (
       <SigningLayout whiteLabel={whiteLabel}>
         <div className="text-center space-y-5 py-12">
-          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto">
             <PenLine className="h-8 w-8 text-gray-500" />
           </div>
           <h1 className="text-2xl font-bold">Contrato ainda em rascunho</h1>
@@ -310,7 +310,7 @@ export default function AssinarContratoPage() {
     return (
       <SigningLayout whiteLabel={whiteLabel}>
         <div className="text-center space-y-5 py-12">
-          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto">
             <XCircle className="h-8 w-8 text-gray-500" />
           </div>
           <h1 className="text-2xl font-bold">Contrato cancelado</h1>
@@ -328,7 +328,7 @@ export default function AssinarContratoPage() {
     return (
       <SigningLayout whiteLabel={whiteLabel}>
         <div className="text-center space-y-5 py-12">
-          <div className="w-16 h-16 rounded-full bg-orange-100 flex items-center justify-center mx-auto">
+          <div className="w-16 h-16 rounded-full bg-orange-500/15 flex items-center justify-center mx-auto">
             <Clock className="h-8 w-8 text-orange-500" />
           </div>
           <h1 className="text-2xl font-bold">Prazo expirado</h1>
@@ -345,7 +345,7 @@ export default function AssinarContratoPage() {
     return (
       <SigningLayout whiteLabel={whiteLabel}>
         <div className="text-center space-y-5 py-12">
-          <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center mx-auto">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto">
             <FileX2 className="h-8 w-8 text-slate-600" />
           </div>
           <h1 className="text-2xl font-bold">Contrato encerrado (distrato)</h1>
@@ -360,7 +360,7 @@ export default function AssinarContratoPage() {
       <SigningLayout whiteLabel={whiteLabel}>
         <div className="space-y-6">
           <div className="no-print text-center space-y-5 py-8">
-            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+            <div className="w-16 h-16 rounded-full bg-green-500/15 flex items-center justify-center mx-auto">
               <CheckCircle2 className="h-8 w-8 text-green-500" />
             </div>
             <h1 className="text-2xl font-bold text-green-700">Contrato totalmente assinado</h1>
@@ -392,7 +392,7 @@ export default function AssinarContratoPage() {
       <SigningLayout whiteLabel={whiteLabel}>
         <div className="space-y-6">
           <div className="no-print text-center space-y-5 py-8">
-            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+            <div className="w-16 h-16 rounded-full bg-green-500/15 flex items-center justify-center mx-auto">
               <CheckCircle2 className="h-8 w-8 text-green-500" />
             </div>
             <h1 className="text-2xl font-bold text-green-700">Você já assinou!</h1>
@@ -418,7 +418,7 @@ export default function AssinarContratoPage() {
     return (
       <SigningLayout whiteLabel={whiteLabel}>
         <div className="text-center space-y-5 py-12">
-          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+          <div className="w-16 h-16 rounded-full bg-red-500/15 flex items-center justify-center mx-auto">
             <XCircle className="h-8 w-8 text-red-500" />
           </div>
           <h1 className="text-2xl font-bold">Assinatura recusada</h1>
@@ -439,7 +439,7 @@ export default function AssinarContratoPage() {
     return (
       <SigningLayout whiteLabel={whiteLabel}>
         <div className="text-center space-y-5 py-12">
-          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+          <div className="w-16 h-16 rounded-full bg-red-500/15 flex items-center justify-center mx-auto">
             <XCircle className="h-8 w-8 text-red-500" />
           </div>
           <h1 className="text-2xl font-bold">Contrato recusado</h1>
@@ -462,7 +462,7 @@ export default function AssinarContratoPage() {
       <SigningLayout whiteLabel={whiteLabel}>
         <div className="space-y-6">
           <div className="no-print text-center space-y-6 py-8">
-            <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+            <div className="w-20 h-20 rounded-full bg-green-500/15 flex items-center justify-center mx-auto">
               <CheckCircle2 className="h-10 w-10 text-green-500" />
             </div>
             <div>
@@ -708,7 +708,7 @@ export default function AssinarContratoPage() {
               </label>
 
               {error && (
-                <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 flex items-center gap-2">
+                <div className="rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm px-4 py-3 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 flex-shrink-0" />
                   {error}
                 </div>
@@ -727,7 +727,7 @@ export default function AssinarContratoPage() {
                   type="button"
                   variant="outline"
                   onClick={() => { setShowRejectForm(true); setError(""); }}
-                  className="text-red-500 border-red-200 hover:bg-red-50 px-4 gap-1.5"
+                  className="text-red-500 border-red-500/30 hover:bg-red-500/10 px-4 gap-1.5"
                   title="Recusar assinatura"
                 >
                   <XCircle className="h-4 w-4" /> Recusar

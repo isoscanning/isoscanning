@@ -2,7 +2,7 @@ import { FileText, Plus, DollarSign, Calendar, AlertCircle, Edit2, Trash2 } from
 
 export function FinanceiroMockup() {
   return (
-    <div className="w-full h-full bg-[#0a0f1c] text-white p-4 font-sans overflow-hidden rounded-b-xl flex flex-col">
+    <div className="w-full h-full bg-[#0b0c0e] text-white p-4 font-sans overflow-hidden rounded-b-xl flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div>
@@ -22,7 +22,7 @@ export function FinanceiroMockup() {
       {/* Regime */}
       <div className="flex items-center gap-3 mb-3 shrink-0">
         <span className="text-xs text-slate-400">Regime Tributário:</span>
-        <div className="flex bg-[#121827] rounded-full p-0.5 border border-[#1e293b]">
+        <div className="flex bg-[#131418] rounded-full p-0.5 border border-[#1f2024]">
           <button className="bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full">MEI</button>
           <button className="text-slate-400 hover:text-white text-xs font-medium px-3 py-1 rounded-full transition-colors">Simples Nacional</button>
         </div>
@@ -63,7 +63,7 @@ export function FinanceiroMockup() {
           { title: "Faturamento Total", value: "R$ 12.350,00", icon: Calendar, color: "text-blue-500" },
           { title: "NFs Pendentes", value: "2", icon: AlertCircle, color: "text-red-500" },
         ].map((card, i) => (
-          <div key={i} className="bg-[#121827] border border-[#1e293b] rounded-xl p-2.5">
+          <div key={i} className="bg-[#131418] border border-[#1f2024] rounded-xl p-2.5">
             <div className="flex justify-between items-start mb-1">
               <span className="text-[10px] xl:text-xs font-semibold text-white/90 truncate mr-1">{card.title}</span>
               <card.icon className={`w-3.5 h-3.5 shrink-0 ${card.color}`} />
@@ -74,17 +74,17 @@ export function FinanceiroMockup() {
       </div>
 
       {/* Table Section */}
-      <div className="bg-[#121827] border border-[#1e293b] rounded-xl overflow-hidden flex flex-col min-h-0">
-        <div className="p-3 sm:p-4 flex justify-between items-center border-b border-[#1e293b] shrink-0">
+      <div className="bg-[#131418] border border-[#1f2024] rounded-xl overflow-hidden flex flex-col min-h-0">
+        <div className="p-3 sm:p-4 flex justify-between items-center border-b border-[#1f2024] shrink-0">
           <div>
             <h2 className="font-bold">Lançamentos</h2>
             <p className="text-xs text-slate-400">Listagem completa de faturamentos e notas fiscais para o período.</p>
           </div>
           <div className="flex gap-2">
-            <select className="bg-[#0a0f1c] border border-slate-700 rounded px-3 py-1.5 text-sm text-white outline-none">
+            <select className="bg-[#0b0c0e] border border-slate-700 rounded px-3 py-1.5 text-sm text-white outline-none">
               <option>Junho</option>
             </select>
-            <select className="bg-[#0a0f1c] border border-slate-700 rounded px-3 py-1.5 text-sm text-white outline-none">
+            <select className="bg-[#0b0c0e] border border-slate-700 rounded px-3 py-1.5 text-sm text-white outline-none">
               <option>2026</option>
             </select>
           </div>
@@ -92,7 +92,7 @@ export function FinanceiroMockup() {
         
         <div className="w-full flex-1 overflow-y-auto custom-scrollbar pr-1">
           <table className="w-full text-xs sm:text-sm text-left">
-            <thead className="text-[10px] sm:text-xs text-slate-400 uppercase bg-[#0a0f1c]/50">
+            <thead className="text-[10px] sm:text-xs text-slate-400 uppercase bg-[#0b0c0e]/50">
               <tr>
                 <th className="px-3 sm:px-4 py-2 font-semibold">Data</th>
                 <th className="px-3 sm:px-4 py-2 font-semibold">Descrição</th>
@@ -109,7 +109,7 @@ export function FinanceiroMockup() {
                 { date: "26/06/2026", desc: "Evento Corporativo", origem: "Externo", status: "Pendente", nfe: "Pendente", nfeColor: "text-red-500 bg-red-500/10", val: "R$ 7.350,00" },
                 { date: "10/06/2026", desc: "Ensaio Fotográfico", origem: "Externo", status: "Pendente", nfe: "Não exige", nfeColor: "text-slate-400 bg-slate-800", val: "R$ 3.000,00" },
               ].map((row, i) => (
-                <tr key={i} className="border-b border-[#1e293b] hover:bg-[#1a2333] transition-colors">
+                <tr key={i} className="border-b border-[#1f2024] hover:bg-[#18191d] transition-colors">
                   <td className="px-3 sm:px-4 py-2 sm:py-3 flex items-center gap-2 text-slate-300">
                     <Calendar className="w-3.5 h-3.5 text-slate-500" /> {row.date}
                   </td>

@@ -61,7 +61,7 @@ export function ContractDocument({
   return (
     <article
       aria-label={title}
-      className={`contract-document bg-white text-black rounded-xl border shadow-sm print:shadow-none print:border-0 print:rounded-none ${className ?? ""}`}
+      className={`contract-document paper bg-white text-black rounded-xl border shadow-sm print:shadow-none print:border-0 print:rounded-none ${className ?? ""}`}
     >
       <div className="px-8 py-10 print:px-0 print:py-0">
         <ContractHtml html={body} className="text-black [&_*]:text-black [&_a]:text-blue-700" />

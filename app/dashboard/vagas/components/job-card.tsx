@@ -64,7 +64,7 @@ const STRIP_COLOR: Record<string, string> = {
 const BADGE_CLASS: Record<string, string> = {
     open: "bg-green-600 hover:bg-green-700 text-white",
     paused: "",
-    closed: "bg-gray-200 text-gray-700",
+    closed: "bg-muted text-muted-foreground",
     expired: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
 };
 

@@ -2,9 +2,9 @@ import { Calculator, Plus, Package, MonitorSmartphone, Server, TrendingDown, Dol
 
 export function CalculadoraMockup() {
   return (
-    <div className="w-full h-full bg-[#0a0f1c] text-white p-4 font-sans overflow-hidden rounded-b-xl flex flex-col">
+    <div className="w-full h-full bg-[#0b0c0e] text-white p-4 font-sans overflow-hidden rounded-b-xl flex flex-col">
       {/* Header Banner */}
-      <div className="bg-[#121827] border border-[#1e293b] rounded-xl p-3 flex items-center justify-between mb-3 shrink-0">
+      <div className="bg-[#131418] border border-[#1f2024] rounded-xl p-3 flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-orange-500/10 rounded-lg flex items-center justify-center border border-orange-500/20 shrink-0">
             <Calculator className="w-4 h-4 text-orange-500" />
@@ -29,7 +29,7 @@ export function CalculadoraMockup() {
           { title: "Infraestrutura / Mês", value: "R$ 345,00", sub: "recorrente por mês", icon: Server, iconColor: "text-pink-500", valueColor: "text-pink-500" },
           { title: "Investimento Total", value: "R$ 56.150,00", sub: "em equipamentos", icon: DollarSign, iconColor: "text-green-500" },
         ].map((card, i) => (
-          <div key={i} className="bg-[#121827] border border-[#1e293b] rounded-lg p-2 flex flex-col justify-between h-20">
+          <div key={i} className="bg-[#131418] border border-[#1f2024] rounded-lg p-2 flex flex-col justify-between h-20">
             <div className="flex justify-between items-start">
               <span className="text-[10px] xl:text-xs font-semibold text-white/90 truncate mr-1">{card.title}</span>
               <card.icon className={`w-3.5 h-3.5 shrink-0 ${card.iconColor}`} />
@@ -49,7 +49,7 @@ export function CalculadoraMockup() {
           { title: "Softwares", sub: "3 itens cadastrados", rightLabel: "Total/mês", rightValue: "R$ 294,00", icon: MonitorSmartphone, color: "text-purple-500", bg: "bg-purple-500/10" },
           { title: "Infraestrutura", sub: "3 itens cadastrados", rightLabel: "Total/mês", rightValue: "R$ 345,00", icon: Server, color: "text-pink-500", bg: "bg-pink-500/10" },
         ].map((row, i) => (
-          <div key={i} className="bg-[#121827] border border-[#1e293b] rounded-lg p-2 flex items-center justify-between">
+          <div key={i} className="bg-[#131418] border border-[#1f2024] rounded-lg p-2 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className={`w-7 h-7 rounded-md flex items-center justify-center ${row.bg}`}>
                 <row.icon className={`w-3.5 h-3.5 ${row.color}`} />
@@ -67,7 +67,7 @@ export function CalculadoraMockup() {
                 <span className="text-[10px] text-slate-400 mr-1.5">{row.rightLabel}</span>
                 <span className={`font-bold text-xs ${row.color}`}>{row.rightValue}</span>
               </div>
-              <button className="bg-[#1e293b] hover:bg-[#273549] border border-[#334155] text-white px-2 py-1 rounded-md text-xs flex items-center gap-1 transition-colors">
+              <button className="bg-[#1f2024] hover:bg-[#26272c] border border-[#2e2f35] text-white px-2 py-1 rounded-md text-xs flex items-center gap-1 transition-colors">
                 <Plus className="w-3 h-3" /> Adicionar
               </button>
             </div>
@@ -87,14 +87,14 @@ export function CalculadoraMockup() {
         </button>
       </div>
 
-      <div className="w-72 bg-[#121827] border border-[#1e293b] rounded-lg p-2.5 shrink-0">
+      <div className="w-72 bg-[#131418] border border-[#1f2024] rounded-lg p-2.5 shrink-0">
         <div className="flex items-center gap-2 mb-2">
           <div className="w-5.5 h-5.5 rounded bg-orange-500/10 flex items-center justify-center shrink-0">
             <FileText className="w-3.5 h-3.5 text-orange-500" />
           </div>
           <span className="font-bold text-xs truncate">Agência de Marketing XPTO</span>
         </div>
-        <div className="border-t border-[#1e293b] pt-2 flex items-center justify-between">
+        <div className="border-t border-[#1f2024] pt-2 flex items-center justify-between">
           <span className="text-[10px] text-slate-400">Total estimado</span>
           <span className="font-bold text-xs text-orange-500">R$ 2.057,92</span>
         </div>

@@ -27,6 +27,23 @@ foco automático e leituras de exposição discretas.
 - **Acessibilidade.** Com `prefers-reduced-motion`, Lenis e retículo desligam e
   o conteúdo aparece nítido.
 
+## O que já vale para o site inteiro (sem VisorShell)
+
+Desde out/2026 as cores do Visor são globais (`app/globals.css`):
+
+- O site é **só escuro**: `ThemeProvider` com `forcedTheme="dark"`, sem botão
+  de tema. A variante `dark:` segue a classe `.dark` (não o sistema).
+- Os tokens shadcn (`--background`, `--card`, `--primary`…) já são os do Visor.
+  `--primary` é o acento (links, ícones, ativo); o `Button` padrão é branco.
+- As famílias `blue`, `indigo`, `sky`, `cyan`, `violet`, `purple`, `pink`,
+  `fuchsia` e os cinzas (`slate`, `gray`…) foram **remapeadas** no `@theme`
+  para tons do Visor. Verde, vermelho, âmbar etc. seguem como cores de status.
+  Em código novo, prefira tokens (`bg-card`, `text-primary`) a cores fixas.
+- **Documentos** (contrato, briefing para imprimir) ficam brancos: envolva a
+  raiz com `className="paper"`. Na impressão, tudo vira papel automaticamente.
+- Não use tons pastel claros (`bg-red-50`, `bg-white` em blocos): no escuro
+  use `bg-red-500/10`, `text-red-400`, `border-red-500/30`.
+
 ## Como montar uma página
 
 ```tsx

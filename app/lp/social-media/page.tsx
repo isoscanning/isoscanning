@@ -587,7 +587,7 @@ export default function LpSocialMedia() {
                     <div className="absolute -inset-4 bg-blue-500/10 rounded-3xl blur-2xl" />
                     <div className="relative rounded-xl overflow-hidden border border-white/10 shadow-2xl" style={{ maxHeight: 420 }}>
                       <CalendarMockup />
-                      <div className="absolute bottom-0 inset-x-0 h-12 bg-gradient-to-t from-[#080d18] to-transparent pointer-events-none" />
+                      <div className="absolute bottom-0 inset-x-0 h-12 bg-gradient-to-t from-[#08090b] to-transparent pointer-events-none" />
                     </div>
                     <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 backdrop-blur-sm">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />

@@ -97,8 +97,9 @@ fbq('track', 'PageView');`,
       <body className="min-h-screen bg-background text-foreground">
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          // Identidade "Visor": o site é só escuro (ver components/visor/README.md).
+          defaultTheme="dark"
+          forcedTheme="dark"
           disableTransitionOnChange
           storageKey="iso-theme-preference"
         >

@@ -205,20 +205,20 @@ export default function ComoFuncionaPage() {
                         <div className="space-y-3">
                           <div className="flex justify-between items-center bg-card border p-4 rounded-xl shadow-sm">
                             <div className="flex gap-3 items-center">
-                              <div className="w-10 h-10 rounded-full bg-gray-200" />
+                              <div className="w-10 h-10 rounded-full bg-muted" />
                               <div>
                                 <div className="font-semibold">João Silva</div>
                                 <div className="text-xs text-muted-foreground">Videomaker - R$ 1.200</div>
                               </div>
                             </div>
                             <div className="flex gap-2">
-                              <Badge variant="outline" className="border-red-200 text-red-600 bg-red-50 hover:bg-red-100 cursor-pointer">Rejeitar</Badge>
+                              <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-500/10 hover:bg-red-500/15 cursor-pointer">Rejeitar</Badge>
                               <Badge className="bg-green-600 hover:bg-green-700 cursor-pointer">Aprovar</Badge>
                             </div>
                           </div>
                           <div className="flex justify-between items-center bg-card border p-4 rounded-xl shadow-sm opacity-60">
                             <div className="flex gap-3 items-center">
-                              <div className="w-10 h-10 rounded-full bg-gray-200" />
+                              <div className="w-10 h-10 rounded-full bg-muted" />
                               <div>
                                 <div className="font-semibold">Maria Costa</div>
                                 <div className="text-xs text-muted-foreground">Fotógrafa - R$ 900</div>

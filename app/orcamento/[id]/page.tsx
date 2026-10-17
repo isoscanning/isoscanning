@@ -150,7 +150,7 @@ export default function OrcamentoPage() {
           </div>
 
           {success && (
-            <Alert className="mb-6 border-green-200 bg-green-50">
+            <Alert className="mb-6 border-green-500/30 bg-green-500/10">
               <CheckCircle2 className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">
                 Solicitação de orçamento enviada com sucesso! Redirecionando...

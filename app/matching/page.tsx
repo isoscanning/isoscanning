@@ -249,7 +249,7 @@ export default function MatchingPage() {
       case 'finish':
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 text-center">{currentCard.title}</h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-foreground text-center">{currentCard.title}</h2>
             {currentCard.text && (
               <div className="text-slate-600 text-base md:text-lg leading-relaxed space-y-4 text-center">
                 {currentCard.text.split('\n\n').map((p, i) => (
@@ -263,12 +263,12 @@ export default function MatchingPage() {
       case 'single':
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 text-center mb-2">{currentCard.title}</h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-foreground text-center mb-2">{currentCard.title}</h2>
             {currentCard.text && (
               <p className="text-slate-600 text-center mb-6">{currentCard.text}</p>
             )}
             {currentCard.question && (
-              <h3 className="text-xl font-medium text-slate-900 text-center mb-6">{currentCard.question}</h3>
+              <h3 className="text-xl font-medium text-foreground text-center mb-6">{currentCard.question}</h3>
             )}
             
             <div className="grid gap-3 max-w-md mx-auto">
@@ -285,7 +285,7 @@ export default function MatchingPage() {
                       : "border-border hover:border-primary/50 hover:bg-muted"
                   }`}
                 >
-                  <span className={`font-medium ${answers[currentCard.field!] === option ? "text-primary" : "text-slate-700"}`}>
+                  <span className={`font-medium ${answers[currentCard.field!] === option ? "text-primary" : "text-muted-foreground"}`}>
                     {option}
                   </span>
                   <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-colors ${
@@ -304,7 +304,7 @@ export default function MatchingPage() {
       case 'multi':
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 text-center mb-2">{currentCard.title}</h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-foreground text-center mb-2">{currentCard.title}</h2>
             {currentCard.text && (
               <p className="text-slate-600 text-center mb-6">{currentCard.text}</p>
             )}
@@ -328,7 +328,7 @@ export default function MatchingPage() {
                         : "border-border hover:border-primary/50 hover:bg-muted"
                     }`}
                   >
-                    <span className={`font-medium ${selected ? "text-primary" : "text-slate-700"}`}>
+                    <span className={`font-medium ${selected ? "text-primary" : "text-muted-foreground"}`}>
                       {option}
                     </span>
                     <div className={`h-5 w-5 rounded border-2 flex items-center justify-center transition-colors ${
@@ -348,11 +348,11 @@ export default function MatchingPage() {
       case 'location':
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 text-center mb-8">{currentCard.title}</h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-foreground text-center mb-8">{currentCard.title}</h2>
             
             <div className="space-y-4 max-w-md mx-auto">
               <div>
-                <label className="text-sm font-medium text-slate-700 mb-1.5 block">País</label>
+                <label className="text-sm font-medium text-muted-foreground mb-1.5 block">País</label>
                 <select
                   value={answers.country || ""}
                   onChange={(e) => setAnswers(prev => ({ ...prev, country: e.target.value }))}
@@ -366,7 +366,7 @@ export default function MatchingPage() {
 
               {answers.country === 'Brasil' && (
                 <div>
-                  <label className="text-sm font-medium text-slate-700 mb-1.5 block">Estado</label>
+                  <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Estado</label>
                   <select
                     value={answers.state || ""}
                     onChange={(e) => setAnswers(prev => ({ ...prev, state: e.target.value }))}
@@ -396,9 +396,9 @@ export default function MatchingPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
+    <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
-      <header className="w-full bg-white border-b border-border/40 py-4 sticky top-0 z-50">
+      <header className="w-full bg-card border-b border-border/40 py-4 sticky top-0 z-50">
         <div className="container max-w-4xl mx-auto px-4 flex flex-col items-center justify-center gap-1">
           <Image
             src="/logo-cortada.png"
@@ -428,7 +428,7 @@ export default function MatchingPage() {
           <div className="relative">
             <div
               key={currentStepIndex}
-              className="bg-white p-6 md:p-10 rounded-3xl shadow-xl shadow-blue-900/5 border border-border/50 animate-in fade-in slide-in-from-right-4 duration-500"
+              className="bg-card p-6 md:p-10 rounded-3xl shadow-xl shadow-blue-900/5 border border-border/50 animate-in fade-in slide-in-from-right-4 duration-500"
             >
               {renderContent()}
 

@@ -40,7 +40,7 @@ export function AgendaMockup() {
   ];
 
   return (
-    <div className="w-full h-full bg-[#0a0f1c] text-white p-5 font-sans overflow-hidden rounded-b-xl flex flex-col">
+    <div className="w-full h-full bg-[#0b0c0e] text-white p-5 font-sans overflow-hidden rounded-b-xl flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-4 mb-4 shrink-0">
         <button className="w-8 h-8 rounded-full hover:bg-slate-800 flex items-center justify-center transition-colors">
@@ -53,7 +53,7 @@ export function AgendaMockup() {
       </div>
 
       {/* Main Container */}
-      <div className="bg-[#121827] border border-[#1e293b] rounded-2xl p-4 flex-1 flex flex-col min-h-0">
+      <div className="bg-[#131418] border border-[#1f2024] rounded-2xl p-4 flex-1 flex flex-col min-h-0">
         <div className="mb-3 shrink-0">
           <h2 className="text-xl font-bold mb-1">Minha Disponibilidade</h2>
           <p className="text-slate-400 text-xs">Gerencie os dias e horários que você está disponível para serviços</p>
@@ -62,7 +62,7 @@ export function AgendaMockup() {
         <div className="flex gap-6 flex-1 min-h-0">
           {/* Left: Calendar Widget */}
           <div className="w-[280px] shrink-0 flex flex-col gap-3">
-            <div className="bg-[#0a0f1c] border border-[#1e293b] rounded-xl p-3 shrink-0">
+            <div className="bg-[#0b0c0e] border border-[#1f2024] rounded-xl p-3 shrink-0">
               {/* Calendar Header */}
               <div className="flex justify-between items-center mb-3">
                 <button className="text-slate-400 hover:text-white"><ChevronLeft className="w-4 h-4" /></button>
@@ -82,7 +82,7 @@ export function AgendaMockup() {
                     <div className={`
                       w-8 h-8 rounded-md flex items-center justify-center
                       ${day.type === 'muted' ? 'text-slate-600' : ''}
-                      ${day.type === 'selected' ? 'bg-[#1e3a8a] text-blue-300 border border-blue-500/30' : ''}
+                      ${day.type === 'selected' ? 'bg-blue-900 text-blue-300 border border-blue-500/30' : ''}
                       ${day.type === 'unavailable' ? 'bg-[#450a0a] text-red-400 border border-red-900/30' : ''}
                       ${day.type === 'available' ? 'bg-[#064e3b] text-emerald-400 border border-emerald-900/30' : ''}
                     `}>
@@ -94,11 +94,11 @@ export function AgendaMockup() {
             </div>
             
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked readOnly className="w-4 h-4 rounded border-slate-600 bg-[#1e3a8a] text-blue-500 focus:ring-blue-500" />
+              <input type="checkbox" checked readOnly className="w-4 h-4 rounded border-slate-600 bg-blue-900 text-blue-500 focus:ring-blue-500" />
               Dia Inteiro
             </label>
             
-            <button className="w-full bg-[#1e3a8a] hover:bg-[#1e40af] text-blue-200 font-medium py-2.5 rounded-lg transition-colors border border-blue-800">
+            <button className="w-full bg-blue-900 hover:bg-blue-800 text-blue-200 font-medium py-2.5 rounded-lg transition-colors border border-blue-800">
               Adicionar Disponibilidade
             </button>
           </div>
@@ -107,7 +107,7 @@ export function AgendaMockup() {
           <div className="flex-1 flex flex-col min-h-0">
             <div className="flex justify-between items-center mb-3 shrink-0">
               <h3 className="font-semibold text-base">Datas Disponíveis</h3>
-              <button className="bg-[#1e293b] hover:bg-[#273549] border border-[#334155] text-white px-3 py-1.5 rounded-lg text-xs transition-colors">
+              <button className="bg-[#1f2024] hover:bg-[#26272c] border border-[#2e2f35] text-white px-3 py-1.5 rounded-lg text-xs transition-colors">
                 Selecionar Todos
               </button>
             </div>
@@ -122,7 +122,7 @@ export function AgendaMockup() {
                 "19 de junho, 2026",
                 "20 de junho, 2026",
               ].map((date, i) => (
-                <div key={i} className="bg-[#0a0f1c] border border-[#1e293b] rounded-xl p-3 flex justify-between items-center group hover:border-slate-700 transition-colors">
+                <div key={i} className="bg-[#0b0c0e] border border-[#1f2024] rounded-xl p-3 flex justify-between items-center group hover:border-slate-700 transition-colors">
                   <div className="flex items-center gap-3">
                     <input type="checkbox" className="w-3.5 h-3.5 rounded border-slate-700 bg-transparent" />
                     <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-500">

@@ -102,7 +102,7 @@ export function InteractiveFeatures() {
                     }}
                     className={`w-full text-left px-4 py-2.5 lg:py-3 rounded-xl flex items-center gap-3 transition-all duration-300 relative overflow-hidden group
                       ${isActive 
-                        ? 'bg-[#1a1528] border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.12)]' 
+                        ? 'bg-[#18191d] border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.12)]' 
                         : 'hover:bg-white/5 border border-transparent'
                       }`}
                   >

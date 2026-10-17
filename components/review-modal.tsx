@@ -197,7 +197,7 @@ export function ReviewModal({
                                 <ToggleGroupItem
                                     key={q}
                                     value={q}
-                                    className="data-[state=on]:bg-green-100 data-[state=on]:text-green-700 data-[state=on]:border-green-200 text-xs sm:text-sm whitespace-nowrap px-3 py-2 h-auto"
+                                    className="data-[state=on]:bg-green-500/15 data-[state=on]:text-green-400 data-[state=on]:border-green-500/30 text-xs sm:text-sm whitespace-nowrap px-3 py-2 h-auto"
                                     // Disable if 3 selected and this is NOT selected
                                     disabled={qualities.length >= 3 && !qualities.includes(q)}
                                 >

@@ -611,7 +611,7 @@ export default function DetalhesVagaPage() {
                                             {formatJobBudget(vaga)}
                                         </div>
                                         {appliedDetails?.counterProposal && (
-                                            <div className="mt-2 flex items-center gap-1.5 text-emerald-700 font-bold bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 w-fit">
+                                            <div className="mt-2 flex items-center gap-1.5 text-emerald-400 font-bold bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/30 w-fit">
                                                 <DollarSign className="h-4 w-4" />
                                                 <span>Minha Proposta: R$ {appliedDetails.counterProposal}</span>
                                             </div>
@@ -702,7 +702,7 @@ export default function DetalhesVagaPage() {
                                         {!isOwner && !hasApplied && acceptingApplications && (
                                             <Dialog open={isProposalModalOpen} onOpenChange={setIsProposalModalOpen}>
                                                 <DialogTrigger asChild>
-                                                    <Button variant="outline" className="w-full border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 mt-2">
+                                                    <Button variant="outline" className="w-full border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/15 hover:text-emerald-400 mt-2">
                                                         Fazer contraproposta
                                                         {counterBlocked && <PlanBadge tier="pro" className="ml-2" />}
                                                     </Button>
@@ -803,7 +803,7 @@ export default function DetalhesVagaPage() {
                         {!isOwner && !hasApplied && acceptingApplications && (
                             <Dialog open={isProposalModalOpen} onOpenChange={setIsProposalModalOpen}>
                                 <DialogTrigger asChild>
-                                    <Button variant="outline" size="icon" className="h-12 w-12 shrink-0 border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800">
+                                    <Button variant="outline" size="icon" className="h-12 w-12 shrink-0 border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/15 hover:text-emerald-400">
                                         <DollarSign className="h-6 w-6" />
                                     </Button>
                                 </DialogTrigger>

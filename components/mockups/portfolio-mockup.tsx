@@ -2,7 +2,7 @@ import { Camera, Plus, Upload, ImageIcon, VideoIcon, Layers } from "lucide-react
 
 export function PortfolioMockup() {
   return (
-    <div className="w-full h-full bg-[#050a15] text-white p-4 font-sans overflow-hidden rounded-b-xl flex flex-col relative">
+    <div className="w-full h-full bg-[#060708] text-white p-4 font-sans overflow-hidden rounded-b-xl flex flex-col relative">
       {/* Background decoration */}
       <div className="absolute top-10 left-10 w-2 h-2 bg-blue-500 rounded-full blur-[2px] opacity-50" />
       <div className="absolute top-40 right-20 w-1 h-1 bg-purple-500 rounded-full blur-[1px] opacity-50" />
@@ -23,7 +23,7 @@ export function PortfolioMockup() {
       {/* Main Content */}
       <div className="flex flex-col md:flex-row gap-4 flex-1 min-h-0 z-10">
         {/* Left Column: Form */}
-        <div className="w-full md:w-1/3 bg-[#0a1020] border border-[#1e293b] rounded-2xl p-4 flex flex-col h-full">
+        <div className="w-full md:w-1/3 bg-[#0b0c0e] border border-[#1f2024] rounded-2xl p-4 flex flex-col h-full">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
               <Plus className="w-4 h-4 text-blue-400" />
@@ -38,13 +38,13 @@ export function PortfolioMockup() {
               <input 
                 type="text" 
                 placeholder="Ex: Ensaio de Casamento" 
-                className="w-full bg-[#0f172a] border border-[#1e293b] rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                className="w-full bg-[#0e0f12] border border-[#1f2024] rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
             </div>
             
             <div className="flex-1 flex flex-col">
               <label className="block text-xs font-semibold mb-1.5 text-slate-300">Arquivo (Imagem ou Vídeo)</label>
-              <div className="flex-1 border-2 border-dashed border-[#1e293b] rounded-xl flex flex-col items-center justify-center p-4 min-h-[120px] bg-[#0a1020]/50 hover:bg-[#0f172a] transition-colors cursor-pointer">
+              <div className="flex-1 border-2 border-dashed border-[#1f2024] rounded-xl flex flex-col items-center justify-center p-4 min-h-[120px] bg-[#0b0c0e]/50 hover:bg-[#0e0f12] transition-colors cursor-pointer">
                 <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center mb-3">
                   <Upload className="w-5 h-5 text-blue-400" />
                 </div>
@@ -69,8 +69,8 @@ export function PortfolioMockup() {
               <h2 className="font-bold text-base">Galeria</h2>
             </div>
             <div className="flex flex-col items-end">
-              <span className="text-xs text-slate-400 bg-[#1e293b] px-2 py-0.5 rounded mb-1">98 de 150 arquivos</span>
-              <div className="w-24 h-1.5 bg-[#1e293b] rounded-full overflow-hidden">
+              <span className="text-xs text-slate-400 bg-[#1f2024] px-2 py-0.5 rounded mb-1">98 de 150 arquivos</span>
+              <div className="w-24 h-1.5 bg-[#1f2024] rounded-full overflow-hidden">
                 <div className="w-[65%] h-full bg-blue-500 rounded-full"></div>
               </div>
             </div>
@@ -79,11 +79,11 @@ export function PortfolioMockup() {
           <div className="grid grid-cols-2 gap-3 overflow-y-auto custom-scrollbar pr-1">
             {[
               { title: "Rio de Janeiro - Pão de Açucar", type: "IMAGEM", bg: "bg-slate-800", img: "https://images.unsplash.com/photo-1483729558449-99ef09a8c325?q=80&w=600&auto=format&fit=crop" },
-              { title: "Ultra Music Festival", type: "IMAGEM", bg: "bg-[#0a1020]" },
-              { title: "Rio de Janeiro", type: "IMAGEM", bg: "bg-[#0a1020]" },
-              { title: "Formatura - Anelisa", type: "VÍDEO", bg: "bg-[#0a1020]" },
+              { title: "Ultra Music Festival", type: "IMAGEM", bg: "bg-[#0b0c0e]" },
+              { title: "Rio de Janeiro", type: "IMAGEM", bg: "bg-[#0b0c0e]" },
+              { title: "Formatura - Anelisa", type: "VÍDEO", bg: "bg-[#0b0c0e]" },
             ].map((item, i) => (
-              <div key={i} className={`relative rounded-xl overflow-hidden ${item.bg} border border-[#1e293b] aspect-video group cursor-pointer`}>
+              <div key={i} className={`relative rounded-xl overflow-hidden ${item.bg} border border-[#1f2024] aspect-video group cursor-pointer`}>
                 {item.img && (
                   <img src={item.img} alt={item.title} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
                 )}

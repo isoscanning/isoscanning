@@ -1004,7 +1004,7 @@ export default function PerfilPage() {
           {(successMsg || errorMsg) && (
             <div className="mb-4">
               {successMsg && (
-                <Alert className="bg-green-50 border-green-200 text-green-800 animate-in fade-in duration-500">
+                <Alert className="bg-green-500/10 border-green-500/30 text-green-400 animate-in fade-in duration-500">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
                   <AlertDescription>{successMsg}</AlertDescription>
                 </Alert>

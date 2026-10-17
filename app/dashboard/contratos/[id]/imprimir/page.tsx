@@ -89,7 +89,7 @@ export default function ImprimirContratoPage() {
   const whiteLabel = contract?.viewerRole === "owner" && !!plan.limits.whiteLabel;
 
   return (
-    <div className="min-h-screen bg-gray-100 print:bg-white">
+    <div className="paper min-h-screen bg-gray-100 print:bg-white">
       <style>{`
         @media print {
           @page { margin: 18mm 16mm; }

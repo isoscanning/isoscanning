@@ -2,11 +2,11 @@ import { FileSignature, Plus, Search, MoreHorizontal, FileText, CheckCircle2, Cl
 
 export function ContratosMockup() {
   return (
-    <div className="w-full h-full bg-[#0a0f1c] text-white p-5 font-sans overflow-hidden rounded-b-xl flex flex-col">
+    <div className="w-full h-full bg-[#0b0c0e] text-white p-5 font-sans overflow-hidden rounded-b-xl flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-lg bg-[#1e1b4b] border border-indigo-500/20 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-lg bg-indigo-950 border border-indigo-500/20 flex items-center justify-center shrink-0">
             <FileSignature className="w-5 h-5 text-indigo-400" />
           </div>
           <div>
@@ -27,7 +27,7 @@ export function ContratosMockup() {
           { title: "Aguardando", value: "1", color: "text-blue-500" },
           { title: "Assinados", value: "1", color: "text-emerald-500" },
         ].map((card, i) => (
-          <div key={i} className="bg-[#0f1524] border border-[#1e293b] rounded-xl p-4 flex flex-col justify-between">
+          <div key={i} className="bg-[#0e0f12] border border-[#1f2024] rounded-xl p-4 flex flex-col justify-between">
             <div className={`text-2xl font-bold mb-1 ${card.color}`}>{card.value}</div>
             <div className="text-sm font-medium text-slate-400">{card.title}</div>
           </div>
@@ -41,10 +41,10 @@ export function ContratosMockup() {
           <input 
             type="text" 
             placeholder="Buscar por título, cliente ou e-mail..." 
-            className="w-full bg-[#0a0f1c] border border-[#1e293b] rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            className="w-full bg-[#0b0c0e] border border-[#1f2024] rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
           />
         </div>
-        <select className="bg-[#0a0f1c] border border-[#1e293b] rounded-lg px-4 py-2 text-sm text-white outline-none w-48 focus:border-indigo-500">
+        <select className="bg-[#0b0c0e] border border-[#1f2024] rounded-lg px-4 py-2 text-sm text-white outline-none w-48 focus:border-indigo-500">
           <option>Todos os status</option>
           <option>Aguardando</option>
           <option>Assinados</option>
@@ -52,8 +52,8 @@ export function ContratosMockup() {
       </div>
 
       {/* Contracts List (Replacing Empty State) */}
-      <div className="flex-1 bg-[#0f1524] border border-[#1e293b] rounded-xl overflow-hidden flex flex-col min-h-0">
-        <div className="grid grid-cols-12 gap-4 px-6 py-2.5 border-b border-[#1e293b] text-xs font-semibold text-slate-400 uppercase bg-[#0a0f1c]/50 shrink-0">
+      <div className="flex-1 bg-[#0e0f12] border border-[#1f2024] rounded-xl overflow-hidden flex flex-col min-h-0">
+        <div className="grid grid-cols-12 gap-4 px-6 py-2.5 border-b border-[#1f2024] text-xs font-semibold text-slate-400 uppercase bg-[#0b0c0e]/50 shrink-0">
           <div className="col-span-5">Título / Cliente</div>
           <div className="col-span-2">Valor</div>
           <div className="col-span-3">Status</div>
@@ -62,7 +62,7 @@ export function ContratosMockup() {
         
         <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">
           {/* Contract 1 */}
-          <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-[#1e293b] hover:bg-[#151b2b] transition-colors items-center group">
+          <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-[#1f2024] hover:bg-[#131418] transition-colors items-center group">
             <div className="col-span-5 flex items-start gap-3">
               <div className="w-8 h-8 rounded bg-indigo-500/10 flex items-center justify-center shrink-0 text-indigo-400 mt-0.5">
                 <FileText className="w-4 h-4" />
@@ -88,7 +88,7 @@ export function ContratosMockup() {
           </div>
 
           {/* Contract 2 */}
-          <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-[#1e293b] hover:bg-[#151b2b] transition-colors items-center group">
+          <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-[#1f2024] hover:bg-[#131418] transition-colors items-center group">
             <div className="col-span-5 flex items-start gap-3">
               <div className="w-8 h-8 rounded bg-indigo-500/10 flex items-center justify-center shrink-0 text-indigo-400 mt-0.5">
                 <FileText className="w-4 h-4" />

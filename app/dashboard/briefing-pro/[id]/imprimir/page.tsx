@@ -220,7 +220,7 @@ export default function BriefingPrintPage() {
 
   if (loading || fetching || !detail || ownerTier === null) {
     return (
-      <div className="min-h-screen bg-white p-8 max-w-3xl mx-auto space-y-4">
+      <div className="paper min-h-screen bg-white p-8 max-w-3xl mx-auto space-y-4">
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-96 w-full" />
       </div>
@@ -341,7 +341,7 @@ export default function BriefingPrintPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 print:bg-white text-gray-900">
+    <div className="paper min-h-screen bg-gray-100 print:bg-white text-gray-900">
       <style>{PRINT_STYLES}</style>
 
       {/* Barra de ações — some na impressão */}

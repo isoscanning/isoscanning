@@ -486,7 +486,7 @@ export default function VagasPublicasPage() {
                 </section>
 
                 {/* CTA Section */}
-                <section className="py-20 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 dark:from-blue-700 dark:via-indigo-700 dark:to-cyan-700">
+                <section className="py-20 border-y border-border bg-card">
                     <div className="container mx-auto px-4">
                         <ScrollReveal>
                             <div className="max-w-3xl mx-auto text-center text-white">
@@ -500,7 +500,6 @@ export default function VagasPublicasPage() {
                                 <Link href="/dashboard/vagas/nova" onClick={() => trackEvent({ action: 'click_cta', category: 'Jobs', label: 'Post Job Footer' })}>
                                     <Button
                                         size="lg"
-                                        variant="secondary"
                                         className="h-14 px-10 rounded-full shadow-xl hover:shadow-2xl transition-all duration-300"
                                     >
                                         Publicar Vaga Agora

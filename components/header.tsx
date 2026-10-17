@@ -9,7 +9,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserNav } from "@/components/user-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { ChatBell } from "@/components/chat-bell";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Menu, User, LogOut, Search, Package, UserPlus, LogIn, Settings, Briefcase, Zap, MessageSquare, Info, UserCircle, CreditCard, Bell } from "lucide-react";
 import { useState, useEffect } from "react";
 import { trackEvent } from "@/lib/analytics";
@@ -138,7 +137,6 @@ export function Header() {
               Olá, {displayName}!
             </span>
           )}
-          <ThemeToggle />
           {isAuthenticated && <ChatBell />}
           {isAuthenticated && <NotificationBell />}
           <UserNav />
@@ -231,10 +229,6 @@ export function Header() {
               null
             )}
             <div className="border-t border-border/50 pt-4 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Tema</span>
-                <ThemeToggle />
-              </div>
               {isAuthenticated ? (
                 <>
                   <div className="px-2 py-2 mb-2">

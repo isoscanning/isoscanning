@@ -1,0 +1,29 @@
+# Vagas do mercado (SQL 83): busca vagas do audiovisual nas APIs oficiais
+# (Jooble/Adzuna), classifica com IA, expira as antigas e avisa os
+# profissionais. Gratuito via GitHub Actions.
+#
+# Configuração (uma vez, no GitHub do repo isoscanning):
+#   Settings → Secrets and variables → Actions → New repository secret:
+#     EXTERNAL_JOBS_CRON_URL = https://SEU_DOMINIO_DO_FRONT/api/vagas-externas/cron-import
+#     CRON_SECRET            = (já existe — o mesmo do agenda-sync)
+#
+# A cada 3 h: a busca nas APIs só acontece 1x a cada ~20 h (a rota controla);
+# as demais rodadas terminam a classificação por IA que não coube na anterior
+# (tier grátis da Groq tem limite de tokens/minuto) e expiram vagas antigas.
+
+name: Vagas do mercado
+
+on:
+  schedule:
+    - cron: "15 */3 * * *"
+  workflow_dispatch: {} # permite rodar manualmente na aba Actions
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar rotina de vagas externas
+        run: |
+          curl -fsS --retry 2 --retry-delay 30 --retry-all-errors --max-time 310 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.EXTERNAL_JOBS_CRON_URL }}"

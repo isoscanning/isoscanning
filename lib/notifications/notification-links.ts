@@ -82,6 +82,7 @@ export const NOTIFICATION_TYPES = [
   "team_escalation_cancelled",
   "team_announcement",
   "team_job_day_before",
+  "external_jobs_digest",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -206,6 +207,8 @@ const CLICK_URLS: Record<NotificationType, Resolver> = {
   team_escalation_cancelled: teamUrl,
   team_announcement: (ref) => `${teamUrl(ref)}?tab=avisos`,
   team_job_day_before: teamUrl,
+
+  external_jobs_digest: () => "/vagas?origem=mercado",
 };
 
 export function notificationClickUrl(type: string, referenceId?: string | null): string {
@@ -309,6 +312,8 @@ export const NOTIFICATION_META: Record<NotificationType, NotificationMeta> = {
   team_escalation_cancelled: { toast: "Escalação cancelada", tone: "warning", group: "times" },
   team_announcement: { toast: "Aviso do time", tone: "info", group: "times" },
   team_job_day_before: { toast: "Amanhã é dia de job!", tone: "warning", group: "times" },
+
+  external_jobs_digest: { toast: "Vagas novas no audiovisual", tone: "info", group: "trabalho" },
 };
 
 export function notificationMeta(type: string): NotificationMeta {

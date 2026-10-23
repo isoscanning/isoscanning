@@ -44,6 +44,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
+import { fetchExternalJobs } from "@/lib/external-jobs/client";
+import type { ExternalJobTeaser } from "@/lib/external-jobs/types";
+import { ExternalJobCard } from "@/components/jobs/external-job-card";
+
+// Origem da vaga: internas (fluxo completo de candidatura/contrato) ou do
+// mercado (SQL 83 — só divulgação, candidatura no site de origem).
+const ORIGENS = [
+    { value: "todas", label: "Todas" },
+    { value: "plataforma", label: "No IsoScanning" },
+    { value: "mercado", label: "Do mercado" },
+] as const;
+type Origem = (typeof ORIGENS)[number]["value"];
 
 const TIPOS_TRABALHO = [
     { value: "all", label: "Todos" },
@@ -60,6 +72,8 @@ const ESTADOS = [
 export default function VagasPublicasPage() {
     const { userProfile } = useAuth();
     const [vagas, setVagas] = useState<JobOffer[]>([]);
+    const [externas, setExternas] = useState<ExternalJobTeaser[]>([]);
+    const [origem, setOrigem] = useState<Origem>("todas");
     const [specialties, setSpecialties] = useState<Specialty[]>([]);
     const [loading, setLoading] = useState(true);
     const [showFilters, setShowFilters] = useState(false);
@@ -72,14 +86,20 @@ export default function VagasPublicasPage() {
     const [selectedCity, setSelectedCity] = useState("");
 
     useEffect(() => {
+        // ?origem=mercado vem da notificação de vagas novas
+        const fromUrl = new URLSearchParams(window.location.search).get("origem");
+        if (fromUrl === "mercado" || fromUrl === "plataforma") setOrigem(fromUrl);
+
         const loadData = async () => {
             try {
-                const [vagasData, specialtiesData] = await Promise.all([
+                const [vagasData, specialtiesData, externasData] = await Promise.all([
                     fetchJobOffers(),
-                    fetchSpecialties()
+                    fetchSpecialties(),
+                    fetchExternalJobs(),
                 ]);
                 setVagas(vagasData);
                 setSpecialties(specialtiesData);
+                setExternas(externasData);
             } catch (error) {
                 console.error("Erro ao buscar dados:", error);
             } finally {
@@ -104,7 +124,30 @@ export default function VagasPublicasPage() {
         return matchesSearch && matchesCategory && matchesJobType && matchesState && matchesCity;
     });
 
+    const filteredExternas = externas.filter((vaga) => {
+        const term = searchTerm.toLowerCase();
+        const matchesSearch =
+            term === "" ||
+            vaga.title.toLowerCase().includes(term) ||
+            (vaga.category ?? "").toLowerCase().includes(term);
+        const matchesCategory = selectedCategory === "Todas" || vaga.category === selectedCategory;
+        const matchesJobType = selectedJobType === "all" || vaga.jobType === selectedJobType;
+        // Remota vale para qualquer estado/cidade
+        const matchesState = selectedState === "Todos" || vaga.state === selectedState || vaga.isRemote;
+        const matchesCity =
+            selectedCity === "" || vaga.isRemote || !!vaga.city?.toLowerCase().includes(selectedCity.toLowerCase());
+        return matchesSearch && matchesCategory && matchesJobType && matchesState && matchesCity;
+    });
+
+    const showInternas = origem !== "mercado";
+    const showExternas = origem !== "plataforma";
+    const visibleInternas = showInternas ? filteredVagas : [];
+    const visibleExternas = showExternas ? filteredExternas : [];
+    const totalVisible = visibleInternas.length + visibleExternas.length;
+    const totalAtivas = vagas.length + externas.length;
+
     const clearFilters = () => {
+        setOrigem("todas");
         setSearchTerm("");
         setSelectedCategory("Todas");
         setSelectedJobType("all");
@@ -113,7 +156,7 @@ export default function VagasPublicasPage() {
         trackEvent({ action: "filter", category: "Jobs", label: "Clear Filters" });
     };
 
-    const hasActiveFilters = selectedCategory !== "Todas" || selectedJobType !== "all" || selectedState !== "Todos" || selectedCity !== "";
+    const hasActiveFilters = origem !== "todas" || selectedCategory !== "Todas" || selectedJobType !== "all" || selectedState !== "Todos" || selectedCity !== "";
 
     // Track Filter Changes
     useEffect(() => {
@@ -217,10 +260,12 @@ export default function VagasPublicasPage() {
                                     <CheckCircle2 className="h-4 w-4 text-green-500" />
                                     <span>Empresas Verificadas</span>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Briefcase className="h-4 w-4 text-blue-500" />
-                                    <span><CountUp end={150} duration={1.5} />+ Vagas Ativas</span>
-                                </div>
+                                {totalAtivas > 0 && (
+                                    <div className="flex items-center gap-2">
+                                        <Briefcase className="h-4 w-4 text-blue-500" />
+                                        <span><CountUp end={totalAtivas} duration={1.5} /> vagas ativas</span>
+                                    </div>
+                                )}
                             </div>
                         </ScrollReveal>
                     </div>
@@ -237,7 +282,21 @@ export default function VagasPublicasPage() {
                             className="overflow-hidden border-b bg-muted/30"
                         >
                             <div className="container mx-auto max-w-7xl px-4 py-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Origem</Label>
+                                        <Select value={origem} onValueChange={(v) => setOrigem(v as Origem)}>
+                                            <SelectTrigger className="rounded-xl">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {ORIGENS.map((o) => (
+                                                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
                                     <div className="space-y-2">
                                         <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Categoria</Label>
                                         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
@@ -316,13 +375,19 @@ export default function VagasPublicasPage() {
                                         Vagas Disponíveis
                                     </h2>
                                     <p className="text-muted-foreground">
-                                        {loading ? "Carregando..." : `${filteredVagas.length} oportunidades encontradas`}
+                                        {loading ? "Carregando..." : `${totalVisible} oportunidades encontradas`}
                                     </p>
                                 </div>
 
                                 {/* Active Filters Pills */}
                                 {hasActiveFilters && (
                                     <div className="flex items-center gap-2 flex-wrap">
+                                        {origem !== "todas" && (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-full text-sm font-medium">
+                                                {ORIGENS.find((o) => o.value === origem)?.label}
+                                                <button onClick={() => setOrigem("todas")} className="ml-1 hover:bg-primary/20 rounded-full p-0.5">×</button>
+                                            </span>
+                                        )}
                                         {selectedCategory !== "Todas" && (
                                             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full text-sm font-medium">
                                                 {selectedCategory}
@@ -360,7 +425,7 @@ export default function VagasPublicasPage() {
                                     </Card>
                                 ))}
                             </div>
-                        ) : filteredVagas.length === 0 ? (
+                        ) : totalVisible === 0 ? (
                             /* Empty State */
                             <ScrollReveal>
                                 <div className="text-center py-20">
@@ -379,8 +444,10 @@ export default function VagasPublicasPage() {
                             </ScrollReveal>
                         ) : (
                             /* Job Cards Grid */
+                            <div className="space-y-12">
+                            {visibleInternas.length > 0 && (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {filteredVagas.map((vaga, index) => {
+                                {visibleInternas.map((vaga, index) => {
                                     const isMatch = userProfile?.userType === "professional" &&
                                         !!userProfile.specialties?.includes(vaga.category);
                                     
@@ -480,6 +547,35 @@ export default function VagasPublicasPage() {
                                     </motion.div>
                                     );
                                 })}
+                            </div>
+                            )}
+
+                            {visibleExternas.length > 0 && (
+                                <div>
+                                    <div className="mb-6 flex flex-col gap-1">
+                                        <h3 className="text-xl md:text-2xl font-bold text-foreground">Vagas do mercado</h3>
+                                        <p className="text-sm text-muted-foreground max-w-3xl">
+                                            Reunimos vagas de foto e vídeo publicadas em outras plataformas. A candidatura é feita no site de origem.
+                                            {!userProfile && " Cadastre-se grátis para ver os detalhes e o link de cada vaga."}
+                                        </p>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {visibleExternas.map((vaga, index) => (
+                                            <ExternalJobCard
+                                                key={vaga.id}
+                                                job={vaga}
+                                                index={index}
+                                                isLoggedIn={!!userProfile}
+                                                isMatch={
+                                                    userProfile?.userType === "professional" &&
+                                                    !!vaga.category &&
+                                                    !!userProfile.specialties?.includes(vaga.category)
+                                                }
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                             </div>
                         )}
                     </div>

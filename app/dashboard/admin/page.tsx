@@ -323,6 +323,14 @@ export default function AdminDashboardPage() {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => router.push("/dashboard/admin/vagas-externas")}
+            >
+              <Briefcase className="mr-2 h-4 w-4 text-primary" />
+              Vagas do mercado
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => mutate()}
               disabled={isValidating}
             >

@@ -555,7 +555,7 @@ export default function VagasPublicasPage() {
                                     <div className="mb-6 flex flex-col gap-1">
                                         <h3 className="text-xl md:text-2xl font-bold text-foreground">Vagas do mercado</h3>
                                         <p className="text-sm text-muted-foreground max-w-3xl">
-                                            Reunimos vagas de foto e vídeo publicadas em outras plataformas. A candidatura é feita no site de origem.
+                                            Reunimos vagas de foto, vídeo, drone, social media, design e outras áreas criativas publicadas em outras plataformas. A candidatura é feita no site de origem.
                                             {!userProfile && " Cadastre-se grátis para ver os detalhes e o link de cada vaga."}
                                         </p>
                                     </div>

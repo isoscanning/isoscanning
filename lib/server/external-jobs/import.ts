@@ -14,7 +14,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ExternalJobType } from "@/lib/external-jobs/types";
 import { classifyJobs, CLASSIFY_BATCH_SIZE, type ClassifyInput } from "./classify";
 import { fingerprintOf, isBlocked, type RawExternalJob } from "./normalize";
-import { fetchAdzuna, fetchJooble, JOOBLE_KEYWORDS, SEARCH_KEYWORDS } from "./sources";
+import { fetchAdzuna, fetchJooble, keywordsForToday } from "./sources";
 
 const PUBLISH_SCORE = Number(process.env.EXTERNAL_JOBS_PUBLISH_SCORE) || 70;
 const REVIEW_SCORE = Number(process.env.EXTERNAL_JOBS_REVIEW_SCORE) || 45;
@@ -341,8 +341,8 @@ export async function sendExternalJobsDigest(admin: SupabaseClient, force = fals
       return {
         profile_id: p.id,
         type: "external_jobs_digest",
-        title: `${total} ${plural} no audiovisual`,
-        message: `Reunimos ${total} ${plural} de foto e vídeo do mercado${highlight}. Confira e candidate-se.`,
+        title: `${total} ${plural} do mercado para você`,
+        message: `Reunimos ${total} ${plural} de foto, vídeo, drone, social media e design${highlight}. Confira e candidate-se.`,
         reference_id: null,
         is_read: false,
       };
@@ -396,9 +396,10 @@ export async function runExternalJobsImport(
   try {
     if (options.forceFetch || (await shouldFetch(admin))) {
       summary.fetchedFromApis = true;
+      const keywords = keywordsForToday();
       const results = await Promise.all([
-        fetchJooble(JOOBLE_KEYWORDS).then((r) => ({ name: "Jooble", ...r })),
-        fetchAdzuna(SEARCH_KEYWORDS).then((r) => ({ name: "Adzuna", ...r })),
+        fetchJooble(keywords).then((r) => ({ name: "Jooble", ...r })),
+        fetchAdzuna(keywords).then((r) => ({ name: "Adzuna", ...r })),
       ]);
       const jobs: RawExternalJob[] = [];
       for (const r of results) {

@@ -313,7 +313,7 @@ export const NOTIFICATION_META: Record<NotificationType, NotificationMeta> = {
   team_announcement: { toast: "Aviso do time", tone: "info", group: "times" },
   team_job_day_before: { toast: "Amanhã é dia de job!", tone: "warning", group: "times" },
 
-  external_jobs_digest: { toast: "Vagas novas no audiovisual", tone: "info", group: "trabalho" },
+  external_jobs_digest: { toast: "Vagas novas do mercado", tone: "info", group: "trabalho" },
 };
 
 export function notificationMeta(type: string): NotificationMeta {

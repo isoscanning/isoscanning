@@ -31,15 +31,20 @@ export interface Classification {
   reason: string | null;
 }
 
-const NICHE = `Nicho do IsoScanning: profissionais do AUDIOVISUAL — fotografia (eventos, casamento, ensaio,
-produto, moda, corporativo, cobertura fotográfica), vídeo (videomaker, filmmaker, cinegrafista,
-captação, gravação, operador de câmera, drone), edição/pós-produção de foto e vídeo, produção
-audiovisual, assistência de foto/vídeo e social media que PRODUZ foto/vídeo.`;
+// O nicho é o conjunto de especialidades que o IsoScanning oferece (tabela
+// specialties): categoria nova cadastrada lá passa a valer aqui sozinha.
+function nicheText(categories: string[]): string {
+  return `Nicho do IsoScanning: profissionais de serviços CRIATIVOS e DIGITAIS — qualquer uma destas
+especialidades oferecidas pela plataforma: ${categories.join(", ")}. Inclui fotografia (eventos,
+casamento, ensaio, produto, cobertura), vídeo (captação, gravação, edição), drone, produção
+audiovisual, social media, design, motion, ilustração, web e programação.`;
+}
 
 const SCORE_RULES = `Nota (0–100) de aderência ao nicho:
-- 80–100: o trabalho principal é fotografar, filmar, editar foto/vídeo ou produzir audiovisual.
-- 50–79: audiovisual é parte relevante (ex.: social media que grava e edita, designer que fotografa produto).
-- 0–49: fora do nicho (vendas de equipamento, CFTV/segurança, radiologia, design só gráfico, marketing sem produção).`;
+- 80–100: o trabalho principal é exercer uma das especialidades da lista (CLT, freela ou por job).
+- 50–79: uma das especialidades é parte relevante da vaga, mas divide espaço com outras funções.
+- 0–49: fora do nicho (vendas/representação, venda de equipamento, CFTV/segurança, radiologia e exames
+  de imagem, atendimento, logística, ou vaga genérica sem relação com as especialidades).`;
 
 function pickCategory(value: unknown, categories: string[]): string | null {
   if (typeof value !== "string") return null;
@@ -69,7 +74,7 @@ export async function classifyJobs(items: ClassifyInput[], categories: string[])
   }));
 
   const systemPrompt = `Você classifica vagas de emprego/freela para uma plataforma brasileira.
-${NICHE}
+${nicheText(categories)}
 
 ${SCORE_RULES}
 
@@ -119,7 +124,7 @@ Responda só JSON: {"results": [ ... ]}`;
 
 export async function extractJobDraft(text: string, categories: string[]): Promise<ExternalJobDraft> {
   const systemPrompt = `Você extrai os dados de UMA vaga de trabalho a partir de um texto colado
-(mensagem de grupo de WhatsApp, post de Instagram, e-mail). ${NICHE}
+(mensagem de grupo de WhatsApp, post de Instagram, e-mail). ${nicheText(categories)}
 
 Não invente nada: campo ausente no texto = null. Responda só JSON com:
 {

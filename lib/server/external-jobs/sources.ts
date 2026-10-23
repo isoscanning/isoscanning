@@ -13,39 +13,43 @@
 import type { ExternalJobType } from "@/lib/external-jobs/types";
 import { stripHtml, truncate, type RawExternalJob } from "./normalize";
 
-/** Buscas da rotina diária: cobrem foto, vídeo, eventos, drone e edição. */
+/**
+ * Buscas da rotina: uma frente para cada especialidade que o IsoScanning
+ * oferece (tabela specialties) — foto, vídeo, drone, edição, social media,
+ * design, motion, ilustração, web e programação.
+ */
 export const SEARCH_KEYWORDS = [
   "fotógrafo",
   "fotografia de eventos",
-  "cobertura fotográfica",
-  "fotógrafo de casamento",
+  "fotógrafo de produtos",
   "videomaker",
-  "filmmaker",
   "cinegrafista",
-  "captação de vídeo",
   "editor de vídeo",
-  "operador de câmera",
+  "tratamento de imagem",
   "piloto de drone",
   "produtor audiovisual",
-  "assistente de fotografia",
-  "social media audiovisual",
+  "social media",
+  "storymaker",
+  "motion designer",
+  "designer gráfico",
+  "ilustrador",
+  "web designer",
+  "programador",
 ];
 
+/** Buscas por dia — cabe no limite padrão de 500 requisições da chave Jooble. */
+const KEYWORDS_PER_DAY = 8;
+
 /**
- * A chave da Jooble tem limite de 500 requisições (padrão; dá para pedir
- * aumento respondendo o e-mail deles). 1 busca = 1 requisição, então usamos
- * termos mais amplos — a IA filtra o que vier fora do nicho.
+ * Fatia do dia de SEARCH_KEYWORDS (rodízio): com 16 termos e 8 por dia,
+ * cada termo roda a cada 2 dias e a cota da Jooble dura bem mais.
  */
-export const JOOBLE_KEYWORDS = [
-  "fotógrafo",
-  "fotografia",
-  "videomaker",
-  "filmmaker",
-  "cinegrafista",
-  "editor de vídeo",
-  "piloto de drone",
-  "audiovisual",
-];
+export function keywordsForToday(now: Date = new Date()): string[] {
+  const day = Math.floor(now.getTime() / 86_400_000);
+  const slices = Math.ceil(SEARCH_KEYWORDS.length / KEYWORDS_PER_DAY);
+  const start = (day % slices) * KEYWORDS_PER_DAY;
+  return SEARCH_KEYWORDS.slice(start, start + KEYWORDS_PER_DAY);
+}
 
 const DESCRIPTION_MAX = 1500;
 const REQUEST_TIMEOUT_MS = 20_000;

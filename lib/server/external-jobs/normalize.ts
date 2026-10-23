@@ -100,7 +100,7 @@ export function safeUrl(value: unknown): string | null {
  */
 const BLOCKLIST = [
   "vendedor", "vendedora", "representante comercial", "consultor de vendas", "operador de caixa",
-  "cftv", "camera de seguranca", "câmera de segurança", "monitoramento", "vigilante", "porteiro",
+  "cftv", "camera de seguranca", "câmera de segurança", "vigilante", "porteiro",
   "radiologia", "raio x", "raio-x", "tomografia", "ultrassom", "mamografia",
   "estoquista", "repositor", "motorista", "entregador", "telemarketing",
 ];
